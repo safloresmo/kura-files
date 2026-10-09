@@ -11,6 +11,7 @@ Item {
     property string detail: ""
     property bool plain: false
     property string yesText: "ACEPTAR"
+    property var choices: []
 
     signal closed()
 
@@ -18,13 +19,29 @@ Item {
         heading = title;
         done = callback;
         plain = false;
+        choices = [];
         yesText = "ACEPTAR";
         field.text = value;
         visible = true;
         field.grabFocus();
     }
+    // A question with several answers: `options` is a list of { text, act }.
+    function choose(title, text, options) {
+        heading = title;
+        detail = text;
+        done = null;
+        choices = options;
+        plain = true;
+        visible = true;
+    }
+    function pick(option) {
+        close();
+        if (option.act)
+            option.act();
+    }
     // A yes or no question; the callback runs only on yes.
     function confirm(title, text, callback, yesLabel) {
+        choices = [];
         yesText = yesLabel || "SÍ";
         heading = title;
         detail = text;
@@ -65,7 +82,7 @@ Item {
 
     Rectangle {
         anchors.centerIn: parent
-        width: 440
+        width: dialog.choices.length > 0 ? 620 : 440
         height: body.height + Tokens.s5 * 2
         color: Tokens.paper
         radius: Tokens.radius
@@ -109,7 +126,17 @@ Item {
                 spacing: Tokens.s2
 
                 Btn { text: "CANCELAR"; onAct: dialog.close() }
-                Btn { id: yes; text: dialog.yesText; primary: true; onAct: dialog.accept() }
+                Repeater {
+                    model: dialog.choices
+                    Btn {
+                        required property var modelData
+                        required property int index
+                        text: modelData.text
+                        primary: index === dialog.choices.length - 1
+                        onAct: dialog.pick(modelData)
+                    }
+                }
+                Btn { id: yes; visible: dialog.choices.length === 0; text: dialog.yesText; primary: true; onAct: dialog.accept() }
             }
         }
     }

@@ -44,10 +44,13 @@ Item {
     property var remotes: ({})
     property var thumbs: ({})
     property real zoom: 1.0
+    property string otherPath: home
+    readonly property bool dual: settings.dual
     readonly property var servers: settings.servers
     property string deepQuery: ""
     property var found: []
     property string appsFor: ""
+    property string appsType: ""
     property var targets: []
     property var preview: ({ kind: "none" })
     property string notice: ""
@@ -160,6 +163,41 @@ Item {
             { label: "Quitar de la lista", act: () => removeServer(server) }
         ]);
     }
+    // Two panes: the second one is where things get copied or moved to.
+    function toggleDual() {
+        if (!settings.dual)
+            otherPath = path;
+        settings.dual = !settings.dual;
+        settingsFile.writeAdapter();
+    }
+    function swapPanes() {
+        if (!dual)
+            return;
+        const mine = path;
+        const theirs = otherPath;
+        if (mine === theirs)
+            return;
+        otherPath = mine;
+        go(theirs);
+    }
+    function otherUp() {
+        if (otherPath === "/")
+            return;
+        const i = otherPath.lastIndexOf("/");
+        otherPath = i <= 0 ? "/" : otherPath.slice(0, i);
+    }
+    function sendToOther(moving) {
+        const list = picked();
+        if (!dual || list.length === 0 || inTrash)
+            return;
+        if (otherPath === path) {
+            say("LOS DOS PANELES MUESTRAN LA MISMA CARPETA", true);
+            return;
+        }
+        marked = {};
+        transferTo(moving ? "move" : "copy", otherPath, list.map(e => e.path),
+            (moving ? "MOVIDO AL OTRO PANEL · " : "COPIADO AL OTRO PANEL · ") + label(list));
+    }
     function setZoom(value) {
         zoom = Math.max(0.6, Math.min(2.4, Math.round(value * 10) / 10));
     }
@@ -253,7 +291,7 @@ Item {
         if (e.isDir)
             go(e.path);
         else
-            Spawn.run(["xdg-open", e.path]);
+            Spawn.run(["gio", "open", e.path]);
     }
     function terminal(p) {
         Spawn.run(["kitty", "--directory", p]);
@@ -390,7 +428,7 @@ Item {
         if (dest === trashDir)
             op(["trash"].concat(paths), "A LA PAPELERA · " + what, ["untrash"].concat(paths));
         else
-            op([inside ? "drop" : "copy", dest].concat(paths), (inside ? "SOLTADO EN " : "COPIADO A ") + where + " · " + what);
+            transferTo(inside ? "drop" : "copy", dest, paths, (inside ? "SOLTADO EN " : "COPIADO A ") + where + " · " + what);
     }
     function search(text) {
         const q = String(text).trim();
@@ -429,7 +467,7 @@ Item {
             pasteboard.running = true;
             return;
         }
-        op([clip.cut ? "move" : "copy", path].concat(clip.paths), (clip.cut ? "MOVIDO · " : "PEGADO · ") + clip.text);
+        transferTo(clip.cut ? "move" : "copy", path, clip.paths, (clip.cut ? "MOVIDO · " : "PEGADO · ") + clip.text);
         if (clip.cut)
             clip = null;
     }
@@ -532,6 +570,26 @@ Item {
     function openWith(e, app) {
         Spawn.run(["gio", "launch", app.file, e.path]);
     }
+    // Make one application the default for this kind of file.
+    function chooseDefault(e) {
+        if (appsFor !== e.path || apps.length === 0 || appsType === "")
+            return;
+        const kind = appsType;
+        palette.choose("ABRIR SIEMPRE " + Fmt.kind(e.name, false).toUpperCase() + " CON", apps.map(a => ({
+            label: a.name,
+            hint: "",
+            act: () => run(["gio", "mime", kind, a.file.slice(a.file.lastIndexOf("/") + 1)], "PREDETERMINADA · " + a.name.toUpperCase())
+        })));
+    }
+    // Copy or move into a folder, asking first when names are already taken there.
+    function transferTo(mode, dest, paths, okText) {
+        if (paths.length === 0)
+            return;
+        clash.pending = { mode: mode, dest: dest, paths: paths, okText: okText };
+        clash.running = false;
+        clash.command = [engine, "conflicts", dest].concat(paths);
+        clash.running = true;
+    }
     function loadApps(filePath) {
         if (appsFor === filePath)
             return;
@@ -632,7 +690,8 @@ Item {
     function appEntries(e) {
         if (appsFor !== e.path || apps.length === 0)
             return [{ label: "Sin aplicaciones", armed: false }];
-        return apps.map((a, i) => ({ label: a.name, hint: i === 0 ? "PREDET." : "", act: () => openWith(e, a) }));
+        return apps.map((a, i) => ({ label: a.name, hint: i === 0 ? "PREDET." : "", act: () => openWith(e, a) }))
+            .concat([{ sep: true }, { label: "Abrir siempre con…", act: () => chooseDefault(e) }]);
     }
 
     // Everything the palette can run, built when it opens.
@@ -691,6 +750,14 @@ Item {
         add("Atrás", "ALT+←", () => goBack());
         add("Adelante", "ALT+→", () => goForward());
         add("Actualizar", "F5", () => refresh());
+        add(dual ? "Cerrar el segundo panel" : "Abrir un segundo panel", "F6", () => toggleDual());
+        if (dual) {
+            add("Cambiar de panel", "TAB", () => swapPanes());
+            if (n > 0) {
+                add("Copiar al otro panel", "CTRL+SHIFT+C", () => sendToOther(false));
+                add("Mover al otro panel", "CTRL+SHIFT+M", () => sendToOther(true));
+            }
+        }
         add("Pestaña nueva", "CTRL+T", () => newTab());
         if (tabs.length > 1)
             add("Cerrar la pestaña", "CTRL+W", () => closeTab(tab));
@@ -893,6 +960,7 @@ Item {
             property string brand: "own"
             property bool grid: false
             property var servers: []
+            property bool dual: false
             property string ownMark: "サ"
             property string ownName: "SFM FILES"
             property string ownTag: "SAFLORESMO // ARCHIVOS"
@@ -959,6 +1027,31 @@ Item {
             onExited: exitCode => {
                 code = exitCode;
                 Qt.callLater(finish);
+            }
+        }
+    }
+    Process {
+        id: clash
+        property var pending: null
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const job = clash.pending;
+                clash.pending = null;
+                if (!job)
+                    return;
+                const names = text.split("\n").filter(line => line !== "");
+                const go = policy => app.op([job.mode].concat(policy ? [policy] : []).concat([job.dest]).concat(job.paths), job.okText);
+                if (names.length === 0) {
+                    go("");
+                    return;
+                }
+                dialog.choose("YA EXISTE",
+                    (names.length === 1 ? "«" + names[0] + "» ya está" : names.length + " elementos ya están") + " en el destino. Reemplazar manda lo que había a la papelera.",
+                    [
+                        { text: "OMITIR", act: () => (names.length === job.paths.length ? app.say("OMITIDO · NO SE COPIÓ NADA") : go("--skip")) },
+                        { text: "REEMPLAZAR", act: () => go("--replace") },
+                        { text: "CONSERVAR AMBOS", act: () => go("") }
+                    ]);
             }
         }
     }
@@ -1199,7 +1292,9 @@ Item {
                 const list = [];
                 for (const line of text.split("\n")) {
                     const cols = line.split("\t");
-                    if (cols.length === 2)
+                    if (cols.length === 2 && cols[0] === "type")
+                        app.appsType = cols[1];
+                    else if (cols.length === 2)
                         list.push({ file: cols[0], name: cols[1] });
                 }
                 app.apps = list;
@@ -1220,7 +1315,7 @@ Item {
                 if (paths.length === 0)
                     app.say("NADA QUE PEGAR", true);
                 else
-                    app.op(["copy", app.path].concat(paths), "PEGADO · " + (paths.length === 1 ? paths[0].slice(paths[0].lastIndexOf("/") + 1).toUpperCase() : paths.length + " ELEMENTOS"));
+                    app.transferTo("copy", app.path, paths, "PEGADO · " + (paths.length === 1 ? paths[0].slice(paths[0].lastIndexOf("/") + 1).toUpperCase() : paths.length + " ELEMENTOS"));
             }
         }
     }
@@ -1236,6 +1331,7 @@ Item {
     Shortcut { sequence: "Ctrl+G"; onActivated: app.toggleGrid() }
     Shortcut { sequence: "Alt+Home"; onActivated: app.go(app.home) }
     Shortcut { sequence: "Ctrl+T"; onActivated: app.newTab() }
+    Shortcut { sequence: "F6"; onActivated: app.toggleDual() }
     Shortcut { sequence: "Ctrl+W"; onActivated: app.closeTab(app.tab) }
     Shortcut { sequence: "Ctrl+PgDown"; onActivated: app.showTab((app.tab + 1) % app.tabs.length) }
     Shortcut { sequence: "Ctrl+PgUp"; onActivated: app.showTab((app.tab + app.tabs.length - 1) % app.tabs.length) }
@@ -1297,6 +1393,12 @@ Item {
                 app.select(app.current + page);
             else if (event.key === Qt.Key_PageUp)
                 app.select(app.current - page);
+            else if (event.key === Qt.Key_Tab && app.dual)
+                app.swapPanes();
+            else if (event.key === Qt.Key_C && ctrl && shift)
+                app.sendToOther(false);
+            else if (event.key === Qt.Key_M && ctrl && shift)
+                app.sendToOther(true);
             else if (event.key === Qt.Key_A && ctrl)
                 app.markAll();
             else if (event.key === Qt.Key_Z && ctrl)
@@ -1564,8 +1666,18 @@ Item {
             id: detail
             app: app
             anchors { right: parent.right; top: tools.bottom; topMargin: Tokens.s4 }
-            width: 340
+            width: app.dual ? Math.round((page.width - Tokens.s5) / 2) : 340
+            visible: !app.dual
         }
+        SidePane {
+            app: app
+            visible: app.dual
+            anchors { right: parent.right; top: tabBar.bottom; bottom: parent.bottom }
+            anchors.topMargin: tabBar.visible ? Tokens.s3 : Tokens.s4
+            anchors.bottomMargin: Tokens.s5
+            width: detail.width
+        }
+
     }
 
     Item {

@@ -51,10 +51,14 @@ ShellRoot {
                 undo: app.undo ? app.undo.text : "",
                 bookmarks: app.bookmarks.length,
                 names: app.rows.map(e => e.name).join(" | "),
+                dual: app.dual,
+                other: app.otherPath.split("/").pop(),
+                here: app.path.split("/").pop(),
                 dragging: app.dragging
             });
         }
         function go(path: string): void { app.go(path); }
+        function other(path: string): void { app.otherPath = path; }
         function shot(file: string): void { app.grabToImage(result => result.saveToFile(file)); }
         function focused(): string { return String(win.backingWindow ? win.backingWindow.active : "?"); }
     }

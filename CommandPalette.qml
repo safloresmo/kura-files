@@ -10,11 +10,13 @@ Item {
     property var all: []
     property string query: ""
     property int at: 0
+    property string heading: "COMANDOS"
+    property bool searching: true
 
     readonly property var shown: {
         const q = query.trim().toLowerCase();
         const out = [];
-        if (q.charAt(0) === "/" || q.charAt(0) === "~") {
+        if (searching && (q.charAt(0) === "/" || q.charAt(0) === "~")) {
             const target = query.trim();
             out.push({ label: "Ir a " + target, hint: "RUTA", act: () => palette.app.tryPath(target) });
         }
@@ -24,7 +26,7 @@ Item {
             if (words.every(w => text.indexOf(w) >= 0))
                 out.push(c);
         }
-        if (q !== "" && out.length === 0 || (q !== "" && q.charAt(0) !== "/" && q.charAt(0) !== "~")) {
+        if (searching && (q !== "" && out.length === 0 || (q !== "" && q.charAt(0) !== "/" && q.charAt(0) !== "~"))) {
             const text = query.trim();
             out.push({ label: "Buscar «" + text + "» en subcarpetas", hint: "BÚSQUEDA", act: () => palette.app.search(text) });
         }
@@ -33,7 +35,20 @@ Item {
 
     signal closed()
 
+    // Pick one of a fixed list, with the same typing and keys as the commands.
+    function choose(title, entries) {
+        heading = title;
+        searching = false;
+        all = entries;
+        query = "";
+        field.clear();
+        at = 0;
+        visible = true;
+        field.grabFocus();
+    }
     function open() {
+        heading = "COMANDOS";
+        searching = true;
         all = app.commands();
         query = "";
         field.clear();
@@ -102,7 +117,7 @@ Item {
                 height: 14
 
                 Text {
-                    text: "// COMANDOS"
+                    text: "// " + palette.heading
                     color: Tokens.ink
                     font.family: Tokens.mono
                     font.pixelSize: 11

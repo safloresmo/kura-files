@@ -16,7 +16,8 @@ use std::path::{Path, PathBuf};
 use std::process::{exit, Command};
 
 const USAGE: &str = "\
-archivos-motor copy|move|drop DEST SRC...
+archivos-motor copy|move|drop [--replace|--skip] DEST SRC...
+archivos-motor conflicts DEST SRC...
 archivos-motor rename SRC NAME
 archivos-motor mkdir|touch DIR NAME
 archivos-motor trash SRC...
@@ -57,8 +58,17 @@ fn main() {
         exit(2);
     };
     let result = match (command.as_str(), rest) {
+        ("copy" | "move" | "drop", [policy, dest, sources @ ..])
+            if (policy == "--replace" || policy == "--skip") && !sources.is_empty() =>
+        {
+            transfer::run(command, Path::new(dest), sources, policy)
+        }
         ("copy" | "move" | "drop", [dest, sources @ ..]) if !sources.is_empty() => {
-            transfer::run(command, Path::new(dest), sources)
+            transfer::run(command, Path::new(dest), sources, "")
+        }
+        ("conflicts", [dest, sources @ ..]) if !sources.is_empty() => {
+            transfer::conflicts(Path::new(dest), sources);
+            Ok(())
         }
         ("rename", [source, name]) => rename(Path::new(source), name),
         ("mkdir", [dir, name]) => create(Path::new(dir), name, true),
@@ -162,7 +172,7 @@ fn create(dir: &Path, name: &str, folder: bool) -> Result<(), String> {
     Ok(())
 }
 
-fn trash(sources: &[String]) -> Result<(), String> {
+pub fn trash(sources: &[String]) -> Result<(), String> {
     let status = Command::new("gio").arg("trash").arg("--").args(sources).status();
     match status {
         Ok(code) if code.success() => Ok(()),

@@ -48,6 +48,10 @@ ShellRoot {
         function trash(): void { app.trash(); }
         function restore(): void { app.restore(); }
         function undo(): void { app.undoLast(); }
+        function dual(): void { app.toggleDual(); }
+        function swap(): void { app.swapPanes(); }
+        function other(path: string): void { app.otherPath = path; }
+        function toOther(move: bool): void { app.sendToOther(move); }
         function tab(path: string): void { app.newTab(path); }
         function showTab(index: int): void { app.showTab(index); }
         function closeTab(index: int): void { app.closeTab(index); }
@@ -83,6 +87,8 @@ ShellRoot {
                 brand: app.brand.name,
                 targets: app.targets.length,
                 marked: app.markedCount,
+                dual: app.dual,
+                other: app.otherPath,
                 tabs: app.tabs.map((t, i) => i === app.tab ? app.path : t.path),
                 tab: app.tab,
                 servers: app.servers.map(x => x.name + (app.remotes[x.uri] ? " (conectado)" : "")),

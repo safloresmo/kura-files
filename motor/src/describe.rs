@@ -272,15 +272,43 @@ fn data_dirs() -> Vec<PathBuf> {
 
 /// The applications that open a file, the default one first: `DESKTOP_FILE<TAB>NAME`.
 pub fn apps(path: &Path) -> Result<(), String> {
-    let kind = mime(path);
-    if kind.is_empty() {
-        return Ok(());
+    // The desktop's own database goes by name as well as content, so a script
+    // is text/x-python here rather than whatever its first bytes look like.
+    let listing = Command::new("gio")
+        .args(["info", "-a", "standard::content-type"])
+        .arg(path)
+        .output()
+        .map(|out| String::from_utf8_lossy(&out.stdout).into_owned())
+        .unwrap_or_default();
+    let named = listing
+        .lines()
+        .find_map(|line| line.split_once("standard::content-type: ").map(|(_, kind)| kind.trim().to_string()))
+        .unwrap_or_default();
+    println!("type\t{named}");
+    let mut kinds = vec![named];
+    let sniffed = mime(path);
+    if !kinds.contains(&sniffed) {
+        kinds.push(sniffed);
     }
-    let mut ids = vec![output_of("xdg-mime", &["query", "default", &kind], None)];
-    let registered = Command::new("gio").args(["mime", &kind]).output().map(|o| o.stdout).unwrap_or_default();
-    for line in String::from_utf8_lossy(&registered).lines() {
-        if let Some(id) = line.strip_prefix('\t') {
-            ids.push(id.trim().to_string());
+    if kinds.iter().any(|kind| kind.starts_with("text/")) && !kinds.iter().any(|kind| kind == "text/plain") {
+        kinds.push("text/plain".into());
+    }
+    let mut ids = Vec::new();
+    for kind in kinds.iter().filter(|kind| !kind.is_empty()) {
+        let registered = Command::new("gio")
+            .env("LC_ALL", "C")
+            .args(["mime", kind])
+            .output()
+            .map(|o| o.stdout)
+            .unwrap_or_default();
+        for line in String::from_utf8_lossy(&registered).lines() {
+            if let Some(id) = line.strip_prefix('\t') {
+                ids.push(id.trim().to_string());
+            } else if line.starts_with("Default application") {
+                if let Some((_, id)) = line.rsplit_once(": ") {
+                    ids.push(id.trim().to_string());
+                }
+            }
         }
     }
     let dirs = data_dirs();
@@ -292,7 +320,8 @@ pub fn apps(path: &Path) -> Result<(), String> {
         seen.push(id.clone());
         let Some(desktop) = dirs.iter().map(|d| d.join("applications").join(&id)).find(|p| p.is_file()) else { continue };
         let Ok(text) = fs::read_to_string(&desktop) else { continue };
-        if text.lines().any(|line| line.trim() == "NoDisplay=true") {
+        // Hidden launchers stay out of the list, unless one is the default.
+        if seen.len() > 1 && text.lines().any(|line| line.trim() == "NoDisplay=true") {
             continue;
         }
         let name = text.lines().find_map(|line| line.strip_prefix("Name=")).unwrap_or(&id);

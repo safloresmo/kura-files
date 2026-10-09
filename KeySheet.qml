@@ -9,16 +9,18 @@ Item {
     readonly property var groups: [
         { name: "MOVERSE", keys: [
             ["Enter", "Abrir"], ["Retroceso · Alt+↑", "Subir una carpeta"], ["Alt+← · Alt+→", "Atrás y adelante"],
-            ["Alt+Inicio", "Carpeta personal"], ["Ctrl+L", "Escribir una ruta"], ["Inicio · Fin", "Primero y último"], ["F5", "Actualizar"]] },
+            ["Alt+Inicio", "Carpeta personal"], ["Ctrl+L", "Escribir una ruta"], ["Inicio · Fin", "Primero y último"], ["F5", "Actualizar"],
+            ["Ctrl+T · Ctrl+W", "Pestaña nueva y cerrar"], ["Ctrl+RePág · AvPág", "Cambiar de pestaña"], ["F6 · Tab", "Segundo panel y cambiar"]] },
         { name: "SELECCIONAR", keys: [
             ["Ctrl+clic", "Añadir o quitar"], ["Mayús+clic · Mayús+↑↓", "Marcar un tramo"], ["Ctrl+A", "Todo"],
             ["Ctrl+Mayús+I", "Invertir"], ["Esc", "Soltar la selección"]] },
         { name: "ARCHIVOS", keys: [
             ["Ctrl+C · Ctrl+X · Ctrl+V", "Copiar, cortar y pegar"], ["Ctrl+Z", "Deshacer"], ["F2", "Renombrar"],
-            ["Ctrl+Mayús+N · Ctrl+N", "Carpeta nueva y archivo nuevo"], ["Supr", "A la papelera"],
+            ["Ctrl+Mayús+N · Ctrl+N", "Carpeta nueva y archivo nuevo"], ["Supr · Mayús+Supr", "A la papelera o para siempre"],
+            ["Ctrl+Mayús+C · Ctrl+Mayús+M", "Copiar o mover al otro panel"],
             ["Ctrl+I", "Propiedades"], ["Ctrl+D", "Marcador"]] },
         { name: "VER Y BUSCAR", keys: [
-            ["Espacio", "Vista rápida"], ["Ctrl+G", "Lista o cuadrícula"], ["Ctrl+H", "Ocultos"],
+            ["Espacio", "Vista rápida"], ["Ctrl+G", "Lista o cuadrícula"], ["Ctrl+más · Ctrl+menos", "Zoom"], ["Ctrl+H", "Ocultos"],
             ["Ctrl+F · / · escribir", "Filtrar la carpeta"], ["Ctrl+K", "Comandos"], ["F1", "Esta hoja"], ["Ctrl+Q", "Salir"]] }
     ]
 

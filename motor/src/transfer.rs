@@ -9,7 +9,7 @@ use std::time::{Duration, Instant};
 
 use std::sync::atomic::Ordering;
 
-use crate::{file_name, free_name, report, taken, STOP};
+use crate::{file_name, free_name, report, taken, trash, STOP};
 
 const CHUNK: usize = 1 << 20;
 
@@ -29,8 +29,22 @@ impl Progress {
     }
 }
 
+/// The sources whose name is already taken in `dest`, one name per line.
+pub fn conflicts(dest: &Path, sources: &[String]) {
+    let real_dest = dest.canonicalize().unwrap_or_else(|_| dest.to_path_buf());
+    for source in sources {
+        let source = Path::new(source);
+        let inside = source.canonicalize().ok().and_then(|real| real.parent().map(|p| p == real_dest)).unwrap_or(false);
+        if !inside && taken(&dest.join(file_name(source))) {
+            println!("{}", file_name(source));
+        }
+    }
+}
+
 /// `mode` is copy, move or drop; drop moves within a disk and copies across disks.
-pub fn run(mode: &str, dest: &Path, sources: &[String]) -> Result<(), String> {
+/// A taken name gets a numbered sibling, unless `policy` is `--skip` (leave it
+/// out) or `--replace` (send what is there to the trash first).
+pub fn run(mode: &str, dest: &Path, sources: &[String], policy: &str) -> Result<(), String> {
     if !dest.is_dir() {
         return Err(format!("El destino no es una carpeta: {}", dest.display()));
     }
@@ -76,7 +90,20 @@ pub fn run(mode: &str, dest: &Path, sources: &[String]) -> Result<(), String> {
             eprintln!("Cancelado");
             return Err(String::new());
         }
-        let name = free_name(dest, &file_name(&source));
+        let wanted = file_name(&source);
+        let clash = taken(&dest.join(&wanted));
+        if clash && policy == "--skip" {
+            continue;
+        }
+        if clash && policy == "--replace" {
+            let old = dest.join(&wanted).to_string_lossy().into_owned();
+            if trash(&[old]).is_err() {
+                eprintln!("No se pudo apartar lo que había: {wanted}");
+                failed = true;
+                continue;
+            }
+        }
+        let name = free_name(dest, &wanted);
         let target = dest.join(&name);
         let outcome = if moving { relocate(&source, &target, &mut progress) } else { duplicate(&source, &target, &mut progress) };
         match outcome {
