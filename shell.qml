@@ -47,6 +47,21 @@ ShellRoot {
         function paste(): void { app.paste(); }
         function trash(): void { app.trash(); }
         function restore(): void { app.restore(); }
+        function undo(): void { app.undoLast(); }
+        function tab(path: string): void { app.newTab(path); }
+        function showTab(index: int): void { app.showTab(index); }
+        function closeTab(index: int): void { app.closeTab(index); }
+        function server(name: string, uri: string): void { app.saveServers(app.servers.filter(x => x.uri !== uri).concat([{ name: name, uri: uri }])); }
+        function connect(uri: string): void { const s = app.servers.find(x => x.uri === uri); if (s) app.connectServer(s); }
+        function disconnect(uri: string): void { const s = app.servers.find(x => x.uri === uri); if (s) app.disconnectServer(s); }
+        function zoom(percent: int): void { app.setZoom(percent / 100); }
+        function compress(format: string): void { app.compress(format); }
+        function extract(): void { app.extract(); }
+        function touch(name: string): void { app.op(["touch", app.path, name], "ARCHIVO CREADO · " + name.toUpperCase()); }
+        function bookmark(path: string): void { app.toggleBookmark(path); }
+        function properties(): void { app.properties(); }
+        function keys(): void { app.openKeys(); }
+        function invert(): void { app.invertMarks(); }
         function search(text: string): void { app.search(text); }
         function drop(dest: string, source: string): void { app.dragging = true; app.dropOn(dest, ["file://" + source]); app.dragging = false; }
         function mark(index: int): void { app.click(index, Qt.ControlModifier); }
@@ -68,6 +83,13 @@ ShellRoot {
                 brand: app.brand.name,
                 targets: app.targets.length,
                 marked: app.markedCount,
+                tabs: app.tabs.map((t, i) => i === app.tab ? app.path : t.path),
+                tab: app.tab,
+                servers: app.servers.map(x => x.name + (app.remotes[x.uri] ? " (conectado)" : "")),
+                thumbs: Object.keys(app.thumbs).length,
+                undo: app.undo ? app.undo.text : "",
+                bookmarks: app.bookmarks.map(b => b.name),
+                info: app.info,
                 grid: app.grid,
                 devices: app.devices.map(d => d.name + (d.mounted ? "" : " (sin montar)")),
                 first: app.rows.length ? app.rows[0].name : "",

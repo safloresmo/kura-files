@@ -10,6 +10,7 @@ Item {
     property var done: null
     property string detail: ""
     property bool plain: false
+    property string yesText: "ACEPTAR"
 
     signal closed()
 
@@ -17,12 +18,14 @@ Item {
         heading = title;
         done = callback;
         plain = false;
+        yesText = "ACEPTAR";
         field.text = value;
         visible = true;
         field.grabFocus();
     }
     // A yes or no question; the callback runs only on yes.
-    function confirm(title, text, callback) {
+    function confirm(title, text, callback, yesLabel) {
+        yesText = yesLabel || "SÍ";
         heading = title;
         detail = text;
         done = callback;
@@ -106,7 +109,7 @@ Item {
                 spacing: Tokens.s2
 
                 Btn { text: "CANCELAR"; onAct: dialog.close() }
-                Btn { id: yes; text: dialog.plain ? "SÍ, VACIAR" : "ACEPTAR"; primary: true; onAct: dialog.accept() }
+                Btn { id: yes; text: dialog.yesText; primary: true; onAct: dialog.accept() }
             }
         }
     }

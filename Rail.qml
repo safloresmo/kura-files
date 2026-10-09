@@ -208,8 +208,85 @@ Item {
                 }
             }
 
+            Item { width: 1; height: rail.app.bookmarks.length > 0 ? Tokens.s2 : 0 }
+            GroupHead {
+                visible: rail.app.bookmarks.length > 0
+                height: visible ? 34 : 0
+                number: 2
+                label: "MARCADORES"
+            }
+
+            Repeater {
+                model: rail.app.bookmarks
+
+                Item {
+                    id: mark
+                    required property var modelData
+                    readonly property bool sel: rail.app.path === modelData.path
+
+                    width: list.width
+                    height: 36
+
+                    Rectangle {
+                        anchors.fill: parent
+                        anchors.topMargin: 1
+                        anchors.bottomMargin: 1
+                        radius: Tokens.radius
+                        color: mark.sel ? Tokens.bone : (markDrop.containsDrag ? Tokens.tint16 : (markHover.hovered ? Tokens.tint10 : "transparent"))
+                        Behavior on color { ColorAnimation { duration: Tokens.snap } }
+                    }
+                    Row {
+                        x: Tokens.s3
+                        anchors.verticalCenter: parent.verticalCenter
+                        spacing: Tokens.s2
+
+                        Text {
+                            visible: mark.sel
+                            text: "//"
+                            color: Tokens.inkOnBoneDim
+                            font.family: Tokens.mono
+                            font.pixelSize: 11
+                            anchors.verticalCenter: parent.verticalCenter
+                        }
+                        Icon {
+                            visible: !mark.sel
+                            name: "folder"
+                            size: 16
+                            color: Tokens.inkFaint
+                            anchors.verticalCenter: parent.verticalCenter
+                        }
+                        Text {
+                            text: mark.modelData.name
+                            color: mark.sel ? Tokens.inkOnBone : Tokens.inkDim
+                            font.family: Tokens.ui
+                            font.pixelSize: 14
+                            anchors.verticalCenter: parent.verticalCenter
+                            elide: Text.ElideRight
+                            width: Math.min(implicitWidth, list.width - 60)
+                        }
+                    }
+                    HoverHandler { id: markHover; cursorShape: Qt.PointingHandCursor }
+                    TapHandler { onTapped: rail.app.go(mark.modelData.path) }
+                    TapHandler {
+                        acceptedButtons: Qt.RightButton
+                        onTapped: point => {
+                            const scene = mark.mapToItem(null, point.position.x, point.position.y);
+                            rail.app.bookmarkMenu(mark.modelData, scene.x, scene.y);
+                        }
+                    }
+                    DropArea {
+                        id: markDrop
+                        anchors.fill: parent
+                        onDropped: drop => {
+                            rail.app.dropOn(mark.modelData.path, drop.urls);
+                            drop.accept(Qt.CopyAction);
+                        }
+                    }
+                }
+            }
+
             Item { width: 1; height: Tokens.s2 }
-            GroupHead { number: 2; label: "DISPOSITIVOS" }
+            GroupHead { id: devicesHead; number: rail.app.bookmarks.length > 0 ? 3 : 2; label: "DISPOSITIVOS" }
 
             Repeater {
                 model: rail.app.devices
@@ -302,6 +379,96 @@ Item {
                         TapHandler { onTapped: rail.app.eject(device.modelData) }
                     }
                 }
+            }
+
+            Item { width: 1; height: Tokens.s2 }
+            GroupHead { number: devicesHead.number + 1; label: "RED" }
+
+            Repeater {
+                model: rail.app.servers
+
+                Item {
+                    id: server
+                    required property var modelData
+                    readonly property string mounted: rail.app.remotes[modelData.uri] || ""
+                    readonly property bool sel: mounted !== "" && (rail.app.path === mounted || rail.app.path.indexOf(mounted + "/") === 0)
+
+                    width: list.width
+                    height: 36
+
+                    Rectangle {
+                        anchors.fill: parent
+                        anchors.topMargin: 1
+                        anchors.bottomMargin: 1
+                        radius: Tokens.radius
+                        color: server.sel ? Tokens.bone : (serverHover.hovered ? Tokens.tint10 : "transparent")
+                        Behavior on color { ColorAnimation { duration: Tokens.snap } }
+                    }
+                    Row {
+                        x: Tokens.s3
+                        anchors.verticalCenter: parent.verticalCenter
+                        spacing: Tokens.s2
+
+                        Text {
+                            visible: server.sel
+                            text: "//"
+                            color: Tokens.inkOnBoneDim
+                            font.family: Tokens.mono
+                            font.pixelSize: 11
+                            anchors.verticalCenter: parent.verticalCenter
+                        }
+                        Icon {
+                            visible: !server.sel
+                            name: "network"
+                            size: 16
+                            color: Tokens.inkFaint
+                            anchors.verticalCenter: parent.verticalCenter
+                        }
+                        Text {
+                            text: server.modelData.name
+                            color: server.sel ? Tokens.inkOnBone : (server.mounted !== "" ? Tokens.inkDim : Tokens.inkFaint)
+                            font.family: Tokens.ui
+                            font.pixelSize: 14
+                            anchors.verticalCenter: parent.verticalCenter
+                            elide: Text.ElideRight
+                            width: Math.min(implicitWidth, list.width - 110)
+                        }
+                    }
+                    Text {
+                        anchors { right: parent.right; rightMargin: Tokens.s3; verticalCenter: parent.verticalCenter }
+                        text: server.mounted !== "" ? "接続" : "CONECTAR"
+                        color: server.sel ? Tokens.inkOnBoneDim : Tokens.inkFaint
+                        font.family: server.mounted !== "" ? Tokens.jp : Tokens.mono
+                        font.pixelSize: server.mounted !== "" ? 12 : 9
+                        font.letterSpacing: server.mounted !== "" ? 0 : 1.4
+                    }
+                    HoverHandler { id: serverHover; cursorShape: Qt.PointingHandCursor }
+                    TapHandler { onTapped: rail.app.connectServer(server.modelData) }
+                    TapHandler {
+                        acceptedButtons: Qt.RightButton
+                        onTapped: point => {
+                            const scene = server.mapToItem(null, point.position.x, point.position.y);
+                            rail.app.serverMenu(server.modelData, scene.x, scene.y);
+                        }
+                    }
+                }
+            }
+
+            Item {
+                width: list.width
+                height: 34
+
+                Text {
+                    x: Tokens.s3
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: "+  AÑADIR SERVIDOR"
+                    color: addHover.hovered ? Tokens.ink : Tokens.inkFaint
+                    font.family: Tokens.mono
+                    font.pixelSize: 9
+                    font.letterSpacing: 1.4
+                }
+                HoverHandler { id: addHover; cursorShape: Qt.PointingHandCursor }
+                TapHandler { onTapped: rail.app.addServer() }
             }
         }
     }

@@ -34,6 +34,17 @@ Item {
     property bool dragging: false
     property string dragData: ""
     property bool deep: false
+    property var undo: null
+    property var transfer: null
+    property var activeJob: null
+    property var bookmarks: []
+    property var info: ({})
+    property var tabs: [{ path: home, back: [], forward: [] }]
+    property int tab: 0
+    property var remotes: ({})
+    property var thumbs: ({})
+    property real zoom: 1.0
+    readonly property var servers: settings.servers
     property string deepQuery: ""
     property var found: []
     property string appsFor: ""
@@ -42,7 +53,7 @@ Item {
     property string notice: ""
     property bool noticeBad: false
 
-    readonly property string binDir: decodeURIComponent(Qt.resolvedUrl("bin").toString().replace("file://", ""))
+    readonly property string engine: decodeURIComponent(Qt.resolvedUrl("motor/target/release/archivos-motor").toString().replace("file://", ""))
     readonly property var brand: settings.brand === "ryoku"
         ? { mark: "力", name: "RYOKU FILES", tag: "RYOKU // FILES" }
         : { mark: settings.ownMark, name: settings.ownName, tag: settings.ownTag }
@@ -54,12 +65,113 @@ Item {
     readonly property bool grid: settings.grid
     readonly property bool ready: dir.status === FolderListModel.Ready
     readonly property var selected: entry(current)
-    readonly property string title: {
-        for (const p of places) {
-            if (p.path === path)
-                return p.name;
+    readonly property string title: nameOf(path)
+
+    function nameOf(p) {
+        for (const place of places) {
+            if (place.path === p)
+                return place.name;
         }
-        return path === "/" ? "Raíz" : path.slice(path.lastIndexOf("/") + 1);
+        for (const server of servers) {
+            if (remotes[server.uri] === p)
+                return server.name;
+        }
+        return p === "/" ? "Raíz" : p.slice(p.lastIndexOf("/") + 1);
+    }
+
+    // Tabs keep a path and its history; the rest of the view follows the open one.
+    function keepTab() {
+        const list = tabs.slice();
+        list[tab] = { path: path, back: back, forward: forward };
+        tabs = list;
+    }
+    function showTab(i) {
+        if (i < 0 || i >= tabs.length || i === tab)
+            return;
+        keepTab();
+        tab = i;
+        back = tabs[i].back;
+        forward = tabs[i].forward;
+        path = tabs[i].path;
+    }
+    function newTab(p) {
+        keepTab();
+        tabs = tabs.concat([{ path: clean(p || path), back: [], forward: [] }]);
+        showTab(tabs.length - 1);
+    }
+    function closeTab(i) {
+        if (tabs.length === 1)
+            return;
+        keepTab();
+        const list = tabs.slice();
+        list.splice(i, 1);
+        const next = Math.min(i < tab ? tab - 1 : tab, list.length - 1);
+        tabs = list;
+        tab = next;
+        back = list[next].back;
+        forward = list[next].forward;
+        path = list[next].path;
+    }
+
+    // Network places: saved in the settings, mounted through GVFS.
+    function saveServers(list) {
+        settings.servers = list;
+        settingsFile.writeAdapter();
+        refresh();
+    }
+    function addServer() {
+        dialog.ask("SERVIDOR · DIRECCIÓN", "sftp://usuario@equipo/", uri => {
+            Qt.callLater(() => dialog.ask("SERVIDOR · NOMBRE", uri.replace(/^[a-z]+:\/\/([^@\/]*@)?/, "").replace(/\/.*$/, ""),
+                name => saveServers(servers.concat([{ name: name, uri: uri }]))));
+        });
+    }
+    function removeServer(server) {
+        saveServers(servers.filter(x => x.uri !== server.uri));
+    }
+    function connectServer(server, secret) {
+        const mounted = remotes[server.uri];
+        if (mounted) {
+            go(mounted);
+            return;
+        }
+        say("CONECTANDO A " + server.name.toUpperCase() + "…");
+        const command = secret === undefined ? ["gio", "mount", server.uri]
+            : ["sh", "-c", "printf '%s\\n' \"$1\" | gio mount \"$2\"", "sh", secret, server.uri];
+        job.createObject(app, {
+            command: command,
+            okText: "CONECTADO · " + server.name.toUpperCase(),
+            failText: "NO SE CONECTÓ A " + server.name.toUpperCase(),
+            server: server,
+            askedSecret: secret !== undefined
+        }).running = true;
+    }
+    function disconnectServer(server) {
+        const mounted = remotes[server.uri];
+        if (mounted && (path === mounted || path.indexOf(mounted + "/") === 0))
+            go(home);
+        run(["gio", "mount", "-u", server.uri], "DESCONECTADO · " + server.name.toUpperCase());
+    }
+    function serverMenu(server, x, y) {
+        const mounted = remotes[server.uri] !== undefined && remotes[server.uri] !== "";
+        menu.popup(x, y, [
+            { label: mounted ? "Abrir" : "Conectar", act: () => connectServer(server) },
+            { label: "Desconectar", armed: mounted, act: () => disconnectServer(server) },
+            { sep: true },
+            { label: "Quitar de la lista", act: () => removeServer(server) }
+        ]);
+    }
+    function setZoom(value) {
+        zoom = Math.max(0.6, Math.min(2.4, Math.round(value * 10) / 10));
+    }
+    function erase() {
+        const list = picked();
+        if (list.length === 0)
+            return;
+        dialog.confirm("ELIMINAR PARA SIEMPRE", "Se eliminará " + label(list).toLowerCase() + " sin pasar por la papelera. No se puede deshacer.",
+            () => {
+                marked = {};
+                op(["delete"].concat(list.map(e => e.path)), "ELIMINADO · " + label(list), null);
+            }, "SÍ, ELIMINAR");
     }
 
     signal quit()
@@ -68,12 +180,22 @@ Item {
         p = String(p).trim();
         if (p === "~" || p.indexOf("~/") === 0)
             p = home + p.slice(1);
+        for (const server of servers) {
+            const mounted = remotes[server.uri];
+            if (mounted && p.indexOf(server.name + ":") === 0)
+                p = mounted + "/" + p.slice(server.name.length + 1);
+        }
         p = p.replace(/\/+/g, "/");
         if (p.length > 1 && p.charAt(p.length - 1) === "/")
             p = p.slice(0, -1);
         return p || "/";
     }
     function shorten(p) {
+        for (const server of servers) {
+            const mounted = remotes[server.uri];
+            if (mounted && (p === mounted || p.indexOf(mounted + "/") === 0))
+                return server.name + ":" + (p.slice(mounted.length) || "/");
+        }
         return p === home || p.indexOf(home + "/") === 0 ? "~" + p.slice(home.length) : p;
     }
     function url(p) {
@@ -150,11 +272,31 @@ Item {
         noticeBad = bad === true;
         noticeClear.restart();
     }
-    function run(command, okText, failText) {
-        job.createObject(app, { command: command, okText: okText, failText: failText || "NO SE PUDO" }).running = true;
+    function run(command, okText, failText, undoArgs) {
+        job.createObject(app, {
+            command: command,
+            okText: okText,
+            failText: failText || "NO SE PUDO",
+            undoArgs: undoArgs === undefined ? null : undoArgs
+        }).running = true;
     }
-    function op(args, okText) {
-        run([binDir + "/archivos-op"].concat(args), okText);
+    // An engine operation. `undoArgs` is how to take it back: "auto" builds it
+    // from what the engine reports, a list is used as given, null means none.
+    function op(args, okText, undoArgs) {
+        run([engine].concat(args), okText, "", undoArgs === undefined ? "auto" : undoArgs);
+    }
+    function undoLast() {
+        if (!undo) {
+            say("NADA QUE DESHACER", true);
+            return;
+        }
+        const last = undo;
+        undo = null;
+        op(last.args, "DESHECHO · " + last.text, null);
+    }
+    function cancelTransfer() {
+        if (activeJob)
+            activeJob.signal(15);
     }
     // What an action applies to: the marked rows, or the one under the cursor.
     function picked() {
@@ -246,7 +388,7 @@ Item {
         const where = dest.slice(dest.lastIndexOf("/") + 1).toUpperCase() || "/";
         marked = {};
         if (dest === trashDir)
-            op(["trash"].concat(paths), "A LA PAPELERA · " + what);
+            op(["trash"].concat(paths), "A LA PAPELERA · " + what, ["untrash"].concat(paths));
         else
             op([inside ? "drop" : "copy", dest].concat(paths), (inside ? "SOLTADO EN " : "COPIADO A ") + where + " · " + what);
     }
@@ -260,8 +402,7 @@ Item {
         rail.filter.clear();
         query = "";
         finder.running = false;
-        finder.command = ["sh", "-c", "cd \"$1\" && find . -mindepth 1 " + (showHidden ? "" : "-not -path '*/.*' ")
-            + "-iname \"*$2*\" -printf '%y\\t%s\\t%T@\\t%p\\n' 2>/dev/null | head -n 500", "sh", path, q];
+        finder.command = showHidden ? [engine, "search", path, q, "hidden"] : [engine, "search", path, q];
         finder.running = true;
         focusList();
     }
@@ -297,7 +438,7 @@ Item {
         if (list.length === 0 || inTrash)
             return;
         marked = {};
-        op(["trash"].concat(list.map(e => e.path)), "A LA PAPELERA · " + label(list));
+        op(["trash"].concat(list.map(e => e.path)), "A LA PAPELERA · " + label(list), ["untrash"].concat(list.map(e => e.path)));
     }
     function rename() {
         const list = picked();
@@ -311,6 +452,55 @@ Item {
             return;
         dialog.ask("NUEVA CARPETA", "Nueva carpeta", value => op(["mkdir", path, value], "CARPETA CREADA · " + value.toUpperCase()));
     }
+    function newFile() {
+        if (inTrash)
+            return;
+        dialog.ask("NUEVO ARCHIVO", "Sin título.txt", value => op(["touch", path, value], "ARCHIVO CREADO · " + value.toUpperCase()));
+    }
+    function compress(format) {
+        const list = picked();
+        if (list.length === 0 || inTrash)
+            return;
+        say("COMPRIMIENDO…");
+        op(["compress", format].concat(list.map(e => e.path)), "COMPRIMIDO · " + label(list));
+    }
+    function extract() {
+        const list = picked().filter(e => !e.isDir && Fmt.icon(e.name, false) === "archive");
+        if (list.length !== 1)
+            return;
+        say("EXTRAYENDO…");
+        op(["extract", list[0].path], "EXTRAÍDO · " + list[0].name.toUpperCase());
+    }
+    function invertMarks() {
+        const next = {};
+        const base = markedCount > 0 ? marked : (selected ? ({ [selected.path]: true }) : ({}));
+        for (const e of rows) {
+            if (base[e.path] !== true)
+                next[e.path] = true;
+        }
+        marked = next;
+    }
+    function isBookmarked(p) {
+        return bookmarks.some(b => b.path === p);
+    }
+    function toggleBookmark(p) {
+        const had = isBookmarked(p);
+        run([engine, "bookmarks", had ? "remove" : "add", p], had ? "MARCADOR QUITADO" : "MARCADOR AÑADIDO");
+    }
+    function bookmarkMenu(b, x, y) {
+        menu.popup(x, y, [
+            { label: "Abrir", act: () => go(b.path) },
+            { label: "Quitar marcador", act: () => toggleBookmark(b.path) }
+        ]);
+    }
+    function properties() {
+        const e = picked().length === 1 ? picked()[0] : null;
+        info = {};
+        teller.running = false;
+        teller.command = [engine, "info", e ? e.path : path];
+        teller.running = true;
+        sheet.open();
+    }
     function restore() {
         const list = picked();
         if (list.length === 0 || !inTrash)
@@ -320,7 +510,7 @@ Item {
     }
     function emptyTrash() {
         dialog.confirm("VACIAR PAPELERA", "Se eliminará todo lo que hay en la papelera. No se puede deshacer.",
-            () => run(["gio", "trash", "--empty"], "PAPELERA VACÍA"));
+            () => run(["gio", "trash", "--empty"], "PAPELERA VACÍA"), "SÍ, VACIAR");
     }
     function sendTo(target) {
         const list = picked().filter(e => !e.isDir);
@@ -348,7 +538,7 @@ Item {
         apps = [];
         appsFor = filePath;
         appFinder.running = false;
-        appFinder.command = [binDir + "/archivos-apps", filePath];
+        appFinder.command = [engine, "apps", filePath];
         appFinder.running = true;
     }
     function mount(d) {
@@ -377,6 +567,8 @@ Item {
         tailnet.running = true;
         if (one) {
             items.push({ label: "Abrir", hint: "ENTER", act: () => open(current) });
+            if (one.isDir)
+                items.push({ label: "Abrir en pestaña nueva", hint: "CTRL+ENTER", act: () => newTab(one.path) });
             if (!one.isDir) {
                 loadApps(one.path);
                 items.push({ label: "Abrir con", sub: () => appEntries(one) });
@@ -392,7 +584,25 @@ Item {
         if (one)
             items.push({ label: "Renombrar", hint: "F2", act: () => rename() });
         items.push({ label: "Nueva carpeta", hint: "CTRL+SHIFT+N", act: () => newFolder() });
+        items.push({ label: "Nuevo archivo", hint: "CTRL+N", act: () => newFile() });
+        if (undo)
+            items.push({ label: "Deshacer", hint: "CTRL+Z", act: () => undoLast() });
         items.push({ sep: true });
+        if (n > 0) {
+            items.push({
+                label: "Comprimir" + many,
+                sub: [
+                    { label: "En .zip", act: () => compress("zip") },
+                    { label: "En .tar.gz", act: () => compress("tar.gz") },
+                    { label: "En .tar.xz", act: () => compress("tar.xz") },
+                    { label: "En .7z", act: () => compress("7z") }
+                ]
+            });
+        }
+        if (one && !one.isDir && Fmt.icon(one.name, false) === "archive")
+            items.push({ label: "Extraer aquí", act: () => extract() });
+        if (one && one.isDir)
+            items.push({ label: isBookmarked(one.path) ? "Quitar marcador" : "Añadir a marcadores", hint: "CTRL+D", act: () => toggleBookmark(one.path) });
         if (n > 0)
             items.push({ label: "Enviar por Tailscale" + many, armed: sendable, sub: sendable ? () => sendEntries() : null });
         if (n > 0)
@@ -401,9 +611,11 @@ Item {
             items.push({ label: "Copiar ruta", act: () => copyPath(one.path) });
         items.push({ label: "Terminal aquí", act: () => terminal(one && one.isDir ? one.path : path) });
         items.push({ label: "Seleccionar todo", hint: "CTRL+A", act: () => markAll() });
+        items.push({ label: "Propiedades", hint: "CTRL+I", act: () => properties() });
         if (n > 0) {
             items.push({ sep: true });
             items.push({ label: "A la papelera" + many, hint: "SUPR", act: () => trash() });
+            items.push({ label: "Eliminar para siempre" + many, hint: "MAYÚS+SUPR", act: () => erase() });
         }
         menu.popup(x, y, items);
     }
@@ -452,8 +664,20 @@ Item {
                     add("Enviar por LocalSend", "LOCALSEND", () => localSend());
                 }
             }
+            if (n > 0) {
+                add("Comprimir en .zip", "ACCIÓN", () => compress("zip"));
+                add("Comprimir en .tar.gz", "ACCIÓN", () => compress("tar.gz"));
+                add("Comprimir en .7z", "ACCIÓN", () => compress("7z"));
+            }
+            if (n === 1 && !list[0].isDir && Fmt.icon(list[0].name, false) === "archive")
+                add("Extraer aquí", "ACCIÓN", () => extract());
             add("Pegar aquí", "CTRL+V", () => paste());
             add("Nueva carpeta", "CTRL+SHIFT+N", () => newFolder());
+            add("Nuevo archivo", "CTRL+N", () => newFile());
+            add("Invertir la selección", "CTRL+SHIFT+I", () => invertMarks());
+            if (undo)
+                add("Deshacer: " + undo.text.toLowerCase(), "CTRL+Z", () => undoLast());
+            add(isBookmarked(path) ? "Quitar esta carpeta de marcadores" : "Añadir esta carpeta a marcadores", "CTRL+D", () => toggleBookmark(path));
             add("Seleccionar todo", "CTRL+A", () => markAll());
         }
         add(grid ? "Ver como lista" : "Ver como cuadrícula", "CTRL+G", () => toggleGrid());
@@ -467,7 +691,18 @@ Item {
         add("Atrás", "ALT+←", () => goBack());
         add("Adelante", "ALT+→", () => goForward());
         add("Actualizar", "F5", () => refresh());
+        add("Pestaña nueva", "CTRL+T", () => newTab());
+        if (tabs.length > 1)
+            add("Cerrar la pestaña", "CTRL+W", () => closeTab(tab));
+        add("Añadir un servidor", "RED", () => addServer());
+        for (const server of servers)
+            add((remotes[server.uri] ? "Ir a " : "Conectar a ") + server.name, "RED", () => connectServer(server));
+        add("Ordenar por tipo", "ACCIÓN", () => sortBy(3));
+        add("Propiedades", "CTRL+I", () => properties());
+        add("Ver los atajos de teclado", "F1", () => keysSheet.open());
         add("Cambiar la marca", "ACCIÓN", () => toggleBrand());
+        for (const b of bookmarks)
+            add("Ir a " + b.name, "MARCADOR", () => go(b.path));
         for (const p of places)
             add("Ir a " + p.name, "LUGAR", () => go(p.path));
         for (const d of devices)
@@ -476,6 +711,9 @@ Item {
         return out;
     }
 
+    function openKeys() {
+        keysSheet.open();
+    }
     function openPalette() {
         tailnet.running = true;
         palette.open();
@@ -493,7 +731,7 @@ Item {
         if (previewer.target !== e.path)
             preview = { kind: "none" };
         previewer.target = e.path;
-        previewer.command = [binDir + "/archivos-preview", e.path, look.visible ? "60000" : "2500"];
+        previewer.command = [engine, "preview", e.path, look.visible ? "60000" : "2500"];
         previewer.running = true;
     }
 
@@ -572,6 +810,8 @@ Item {
                 d = a.size - b.size;
             else if (sortKey === 2)
                 d = b.modified - a.modified;
+            else if (sortKey === 3)
+                d = Fmt.kind(a.name, a.isDir).localeCompare(Fmt.kind(b.name, b.isDir));
             return flip * (d || (a.shown || a.name).localeCompare(b.shown || b.name));
         });
         dirTotal = dirs;
@@ -582,13 +822,25 @@ Item {
     function refresh() {
         countsReady = false;
         counter.running = false;
-        counter.command = ["sh", "-c", "find -L \"$1\" -mindepth 2 -maxdepth 2 -printf '%h\\n' 2>/dev/null | sort | uniq -c", "sh", path];
+        counter.command = [engine, "counts", path];
         counter.running = true;
         disk.running = false;
         disk.command = ["df", "-B1", "--output=fstype,avail", path];
         disk.running = true;
         blocks.running = true;
+        marks.running = true;
+        if (servers.length > 0) {
+            mounts.running = false;
+            mounts.command = [engine, "remote"].concat(servers.map(x => x.uri));
+            mounts.running = true;
+        }
+        if (grid) {
+            painter.running = false;
+            painter.command = [engine, "thumbs", path];
+            painter.running = true;
+        }
     }
+    onGridChanged: refresh()
 
     onPathChanged: {
         deep = false;
@@ -640,6 +892,7 @@ Item {
             id: settings
             property string brand: "own"
             property bool grid: false
+            property var servers: []
             property string ownMark: "サ"
             property string ownName: "SFM FILES"
             property string ownTag: "SAFLORESMO // ARCHIVOS"
@@ -661,11 +914,27 @@ Item {
             id: task
             property string okText: ""
             property string failText: ""
+            property var undoArgs: null
+            property var server: null
+            property bool askedSecret: false
             property int code: -1
+            property var results: []
 
             function finish() {
                 const why = errors.text.trim().split("\n")[0];
-                if (code === 0)
+                if (app.activeJob === task) {
+                    app.activeJob = null;
+                    app.transfer = null;
+                }
+                if (undoArgs === "auto")
+                    app.undo = results.length > 0 ? { text: okText, args: ["revert"].concat(results) } : app.undo;
+                else if (undoArgs !== null && code === 0)
+                    app.undo = { text: okText, args: undoArgs };
+                if (server && code !== 0 && !askedSecret) {
+                    // Keys did not get us in: ask for the password and try once more.
+                    const target = server;
+                    dialog.ask("CONTRASEÑA · " + target.name.toUpperCase(), "", secret => app.connectServer(target, secret));
+                } else if (code === 0)
                     app.say(okText);
                 else if (/access denied/i.test(why) && command[0] === "tailscale")
                     app.say(failText + " · FALTA EL PERMISO: SUDO TAILSCALE SET --OPERATOR=$USER", true);
@@ -675,10 +944,86 @@ Item {
                 destroy();
             }
 
+            stdout: SplitParser {
+                onRead: line => {
+                    const cols = line.split("\t");
+                    if (cols[0] === "progress" && cols.length >= 4) {
+                        app.activeJob = task;
+                        app.transfer = { done: Number(cols[1]), total: Number(cols[2]), name: cols.slice(3).join("\t") };
+                    } else if (cols[0] === "done" && cols.length === 4) {
+                        task.results = task.results.concat([cols[1], cols[2], cols[3]]);
+                    }
+                }
+            }
             stderr: StdioCollector { id: errors }
             onExited: exitCode => {
                 code = exitCode;
                 Qt.callLater(finish);
+            }
+        }
+    }
+    Process {
+        id: mounts
+        property string wanted: ""
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const map = {};
+                for (const line of text.split("\n")) {
+                    const cut = line.indexOf("\t");
+                    if (cut > 0 && line.length > cut + 1)
+                        map[line.slice(0, cut)] = line.slice(cut + 1);
+                }
+                const fresh = Object.keys(map).find(uri => !app.remotes[uri]);
+                const first = Object.keys(app.remotes).length === 0 && !mounts.wanted;
+                app.remotes = map;
+                if (mounts.wanted && map[mounts.wanted]) {
+                    app.go(map[mounts.wanted]);
+                    mounts.wanted = "";
+                } else if (fresh && !first && app.notice.indexOf("CONECTADO") === 0)
+                    app.go(map[fresh]);
+            }
+        }
+    }
+    Process {
+        id: painter
+        stdout: SplitParser {
+            onRead: line => {
+                const cut = line.indexOf("\t");
+                if (cut <= 0)
+                    return;
+                const next = Object.assign({}, app.thumbs);
+                next[line.slice(0, cut)] = line.slice(cut + 1);
+                app.thumbs = next;
+            }
+        }
+    }
+    Process {
+        id: marks
+        running: true
+        command: [app.engine, "bookmarks", "list"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const list = [];
+                for (const line of text.split("\n")) {
+                    const cut = line.indexOf("\t");
+                    if (cut > 0)
+                        list.push({ path: line.slice(0, cut), name: line.slice(cut + 1) });
+                }
+                app.bookmarks = list;
+            }
+        }
+    }
+    Process {
+        id: teller
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const map = {};
+                for (const line of text.split("\n")) {
+                    const cut = line.indexOf("\t");
+                    if (cut > 0)
+                        map[line.slice(0, cut)] = line.slice(cut + 1);
+                }
+                app.info = map;
             }
         }
     }
@@ -718,7 +1063,6 @@ Item {
             }
         }
     }
-
     Process {
         id: probe
         property string target: ""
@@ -736,9 +1080,9 @@ Item {
             onStreamFinished: {
                 const map = {};
                 for (const line of text.split("\n")) {
-                    const m = line.match(/^\s*(\d+) (.+)$/);
-                    if (m)
-                        map[m[2]] = Number(m[1]);
+                    const cut = line.indexOf("\t");
+                    if (cut > 0)
+                        map[line.slice(cut + 1)] = Number(line.slice(0, cut));
                 }
                 app.counts = map;
                 app.countsReady = true;
@@ -751,7 +1095,9 @@ Item {
             onStreamFinished: {
                 const row = text.trim().split("\n")[1];
                 const cols = row ? row.trim().split(/\s+/) : [];
-                app.space = cols.length === 2 ? cols[0].toUpperCase() + " · " + Fmt.size(cols[1]).toUpperCase() + " LIBRES" : "";
+                app.space = cols.length !== 2 ? ""
+                    : cols[0].indexOf("fuse.gvfsd") === 0 ? "EN RED"
+                    : cols[0].toUpperCase() + " · " + Fmt.size(cols[1]).toUpperCase() + " LIBRES";
             }
         }
     }
@@ -830,7 +1176,7 @@ Item {
                     const cols = line.split("\t");
                     if (cols.length < 4)
                         continue;
-                    const shown = cols.slice(3).join("\t").slice(2);
+                    const shown = cols.slice(3).join("\t");
                     const full = (app.path === "/" ? "" : app.path) + "/" + shown;
                     list.push({
                         name: full.slice(full.lastIndexOf("/") + 1),
@@ -888,6 +1234,16 @@ Item {
     Shortcut { sequence: "Ctrl+K"; onActivated: app.openPalette() }
     Shortcut { sequence: "Ctrl+F"; onActivated: rail.filter.grabFocus() }
     Shortcut { sequence: "Ctrl+G"; onActivated: app.toggleGrid() }
+    Shortcut { sequence: "Alt+Home"; onActivated: app.go(app.home) }
+    Shortcut { sequence: "Ctrl+T"; onActivated: app.newTab() }
+    Shortcut { sequence: "Ctrl+W"; onActivated: app.closeTab(app.tab) }
+    Shortcut { sequence: "Ctrl+PgDown"; onActivated: app.showTab((app.tab + 1) % app.tabs.length) }
+    Shortcut { sequence: "Ctrl+PgUp"; onActivated: app.showTab((app.tab + app.tabs.length - 1) % app.tabs.length) }
+    Shortcut { sequence: "Ctrl++"; onActivated: app.setZoom(app.zoom + 0.2) }
+    Shortcut { sequence: "Ctrl+="; onActivated: app.setZoom(app.zoom + 0.2) }
+    Shortcut { sequence: "Ctrl+-"; onActivated: app.setZoom(app.zoom - 0.2) }
+    Shortcut { sequence: "Ctrl+0"; onActivated: app.setZoom(1) }
+    Shortcut { sequence: "F1"; onActivated: keysSheet.open() }
     Shortcut { sequence: "Ctrl+L"; onActivated: pathField.grabFocus() }
     Shortcut { sequence: "Ctrl+H"; onActivated: app.showHidden = !app.showHidden }
     Shortcut { sequence: "Alt+Left"; onActivated: app.goBack() }
@@ -897,11 +1253,13 @@ Item {
     Shortcut { sequence: "Ctrl+Q"; onActivated: app.quit() }
     Shortcut {
         sequence: "Escape"
-        enabled: menu.visible || dialog.visible || look.visible || palette.visible
+        enabled: menu.visible || dialog.visible || look.visible || palette.visible || sheet.visible || keysSheet.visible
         onActivated: {
             menu.close();
             dialog.close();
             palette.close();
+            sheet.close();
+            keysSheet.close();
             look.close();
         }
     }
@@ -913,7 +1271,17 @@ Item {
             const page = files.pageStep;
             const ctrl = (event.modifiers & Qt.ControlModifier) !== 0;
             let handled = true;
-            if (event.key === Qt.Key_Down)
+            const shift = (event.modifiers & Qt.ShiftModifier) !== 0;
+            if ((event.key === Qt.Key_Down || event.key === Qt.Key_Up) && shift && app.current >= 0) {
+                const to = Math.max(0, Math.min(app.rows.length - 1, app.current + (event.key === Qt.Key_Down ? files.columns : -files.columns)));
+                if (app.anchor < 0)
+                    app.anchor = app.current;
+                const next = {};
+                for (let n = Math.min(app.anchor, to); n <= Math.max(app.anchor, to); n++)
+                    next[app.rows[n].path] = true;
+                app.marked = next;
+                app.select(to);
+            } else if (event.key === Qt.Key_Down)
                 app.select(app.current < 0 ? 0 : app.current + files.columns);
             else if (event.key === Qt.Key_Up)
                 app.select(app.current < 0 ? app.rows.length - 1 : app.current - files.columns);
@@ -931,6 +1299,16 @@ Item {
                 app.select(app.current - page);
             else if (event.key === Qt.Key_A && ctrl)
                 app.markAll();
+            else if (event.key === Qt.Key_Z && ctrl)
+                app.undoLast();
+            else if (event.key === Qt.Key_I && ctrl && shift)
+                app.invertMarks();
+            else if (event.key === Qt.Key_I && ctrl)
+                app.properties();
+            else if (event.key === Qt.Key_D && ctrl)
+                app.toggleBookmark(app.selected && app.selected.isDir ? app.selected.path : app.path);
+            else if (event.key === Qt.Key_N && ctrl && !shift)
+                app.newFile();
             else if (event.key === Qt.Key_Slash)
                 rail.filter.grabFocus();
             else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter)
@@ -939,8 +1317,14 @@ Item {
                 app.goUp();
             else if (event.key === Qt.Key_Space)
                 look.open();
+            else if (event.key === Qt.Key_Delete && shift)
+                app.erase();
             else if (event.key === Qt.Key_Delete)
                 app.trash();
+            else if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && ctrl && app.selected && app.selected.isDir)
+                app.newTab(app.selected.path);
+            else if (event.key >= Qt.Key_1 && event.key <= Qt.Key_9 && (event.modifiers & Qt.AltModifier))
+                app.showTab(event.key - Qt.Key_1);
             else if (event.key === Qt.Key_F2)
                 app.rename();
             else if (event.key === Qt.Key_C && (event.modifiers & Qt.ControlModifier))
@@ -957,7 +1341,12 @@ Item {
                 app.marked = {};
                 app.current = -1;
             }
-            else
+            else if (!ctrl && !(event.modifiers & Qt.AltModifier) && event.text.length === 1 && /^[A-Za-z0-9À-ÿ._-]$/.test(event.text)) {
+                // Typing starts filtering the folder.
+                rail.filter.text = event.text;
+                app.query = event.text;
+                rail.filter.grabFocus();
+            } else
                 handled = false;
             event.accepted = handled;
         }
@@ -995,14 +1384,22 @@ Item {
                 }
                 Repeater {
                     model: {
-                        const parts = app.shorten(app.path).split("/").filter(s => s !== "");
                         const out = [];
                         let at = "";
+                        let shown = app.shorten(app.path);
+                        const colon = shown.indexOf(":/");
+                        if (colon > 0 && shown.charAt(0) !== "/") {
+                            at = app.path.slice(0, app.path.length - (shown.length - colon - 1)).replace(/\/$/, "");
+                            out.push({ label: shown.slice(0, colon).toUpperCase(), path: at });
+                            shown = shown.slice(colon + 1);
+                        }
+                        const remote = out.length > 0;
+                        const parts = shown.split("/").filter(s => s !== "");
                         for (const s of parts) {
                             at = s === "~" ? app.home : at + "/" + s;
                             out.push({ label: s === "~" ? "INICIO" : s.toUpperCase(), path: at });
                         }
-                        if (app.path.indexOf(app.home) !== 0)
+                        if (!remote && app.path.indexOf(app.home) !== 0)
                             out.unshift({ label: "RAÍZ", path: "/" });
                         return out.slice(-5);
                     }
@@ -1090,11 +1487,76 @@ Item {
             }
         }
 
+        Row {
+            id: tabBar
+            anchors { left: parent.left; right: detail.left; top: tools.bottom; topMargin: Tokens.s3; rightMargin: Tokens.s5 }
+            visible: app.tabs.length > 1
+            height: visible ? 30 : 0
+            spacing: Tokens.s2
+            clip: true
+
+            Repeater {
+                model: app.tabs
+
+                Rectangle {
+                    id: chip
+                    required property var modelData
+                    required property int index
+                    readonly property bool on: app.tab === index
+
+                    width: Math.min(220, chipRow.width + Tokens.s4)
+                    height: 30
+                    radius: Tokens.radius
+                    color: on ? Tokens.bone : (chipHover.hovered ? Tokens.tint10 : "transparent")
+                    border.width: Tokens.border
+                    border.color: on ? Tokens.bone : Tokens.line
+
+                    Row {
+                        id: chipRow
+                        anchors.centerIn: parent
+                        spacing: Tokens.s2
+
+                        Text {
+                            visible: chip.on
+                            text: "//"
+                            color: Tokens.inkOnBoneDim
+                            font.family: Tokens.mono
+                            font.pixelSize: 10
+                            anchors.verticalCenter: parent.verticalCenter
+                        }
+                        Text {
+                            text: app.nameOf(chip.on ? app.path : chip.modelData.path).toUpperCase()
+                            color: chip.on ? Tokens.inkOnBone : Tokens.inkDim
+                            font.family: Tokens.ui
+                            font.pixelSize: 11
+                            font.weight: Font.Medium
+                            font.letterSpacing: Tokens.trackLabel
+                            elide: Text.ElideRight
+                            width: Math.min(implicitWidth, 150)
+                            anchors.verticalCenter: parent.verticalCenter
+                        }
+                        Text {
+                            text: "×"
+                            color: chip.on ? Tokens.inkOnBoneDim : Tokens.inkFaint
+                            font.family: Tokens.ui
+                            font.pixelSize: 14
+                            anchors.verticalCenter: parent.verticalCenter
+                            TapHandler { onTapped: app.closeTab(chip.index) }
+                        }
+                    }
+                    HoverHandler { id: chipHover; cursorShape: Qt.PointingHandCursor }
+                    TapHandler { onTapped: app.showTab(chip.index) }
+                    TapHandler { acceptedButtons: Qt.MiddleButton; onTapped: app.closeTab(chip.index) }
+                }
+            }
+            Btn { text: "+"; width: 34; height: 30; onAct: app.newTab() }
+        }
+
         FileList {
             id: files
             app: app
-            anchors { left: parent.left; right: detail.left; top: tools.bottom; bottom: parent.bottom }
-            anchors.topMargin: Tokens.s4
+            anchors { left: parent.left; right: detail.left; top: tabBar.bottom; bottom: parent.bottom }
+            anchors.topMargin: tabBar.visible ? Tokens.s3 : Tokens.s4
             anchors.rightMargin: Tokens.s5
             anchors.bottomMargin: Tokens.s5
         }
@@ -1143,11 +1605,27 @@ Item {
                 anchors.verticalCenter: parent.verticalCenter
             }
         }
-        Text {
+        Rectangle {
+            visible: app.transfer !== null
+            height: 2
+            width: app.transfer && app.transfer.total > 0 ? parent.width * Math.min(1, app.transfer.done / app.transfer.total) : 0
+            color: Tokens.sun
+        }
+        Btn {
+            id: cancel
+            visible: app.transfer !== null
             anchors { right: parent.right; rightMargin: Tokens.s6; verticalCenter: parent.verticalCenter }
-            text: app.notice !== "" ? app.notice : (app.clip ? "PORTAPAPELES · " + app.clip.text + "   " : "") + app.space
-            color: app.notice !== "" && app.noticeBad ? Tokens.alert : (app.notice !== "" ? Tokens.ink : Tokens.inkMuted)
-            width: parent.width * 0.6
+            compact: true
+            text: "CANCELAR"
+            onAct: app.cancelTransfer()
+        }
+        Text {
+            anchors { right: cancel.visible ? cancel.left : parent.right; rightMargin: cancel.visible ? Tokens.s3 : Tokens.s6; verticalCenter: parent.verticalCenter }
+            text: app.transfer !== null
+                ? "COPIANDO · " + app.transfer.name.toUpperCase() + " · " + (app.transfer.total > 0 ? Math.floor(100 * app.transfer.done / app.transfer.total) : 0) + "%"
+                : app.notice !== "" ? app.notice : (app.clip ? "PORTAPAPELES · " + app.clip.text + "   " : "") + app.space
+            color: app.transfer !== null ? Tokens.ink : (app.notice !== "" && app.noticeBad ? Tokens.alert : (app.notice !== "" ? Tokens.ink : Tokens.inkMuted))
+            width: parent.width * 0.55
             horizontalAlignment: Text.AlignRight
             elide: Text.ElideMiddle
             font.family: Tokens.mono
@@ -1160,6 +1638,15 @@ Item {
         id: look
         app: app
         onVisibleChanged: app.loadPreview()
+        onClosed: app.focusList()
+    }
+    Properties {
+        id: sheet
+        app: app
+        onClosed: app.focusList()
+    }
+    KeySheet {
+        id: keysSheet
         onClosed: app.focusList()
     }
     CommandPalette {

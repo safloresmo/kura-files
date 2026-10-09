@@ -1,0 +1,10 @@
+[package]
+name = "archivos-motor"
+version = "0.1.0"
+edition = "2021"
+description = "File operations behind the file manager"
+publish = false
+
+[profile.release]
+opt-level = 2
+strip = true

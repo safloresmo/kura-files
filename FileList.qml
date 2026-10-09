@@ -13,8 +13,8 @@ Rectangle {
     readonly property int sizeW: 110
     readonly property int whenW: 160
     readonly property int kindW: 96
-    readonly property int cellW: 136
-    readonly property int cellH: 124
+    readonly property int cellW: Math.round(136 * app.zoom)
+    readonly property int cellH: Math.round(124 * app.zoom)
     readonly property int columns: app.grid ? Math.max(1, Math.floor(tiles.width / cellW)) : 1
     readonly property int pageStep: app.grid ? Math.max(1, Math.floor(tiles.height / cellH)) * columns
         : Math.max(1, Math.floor(view.height / 40) - 1)
@@ -125,15 +125,11 @@ Rectangle {
             label: "MODIFICADO"
             key: 2
         }
-        Text {
-            visible: !card.app.grid
-            x: parent.width - card.kindW
-            anchors.verticalCenter: parent.verticalCenter
-            text: "TIPO"
-            color: Tokens.inkFaint
-            font.family: Tokens.mono
-            font.pixelSize: 10
-            font.letterSpacing: Tokens.trackMark
+        HeadCell {
+            x: card.app.grid ? 420 : parent.width - card.kindW
+            width: card.kindW
+            label: "TIPO"
+            key: 3
         }
     }
 
@@ -319,24 +315,26 @@ Rectangle {
             Item {
                 id: art
                 anchors { top: parent.top; topMargin: 14; horizontalCenter: parent.horizontalCenter }
-                width: 96
-                height: 60
+                width: Math.round(96 * card.app.zoom)
+                height: Math.round(60 * card.app.zoom)
 
                 Image {
                     id: thumb
                     anchors.fill: parent
                     visible: status === Image.Ready
-                    source: !tile.modelData.isDir && Fmt.isImage(tile.modelData.name) ? card.app.url(tile.modelData.path) : ""
+                    source: tile.modelData.isDir ? ""
+                        : Fmt.isImage(tile.modelData.name) ? card.app.url(tile.modelData.path)
+                        : card.app.thumbs[tile.modelData.path] ? card.app.url(card.app.thumbs[tile.modelData.path]) : ""
                     asynchronous: true
                     fillMode: Image.PreserveAspectFit
-                    sourceSize.width: 192
-                    sourceSize.height: 120
+                    sourceSize.width: 384
+                    sourceSize.height: 240
                 }
                 Icon {
                     anchors.centerIn: parent
                     visible: !thumb.visible
                     name: card.app.iconFor(tile.modelData.name, tile.modelData.path, tile.modelData.isDir)
-                    size: 34
+                    size: Math.round(34 * card.app.zoom)
                     color: tile.lit ? Tokens.inkDim : Tokens.inkFaint
                 }
             }

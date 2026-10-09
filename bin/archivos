@@ -24,7 +24,19 @@ archivos mover DESTINO ORIGEN...    mueve sin sobrescribir
 archivos renombrar ORIGEN NOMBRE
 archivos carpeta DONDE NOMBRE       crea una carpeta
 archivos papelera ORIGEN...         manda a la papelera
+archivos comprimir FORMATO ORIGEN...   zip, tar.gz, tar.xz o 7z
+archivos extraer ARCHIVO            extrae en una carpeta nueva
+archivos info RUTA                  lo que se sabe de un archivo o carpeta
+
+archivos compilar               compila el motor (hace falta la primera vez)
 TEXT
+}
+
+motor=$root/motor/target/release/archivos-motor
+
+engine() {
+    [ -x "$motor" ] || { echo "Falta compilar el motor: archivos compilar" >&2; exit 1; }
+    exec "$motor" "$@"
 }
 
 window() {
@@ -49,6 +61,7 @@ open_at() {
         [ -n "$dir" ] && window go "$dir"
         return 0
     fi
+    [ -x "$motor" ] || { echo "Falta compilar el motor: archivos compilar" >&2; exit 1; }
     [ -n "$dir" ] && export ARCHIVOS_DIR=$dir
     exec qs -p "$root"
 }
@@ -70,10 +83,14 @@ case ${1:-} in
         shift 2
         exec tailscale file cp -- "$@" "$target:"
         ;;
-    copiar) shift; exec "$root/bin/archivos-op" copy "$@" ;;
-    mover) shift; exec "$root/bin/archivos-op" move "$@" ;;
-    renombrar) shift; exec "$root/bin/archivos-op" rename "$@" ;;
-    carpeta) shift; exec "$root/bin/archivos-op" mkdir "$@" ;;
-    papelera) shift; exec "$root/bin/archivos-op" trash "$@" ;;
+    copiar) shift; engine copy "$@" ;;
+    mover) shift; engine move "$@" ;;
+    renombrar) shift; engine rename "$@" ;;
+    carpeta) shift; engine mkdir "$@" ;;
+    papelera) shift; engine trash "$@" ;;
+    comprimir) shift; engine compress "$@" ;;
+    extraer) shift; engine extract "$@" ;;
+    info) shift; engine info "$@" ;;
+    compilar) exec cargo build --release --manifest-path "$root/motor/Cargo.toml" ;;
     *) open_at "$1" ;;
 esac
