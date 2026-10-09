@@ -47,6 +47,8 @@ ShellRoot {
         function paste(): void { app.paste(); }
         function trash(): void { app.trash(); }
         function restore(): void { app.restore(); }
+        function search(text: string): void { app.search(text); }
+        function drop(dest: string, source: string): void { app.dragging = true; app.dropOn(dest, ["file://" + source]); app.dragging = false; }
         function mark(index: int): void { app.click(index, Qt.ControlModifier); }
         function all(): void { app.markAll(); }
         function grid(): void { app.toggleGrid(); }

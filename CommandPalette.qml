@@ -24,6 +24,10 @@ Item {
             if (words.every(w => text.indexOf(w) >= 0))
                 out.push(c);
         }
+        if (q !== "" && out.length === 0 || (q !== "" && q.charAt(0) !== "/" && q.charAt(0) !== "~")) {
+            const text = query.trim();
+            out.push({ label: "Buscar «" + text + "» en subcarpetas", hint: "BÚSQUEDA", act: () => palette.app.search(text) });
+        }
         return out;
     }
 

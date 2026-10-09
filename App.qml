@@ -31,6 +31,11 @@ Item {
     property var marked: ({})
     property int anchor: -1
     property var apps: []
+    property bool dragging: false
+    property string dragData: ""
+    property bool deep: false
+    property string deepQuery: ""
+    property var found: []
     property string appsFor: ""
     property var targets: []
     property var preview: ({ kind: "none" })
@@ -77,8 +82,10 @@ Item {
 
     function go(p) {
         p = clean(p);
-        if (p === path)
+        if (p === path) {
+            endSearch();
             return;
+        }
         back = back.concat([path]);
         forward = [];
         path = p;
@@ -207,6 +214,63 @@ Item {
     function toggleGrid() {
         settings.grid = !settings.grid;
         settingsFile.writeAdapter();
+    }
+
+    // A drag carries the marked rows when it starts on one of them, else its own row.
+    function beginDrag(i) {
+        const e = entry(i);
+        if (!e)
+            return;
+        if (marked[e.path] !== true) {
+            marked = {};
+            current = i;
+            anchor = i;
+        }
+        dragData = picked().map(x => url(x.path)).join("\r\n");
+        dragging = true;
+    }
+    function dropOn(dest, urls) {
+        const inside = dragging;
+        const paths = [];
+        for (const u of urls) {
+            const p = decodeURIComponent(String(u).replace(/^file:\/\//, ""));
+            if (p.charAt(0) !== "/" || p === dest)
+                continue;
+            if (inside && p.slice(0, p.lastIndexOf("/")) === dest)
+                continue;
+            paths.push(p);
+        }
+        if (paths.length === 0 || inTrash)
+            return;
+        const what = paths.length === 1 ? paths[0].slice(paths[0].lastIndexOf("/") + 1).toUpperCase() : paths.length + " ELEMENTOS";
+        const where = dest.slice(dest.lastIndexOf("/") + 1).toUpperCase() || "/";
+        marked = {};
+        if (dest === trashDir)
+            op(["trash"].concat(paths), "A LA PAPELERA · " + what);
+        else
+            op([inside ? "drop" : "copy", dest].concat(paths), (inside ? "SOLTADO EN " : "COPIADO A ") + where + " · " + what);
+    }
+    function search(text) {
+        const q = String(text).trim();
+        if (q === "")
+            return;
+        deepQuery = q;
+        found = [];
+        deep = true;
+        rail.filter.clear();
+        query = "";
+        finder.running = false;
+        finder.command = ["sh", "-c", "cd \"$1\" && find . -mindepth 1 " + (showHidden ? "" : "-not -path '*/.*' ")
+            + "-iname \"*$2*\" -printf '%y\\t%s\\t%T@\\t%p\\n' 2>/dev/null | head -n 500", "sh", path, q];
+        finder.running = true;
+        focusList();
+    }
+    function endSearch() {
+        if (!deep)
+            return;
+        deep = false;
+        found = [];
+        rebuild();
     }
 
     function hold(cut) {
@@ -395,6 +459,8 @@ Item {
         add(grid ? "Ver como lista" : "Ver como cuadrícula", "CTRL+G", () => toggleGrid());
         add(showHidden ? "Esconder los ocultos" : "Mostrar los ocultos", "CTRL+H", () => showHidden = !showHidden);
         add("Filtrar esta carpeta", "CTRL+F", () => rail.filter.grabFocus());
+        if (deep)
+            add("Cerrar la búsqueda", "ESC", () => endSearch());
         add("Terminal aquí", "ACCIÓN", () => terminal(path));
         add("Copiar la ruta de esta carpeta", "ACCIÓN", () => copyPath(path));
         add("Subir una carpeta", "ALT+↑", () => goUp());
@@ -474,14 +540,22 @@ Item {
         const list = [];
         let dirs = 0;
         let regular = 0;
-        for (let i = 0; i < dir.count; i++) {
-            const e = {
-                name: dir.get(i, "fileName"),
-                path: dir.get(i, "filePath"),
-                size: dir.get(i, "fileSize"),
-                modified: dir.get(i, "fileModified"),
-                isDir: dir.isFolder(i)
-            };
+        const source = [];
+        if (deep) {
+            for (const e of found)
+                source.push(e);
+        } else {
+            for (let i = 0; i < dir.count; i++) {
+                source.push({
+                    name: dir.get(i, "fileName"),
+                    path: dir.get(i, "filePath"),
+                    size: dir.get(i, "fileSize"),
+                    modified: dir.get(i, "fileModified"),
+                    isDir: dir.isFolder(i)
+                });
+            }
+        }
+        for (const e of source) {
             if (e.isDir)
                 dirs++;
             else
@@ -498,7 +572,7 @@ Item {
                 d = a.size - b.size;
             else if (sortKey === 2)
                 d = b.modified - a.modified;
-            return flip * (d || a.name.localeCompare(b.name));
+            return flip * (d || (a.shown || a.name).localeCompare(b.shown || b.name));
         });
         dirTotal = dirs;
         fileTotal = regular;
@@ -517,6 +591,8 @@ Item {
     }
 
     onPathChanged: {
+        deep = false;
+        found = [];
         current = -1;
         marked = {};
         anchor = -1;
@@ -746,6 +822,31 @@ Item {
         }
     }
     Process {
+        id: finder
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const list = [];
+                for (const line of text.split("\n")) {
+                    const cols = line.split("\t");
+                    if (cols.length < 4)
+                        continue;
+                    const shown = cols.slice(3).join("\t").slice(2);
+                    const full = (app.path === "/" ? "" : app.path) + "/" + shown;
+                    list.push({
+                        name: full.slice(full.lastIndexOf("/") + 1),
+                        shown: shown,
+                        path: full,
+                        size: Number(cols[1]),
+                        modified: new Date(Number(cols[2]) * 1000),
+                        isDir: cols[0] === "d"
+                    });
+                }
+                app.found = list;
+                app.rebuild();
+            }
+        }
+    }
+    Process {
         id: appFinder
         stdout: StdioCollector {
             onStreamFinished: {
@@ -851,6 +952,8 @@ Item {
             else if (event.key === Qt.Key_N && (event.modifiers & Qt.ControlModifier) && (event.modifiers & Qt.ShiftModifier))
                 app.newFolder();
             else if (event.key === Qt.Key_Escape) {
+                if (app.markedCount === 0 && app.current < 0)
+                    app.endSearch();
                 app.marked = {};
                 app.current = -1;
             }
@@ -960,7 +1063,8 @@ Item {
         Text {
             id: blurb
             anchors { left: parent.left; right: parent.right; top: heading.bottom; topMargin: Tokens.s1 }
-            text: !app.ready ? "Leyendo…"
+            text: app.deep ? Fmt.plural(app.rows.length, "resultado", "resultados") + " para «" + app.deepQuery + "» en esta carpeta y sus subcarpetas."
+                : !app.ready ? "Leyendo…"
                 : (dir.count === 0 ? "Sin contenido."
                     : Fmt.plural(app.dirTotal, "carpeta", "carpetas") + " y " + Fmt.plural(app.fileTotal, "archivo", "archivos") + ".")
             color: Tokens.inkMuted

@@ -112,6 +112,13 @@ Item {
             onEdited: t => rail.app.query = t
             onAccepted: rail.app.focusList()
         }
+        Btn {
+            visible: rail.app.query !== "" && !rail.app.inTrash
+            width: parent.width
+            compact: true
+            text: "BUSCAR EN SUBCARPETAS"
+            onAct: rail.app.search(rail.app.query)
+        }
     }
 
     Flickable {
@@ -146,7 +153,9 @@ Item {
                         anchors.topMargin: 1
                         anchors.bottomMargin: 1
                         radius: Tokens.radius
-                        color: place.sel ? Tokens.bone : (placeHover.hovered ? Tokens.tint10 : "transparent")
+                        color: place.sel ? Tokens.bone : (placeDrop.containsDrag ? Tokens.tint16 : (placeHover.hovered ? Tokens.tint10 : "transparent"))
+                        border.width: placeDrop.containsDrag ? Tokens.border : 0
+                        border.color: Tokens.lineStrong
                         Behavior on color { ColorAnimation { duration: Tokens.snap } }
                     }
                     Row {
@@ -188,6 +197,14 @@ Item {
                     }
                     HoverHandler { id: placeHover; cursorShape: Qt.PointingHandCursor }
                     TapHandler { onTapped: rail.app.go(place.modelData.path) }
+                    DropArea {
+                        id: placeDrop
+                        anchors.fill: parent
+                        onDropped: drop => {
+                            rail.app.dropOn(place.modelData.path, drop.urls);
+                            drop.accept(Qt.CopyAction);
+                        }
+                    }
                 }
             }
 
@@ -210,7 +227,7 @@ Item {
                         anchors.topMargin: 1
                         anchors.bottomMargin: 1
                         radius: Tokens.radius
-                        color: device.sel ? Tokens.tint16 : (deviceHover.hovered ? Tokens.tint10 : "transparent")
+                        color: device.sel || deviceDrop.containsDrag ? Tokens.tint16 : (deviceHover.hovered ? Tokens.tint10 : "transparent")
                         Behavior on color { ColorAnimation { duration: Tokens.snap } }
                     }
                     Row {
@@ -257,6 +274,15 @@ Item {
                     }
                     HoverHandler { id: deviceHover; cursorShape: Qt.PointingHandCursor }
                     TapHandler { onTapped: device.modelData.mounted ? rail.app.go(device.modelData.path) : rail.app.mount(device.modelData) }
+                    DropArea {
+                        id: deviceDrop
+                        anchors.fill: parent
+                        enabled: device.modelData.mounted
+                        onDropped: drop => {
+                            rail.app.dropOn(device.modelData.path, drop.urls);
+                            drop.accept(Qt.CopyAction);
+                        }
+                    }
 
                     Item {
                         id: ejectButton

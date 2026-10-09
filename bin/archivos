@@ -10,6 +10,7 @@ usage() {
 archivos [RUTA]                 abre el gestor; si ya está abierto, lo lleva a RUTA
 archivos ir RUTA                lleva la ventana abierta a RUTA
 archivos filtro [TEXTO]         filtra la carpeta que se está viendo
+archivos buscar TEXTO           busca por nombre en la carpeta y sus subcarpetas
 archivos estado                 lo que muestra la ventana, en JSON
 archivos marca                  cambia entre la marca propia y Ryoku Files
 archivos vista                  cambia entre lista y cuadrícula
@@ -57,6 +58,7 @@ case ${1:-} in
     ayuda | -h | --help) usage ;;
     ir) need_window; window go "$(readlink -f -- "${2:?falta la ruta}")" ;;
     filtro) need_window; window filter "${2:-}" ;;
+    buscar) need_window; window search "${2:?falta el texto}" ;;
     estado) need_window; window state ;;
     marca) need_window; window brand ;;
     vista) need_window; window grid ;;

@@ -4,6 +4,7 @@
 #
 #   archivos-op copy   DEST SRC...
 #   archivos-op move   DEST SRC...
+#   archivos-op drop   DEST SRC...   move within a disk, copy across disks
 #   archivos-op rename SRC NEWNAME
 #   archivos-op mkdir  DIR NAME
 #   archivos-op trash  SRC...
@@ -38,7 +39,7 @@ valid_name() {
 }
 
 transfer() {
-    local op=$1 dest=$2 src name real_src real_dest failed=0
+    local mode=$1 dest=$2 op src name real_src real_dest failed=0
     shift 2
     [ -d "$dest" ] || fail "El destino no es una carpeta: $dest"
     real_dest=$(readlink -f -- "$dest")
@@ -49,6 +50,10 @@ transfer() {
             continue
         fi
         real_src=$(readlink -f -- "$src")
+        op=$mode
+        if [ "$mode" = drop ]; then
+            if [ "$(stat -c %d -- "$src")" = "$(stat -c %d -- "$dest")" ]; then op=move; else op=copy; fi
+        fi
         case $real_dest/ in
             "$real_src"/*)
                 printf 'No se puede poner una carpeta dentro de sí misma: %s\n' "$src" >&2
@@ -78,7 +83,7 @@ op=$1
 shift
 
 case $op in
-    copy | move)
+    copy | move | drop)
         [ $# -ge 2 ] || fail "uso: archivos-op $op DEST SRC..." 2
         transfer "$op" "$@"
         ;;

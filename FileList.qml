@@ -61,6 +61,15 @@ Rectangle {
         TapHandler { onTapped: card.app.sortBy(key) }
     }
 
+    DropArea {
+        id: folderDrop
+        anchors.fill: parent
+        onDropped: drop => {
+            card.app.dropOn(card.app.path, drop.urls);
+            drop.accept(Qt.CopyAction);
+        }
+    }
+
     Item {
         id: title
         anchors { left: parent.left; right: parent.right; top: parent.top }
@@ -68,7 +77,7 @@ Rectangle {
 
         Text {
             anchors { left: parent.left; leftMargin: Tokens.s4; verticalCenter: parent.verticalCenter }
-            text: card.app.inTrash ? "PAPELERA" : "CONTENIDO"
+            text: card.app.inTrash ? "PAPELERA" : (card.app.deep ? "RESULTADOS · " + card.app.deepQuery.toUpperCase() : "CONTENIDO")
             color: Tokens.ink
             font.family: Tokens.mono
             font.pixelSize: 12
@@ -190,7 +199,7 @@ Rectangle {
                     anchors.verticalCenter: parent.verticalCenter
                 }
                 Text {
-                    text: row.modelData.name
+                    text: row.modelData.shown || row.modelData.name
                     color: row.lit ? Tokens.ink : (row.modelData.name.charAt(0) === "." ? Tokens.inkFaint : Tokens.inkDim)
                     font.family: Tokens.ui
                     font.pixelSize: Tokens.fRow
@@ -227,6 +236,38 @@ Rectangle {
                 color: Tokens.inkFaint
                 font.family: Tokens.mono
                 font.pixelSize: 11
+            }
+
+            Drag.dragType: Drag.Automatic
+            Drag.supportedActions: Qt.CopyAction
+            Drag.mimeData: ({ "text/uri-list": card.app.dragData })
+            Drag.onDragFinished: card.app.dragging = false
+
+            DragHandler {
+                target: null
+                acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+                grabPermissions: PointerHandler.CanTakeOverFromAnything
+                onActiveChanged: {
+                    if (active)
+                        card.app.beginDrag(row.index);
+                    row.Drag.active = active;
+                }
+            }
+            DropArea {
+                id: rowDrop
+                anchors.fill: parent
+                enabled: row.modelData.isDir
+                onDropped: drop => {
+                    card.app.dropOn(row.modelData.path, drop.urls);
+                    drop.accept(Qt.CopyAction);
+                }
+            }
+            Rectangle {
+                anchors.fill: parent
+                visible: rowDrop.containsDrag
+                color: Tokens.tint10
+                border.width: Tokens.border
+                border.color: Tokens.lineStrong
             }
 
             HoverHandler { id: rowHover }
@@ -304,13 +345,47 @@ Rectangle {
                 anchors.leftMargin: 10
                 anchors.rightMargin: 10
                 horizontalAlignment: Text.AlignHCenter
-                text: (tile.lit ? "// " : "") + tile.modelData.name
+                text: (tile.lit ? "// " : "") + (tile.modelData.shown || tile.modelData.name)
                 color: tile.lit ? Tokens.ink : (tile.modelData.name.charAt(0) === "." ? Tokens.inkFaint : Tokens.inkDim)
                 font.family: Tokens.ui
                 font.pixelSize: 12
                 wrapMode: Text.WrapAnywhere
                 maximumLineCount: 2
                 elide: Text.ElideRight
+            }
+
+            Drag.dragType: Drag.Automatic
+            Drag.supportedActions: Qt.CopyAction
+            Drag.mimeData: ({ "text/uri-list": card.app.dragData })
+            Drag.onDragFinished: card.app.dragging = false
+
+            DragHandler {
+                target: null
+                acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+                grabPermissions: PointerHandler.CanTakeOverFromAnything
+                onActiveChanged: {
+                    if (active)
+                        card.app.beginDrag(tile.index);
+                    tile.Drag.active = active;
+                }
+            }
+            DropArea {
+                id: tileDrop
+                anchors.fill: parent
+                enabled: tile.modelData.isDir
+                onDropped: drop => {
+                    card.app.dropOn(tile.modelData.path, drop.urls);
+                    drop.accept(Qt.CopyAction);
+                }
+            }
+            Rectangle {
+                anchors.fill: parent
+                anchors.margins: 4
+                radius: Tokens.radius
+                visible: tileDrop.containsDrag
+                color: Tokens.tint10
+                border.width: Tokens.border
+                border.color: Tokens.lineStrong
             }
 
             HoverHandler { id: tileHover }
@@ -334,7 +409,8 @@ Rectangle {
     Empty {
         anchors.centerIn: view
         visible: card.app.ready && card.app.rows.length === 0
-        caption: card.app.query !== "" ? "Nada coincide con «" + card.app.query + "»."
+        caption: card.app.deep ? "Nada coincide con «" + card.app.deepQuery + "» en las subcarpetas."
+            : card.app.query !== "" ? "Nada coincide con «" + card.app.query + "»."
             : (card.app.inTrash ? "La papelera está vacía." : "Esta carpeta está vacía.")
     }
 }
