@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# Open the file manager, optionally at a given folder.
+set -eu
+
+root=$(dirname "$(dirname "$(readlink -f "$0")")")
+
+if [ $# -gt 0 ]; then
+    ARCHIVOS_DIR=$(readlink -f -- "$1")
+    export ARCHIVOS_DIR
+fi
+
+exec qs -p "$root"
