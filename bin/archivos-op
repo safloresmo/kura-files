@@ -1,0 +1,111 @@
+#!/usr/bin/env bash
+# File operations for the file manager. Nothing here overwrites: a name that
+# is already taken gets a numbered copy instead.
+#
+#   archivos-op copy   DEST SRC...
+#   archivos-op move   DEST SRC...
+#   archivos-op rename SRC NEWNAME
+#   archivos-op mkdir  DIR NAME
+#   archivos-op trash  SRC...
+set -u
+
+fail() {
+    printf '%s\n' "$1" >&2
+    exit "${2:-1}"
+}
+
+# free_name DIR NAME: NAME, or "stem (2).ext" and up while the name is taken.
+free_name() {
+    local dir=$1 name=$2 stem ext n=2
+    if [ ! -e "$dir/$name" ] && [ ! -L "$dir/$name" ]; then
+        printf '%s' "$name"
+        return
+    fi
+    case $name in
+        ?*.*) stem=${name%.*}; ext=.${name##*.} ;;
+        *) stem=$name; ext= ;;
+    esac
+    while [ -e "$dir/$stem ($n)$ext" ] || [ -L "$dir/$stem ($n)$ext" ]; do
+        n=$((n + 1))
+    done
+    printf '%s' "$stem ($n)$ext"
+}
+
+valid_name() {
+    case $1 in
+        "" | . | .. | */*) return 1 ;;
+    esac
+}
+
+transfer() {
+    local op=$1 dest=$2 src name real_src real_dest failed=0
+    shift 2
+    [ -d "$dest" ] || fail "El destino no es una carpeta: $dest"
+    real_dest=$(readlink -f -- "$dest")
+    for src in "$@"; do
+        if [ ! -e "$src" ] && [ ! -L "$src" ]; then
+            printf 'No existe: %s\n' "$src" >&2
+            failed=1
+            continue
+        fi
+        real_src=$(readlink -f -- "$src")
+        case $real_dest/ in
+            "$real_src"/*)
+                printf 'No se puede poner una carpeta dentro de sí misma: %s\n' "$src" >&2
+                failed=1
+                continue
+                ;;
+        esac
+        if [ "$op" = move ] && [ "$(dirname -- "$real_src")" = "$real_dest" ]; then
+            continue
+        fi
+        name=$(free_name "$dest" "$(basename -- "$src")")
+        if [ "$op" = copy ]; then
+            cp -a --reflink=auto -n -- "$src" "$dest/$name" || failed=1
+        else
+            mv -n -- "$src" "$dest/$name" || failed=1
+            if [ -e "$src" ] || [ -L "$src" ]; then
+                printf 'No se movió: %s\n' "$src" >&2
+                failed=1
+            fi
+        fi
+    done
+    exit "$failed"
+}
+
+[ $# -ge 1 ] || fail "falta la operación" 2
+op=$1
+shift
+
+case $op in
+    copy | move)
+        [ $# -ge 2 ] || fail "uso: archivos-op $op DEST SRC..." 2
+        transfer "$op" "$@"
+        ;;
+    rename)
+        [ $# -eq 2 ] || fail "uso: archivos-op rename SRC NEWNAME" 2
+        valid_name "$2" || fail "Nombre no válido: $2"
+        dir=$(dirname -- "$1")
+        [ "$(basename -- "$1")" = "$2" ] && exit 0
+        if [ -e "$dir/$2" ] || [ -L "$dir/$2" ]; then
+            fail "Ya existe: $2" 3
+        fi
+        mv -n -T -- "$1" "$dir/$2" || exit 1
+        if [ -e "$1" ] || [ -L "$1" ]; then
+            fail "No se pudo renombrar: $1"
+        fi
+        ;;
+    mkdir)
+        [ $# -eq 2 ] || fail "uso: archivos-op mkdir DIR NAME" 2
+        valid_name "$2" || fail "Nombre no válido: $2"
+        [ -d "$1" ] || fail "No es una carpeta: $1"
+        mkdir -- "$1/$(free_name "$1" "$2")"
+        ;;
+    trash)
+        [ $# -ge 1 ] || fail "uso: archivos-op trash SRC..." 2
+        gio trash -- "$@"
+        ;;
+    *)
+        fail "operación desconocida: $op" 2
+        ;;
+esac

@@ -97,14 +97,28 @@ Rectangle {
                     anchors.fill: parent
                     anchors.margins: 1
                     visible: status === Image.Ready
-                    source: card.item && !card.item.isDir && Fmt.isImage(card.item.name) ? card.app.url(card.item.path) : ""
+                    source: card.app.preview.kind === "image" ? card.app.url(card.app.preview.path) : ""
                     asynchronous: true
                     fillMode: Image.PreserveAspectFit
                     sourceSize.width: 720
                 }
+                Text {
+                    id: excerpt
+                    anchors.fill: parent
+                    anchors.margins: Tokens.s2
+                    visible: card.app.preview.kind === "text"
+                    text: visible ? card.app.preview.text : ""
+                    textFormat: Text.PlainText
+                    wrapMode: Text.WrapAnywhere
+                    clip: true
+                    color: Tokens.inkMuted
+                    font.family: Tokens.mono
+                    font.pixelSize: 9
+                    lineHeight: 1.3
+                }
                 Icon {
                     anchors.centerIn: parent
-                    visible: !preview.visible
+                    visible: !preview.visible && !excerpt.visible
                     name: card.item ? card.app.iconFor(card.item.name, card.item.path, card.item.isDir) : "folder"
                     size: 44
                     color: card.item ? Tokens.sun : Tokens.inkFaint
@@ -157,7 +171,7 @@ Rectangle {
 
         Item {
             width: parent.width
-            height: 96
+            height: 136
 
             Rectangle {
                 width: parent.width
@@ -179,8 +193,21 @@ Rectangle {
                 }
                 Btn {
                     width: (parent.width - Tokens.s2) / 2
-                    text: "TERMINAL AQUÍ"
-                    onAct: card.app.terminal(card.item && card.item.isDir ? card.item.path : card.app.path)
+                    text: "VISTA RÁPIDA"
+                    armed: card.item !== null && !card.item.isDir
+                    onAct: card.app.quickLook()
+                }
+                Btn {
+                    width: (parent.width - Tokens.s2) / 2
+                    text: "RENOMBRAR"
+                    armed: card.item !== null && !card.app.inTrash
+                    onAct: card.app.rename()
+                }
+                Btn {
+                    width: (parent.width - Tokens.s2) / 2
+                    text: card.app.inTrash ? "RESTAURAR" : "A LA PAPELERA"
+                    armed: card.item !== null
+                    onAct: card.app.inTrash ? card.app.restore() : card.app.trash()
                 }
                 Btn {
                     width: (parent.width - Tokens.s2) / 2
@@ -189,9 +216,8 @@ Rectangle {
                 }
                 Btn {
                     width: (parent.width - Tokens.s2) / 2
-                    text: "SUBIR"
-                    armed: card.app.path !== "/"
-                    onAct: card.app.goUp()
+                    text: "TERMINAL AQUÍ"
+                    onAct: card.app.terminal(card.item && card.item.isDir ? card.item.path : card.app.path)
                 }
             }
         }

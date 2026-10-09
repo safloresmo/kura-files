@@ -74,7 +74,7 @@ Item {
                 spacing: Tokens.s3
 
                 Text {
-                    text: "力"
+                    text: rail.app.brand.mark
                     color: Tokens.ink
                     font.family: Tokens.jp
                     font.pixelSize: 22
@@ -84,7 +84,7 @@ Item {
                     anchors.verticalCenter: parent.verticalCenter
 
                     Text {
-                        text: "ARCHIVOS"
+                        text: rail.app.brand.name
                         color: Tokens.ink
                         font.family: Tokens.ui
                         font.pixelSize: 14
@@ -92,7 +92,7 @@ Item {
                         font.letterSpacing: 2.4
                     }
                     Text {
-                        text: "RYOKU // FILES"
+                        text: rail.app.brand.tag
                         color: Tokens.inkMuted
                         font.family: Tokens.mono
                         font.pixelSize: 10
@@ -100,6 +100,8 @@ Item {
                     }
                 }
             }
+            HoverHandler { cursorShape: Qt.PointingHandCursor }
+            TapHandler { onTapped: rail.app.toggleBrand() }
         }
 
         Field {
@@ -198,10 +200,10 @@ Item {
                 Item {
                     id: device
                     required property var modelData
-                    readonly property bool sel: rail.app.path === modelData.path
+                    readonly property bool sel: modelData.mounted && rail.app.path === modelData.path
 
                     width: list.width
-                    height: 46
+                    height: modelData.mounted ? 46 : 36
 
                     Rectangle {
                         anchors.fill: parent
@@ -213,7 +215,7 @@ Item {
                     }
                     Row {
                         x: Tokens.s3
-                        y: 8
+                        y: device.modelData.mounted ? 8 : 9
                         spacing: Tokens.s2
 
                         Icon {
@@ -223,7 +225,7 @@ Item {
                         }
                         Text {
                             text: device.modelData.name
-                            color: device.sel ? Tokens.ink : Tokens.inkDim
+                            color: device.sel ? Tokens.ink : (device.modelData.mounted ? Tokens.inkDim : Tokens.inkFaint)
                             font.family: Tokens.ui
                             font.pixelSize: 14
                             elide: Text.ElideRight
@@ -231,14 +233,16 @@ Item {
                         }
                     }
                     Text {
-                        anchors { right: parent.right; rightMargin: Tokens.s3 }
-                        y: 11
-                        text: device.modelData.used + "%"
+                        anchors { right: parent.right; rightMargin: Tokens.s3 + (ejectButton.visible ? 22 : 0) }
+                        y: device.modelData.mounted ? 11 : 12
+                        text: device.modelData.mounted ? device.modelData.used + "%" : "MONTAR"
                         color: Tokens.inkFaint
                         font.family: Tokens.mono
-                        font.pixelSize: 10
+                        font.pixelSize: device.modelData.mounted ? 10 : 9
+                        font.letterSpacing: device.modelData.mounted ? 0 : 1.4
                     }
                     Rectangle {
+                        visible: device.modelData.mounted
                         x: Tokens.s3 + 24
                         y: 34
                         width: parent.width - x - Tokens.s3
@@ -252,7 +256,25 @@ Item {
                         }
                     }
                     HoverHandler { id: deviceHover; cursorShape: Qt.PointingHandCursor }
-                    TapHandler { onTapped: rail.app.go(device.modelData.path) }
+                    TapHandler { onTapped: device.modelData.mounted ? rail.app.go(device.modelData.path) : rail.app.mount(device.modelData) }
+
+                    Item {
+                        id: ejectButton
+                        visible: device.modelData.mounted && device.modelData.removable && deviceHover.hovered
+                        anchors { right: parent.right; rightMargin: Tokens.s2 }
+                        y: 6
+                        width: 22
+                        height: 22
+
+                        Icon {
+                            anchors.centerIn: parent
+                            name: "eject"
+                            size: 14
+                            color: ejectHover.hovered ? Tokens.ink : Tokens.inkFaint
+                        }
+                        HoverHandler { id: ejectHover }
+                        TapHandler { onTapped: rail.app.eject(device.modelData) }
+                    }
                 }
             }
         }

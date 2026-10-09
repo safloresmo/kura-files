@@ -1,12 +1,77 @@
 #!/usr/bin/env bash
-# Open the file manager, optionally at a given folder.
+# The file manager from the terminal: open it, drive the open window, or run a
+# file operation without it.
 set -eu
 
 root=$(dirname "$(dirname "$(readlink -f "$0")")")
 
-if [ $# -gt 0 ]; then
-    ARCHIVOS_DIR=$(readlink -f -- "$1")
-    export ARCHIVOS_DIR
-fi
+usage() {
+    cat <<'TEXT'
+archivos [RUTA]                 abre el gestor; si ya está abierto, lo lleva a RUTA
+archivos ir RUTA                lleva la ventana abierta a RUTA
+archivos filtro [TEXTO]         filtra la carpeta que se está viendo
+archivos estado                 lo que muestra la ventana, en JSON
+archivos marca                  cambia entre la marca propia y Ryoku Files
+archivos vista                  cambia entre lista y cuadrícula
+archivos comandos               abre la paleta de comandos
 
-exec qs -p "$root"
+archivos dispositivos           equipos de Tailscale a los que se puede enviar
+archivos enviar EQUIPO ARCHIVO...   manda archivos por Tailscale
+
+archivos copiar DESTINO ORIGEN...   copia sin sobrescribir
+archivos mover DESTINO ORIGEN...    mueve sin sobrescribir
+archivos renombrar ORIGEN NOMBRE
+archivos carpeta DONDE NOMBRE       crea una carpeta
+archivos papelera ORIGEN...         manda a la papelera
+TEXT
+}
+
+window() {
+    qs -p "$root" ipc call archivos "$@"
+}
+
+running() {
+    window state >/dev/null 2>&1
+}
+
+need_window() {
+    running || { echo "El gestor no está abierto." >&2; exit 1; }
+}
+
+open_at() {
+    local dir=${1:-}
+    if [ -n "$dir" ]; then
+        dir=$(readlink -f -- "$dir")
+        [ -d "$dir" ] || dir=$(dirname -- "$dir")
+    fi
+    if running; then
+        [ -n "$dir" ] && window go "$dir"
+        return 0
+    fi
+    [ -n "$dir" ] && export ARCHIVOS_DIR=$dir
+    exec qs -p "$root"
+}
+
+case ${1:-} in
+    "") open_at ;;
+    ayuda | -h | --help) usage ;;
+    ir) need_window; window go "$(readlink -f -- "${2:?falta la ruta}")" ;;
+    filtro) need_window; window filter "${2:-}" ;;
+    estado) need_window; window state ;;
+    marca) need_window; window brand ;;
+    vista) need_window; window grid ;;
+    comandos) need_window; window palette ;;
+    dispositivos) tailscale file cp --targets ;;
+    enviar)
+        [ $# -ge 3 ] || { echo "uso: archivos enviar EQUIPO ARCHIVO..." >&2; exit 2; }
+        target=$2
+        shift 2
+        exec tailscale file cp -- "$@" "$target:"
+        ;;
+    copiar) shift; exec "$root/bin/archivos-op" copy "$@" ;;
+    mover) shift; exec "$root/bin/archivos-op" move "$@" ;;
+    renombrar) shift; exec "$root/bin/archivos-op" rename "$@" ;;
+    carpeta) shift; exec "$root/bin/archivos-op" mkdir "$@" ;;
+    papelera) shift; exec "$root/bin/archivos-op" trash "$@" ;;
+    *) open_at "$1" ;;
+esac

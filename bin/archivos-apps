@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# List the applications that open a file, the default one first.
+# One line each: DESKTOP_FILE<TAB>NAME
+#
+#   archivos-apps PATH
+set -u
+
+path=${1:?uso: archivos-apps PATH}
+mime=$(file --brief --mime-type --dereference -- "$path" 2>/dev/null) || exit 0
+[ -n "$mime" ] || exit 0
+
+IFS=: read -ra dirs <<<"${XDG_DATA_HOME:-$HOME/.local/share}:${XDG_DATA_DIRS:-/usr/local/share:/usr/share}"
+
+locate() {
+    local d
+    for d in "${dirs[@]}"; do
+        if [ -f "$d/applications/$1" ]; then
+            printf '%s' "$d/applications/$1"
+            return
+        fi
+    done
+    return 1
+}
+
+seen=" "
+{
+    xdg-mime query default "$mime" 2>/dev/null
+    gio mime "$mime" 2>/dev/null | sed -n 's/^\t//p'
+} | while IFS= read -r id; do
+    [ -n "$id" ] || continue
+    case $seen in *" $id "*) continue ;; esac
+    seen="$seen$id "
+    desktop=$(locate "$id") || continue
+    grep -q '^NoDisplay=true' "$desktop" && continue
+    name=$(sed -n 's/^Name=//p' "$desktop" | head -1)
+    printf '%s\t%s\n' "$desktop" "${name:-$id}"
+done

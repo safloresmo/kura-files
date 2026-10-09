@@ -4,16 +4,35 @@ import Ryoku.Ui
 import Ryoku.Ui.Singletons
 import "lib/format.js" as Fmt
 
-// The folder contents as a bordered card: sortable header and one row per entry.
+// The folder contents as a bordered card, as sortable rows or as a grid.
 Rectangle {
     id: card
 
     required property var app
-    property alias view: view
 
     readonly property int sizeW: 110
     readonly property int whenW: 160
     readonly property int kindW: 96
+    readonly property int cellW: 136
+    readonly property int cellH: 124
+    readonly property int columns: app.grid ? Math.max(1, Math.floor(tiles.width / cellW)) : 1
+    readonly property int pageStep: app.grid ? Math.max(1, Math.floor(tiles.height / cellH)) * columns
+        : Math.max(1, Math.floor(view.height / 40) - 1)
+
+    function reveal(i) {
+        if (app.grid)
+            tiles.positionViewAtIndex(i, GridView.Contain);
+        else
+            view.positionViewAtIndex(i, ListView.Contain);
+    }
+    function indexAt(x, y) {
+        if (app.grid) {
+            const p = tiles.mapFromItem(card, x, y);
+            return p.y >= 0 ? tiles.indexAt(p.x + tiles.contentX, p.y + tiles.contentY) : -1;
+        }
+        const p = view.mapFromItem(card, x, y);
+        return p.y >= 0 ? view.indexAt(p.x, p.y + view.contentY) : -1;
+    }
 
     color: "transparent"
     radius: Tokens.radius
@@ -49,7 +68,7 @@ Rectangle {
 
         Text {
             anchors { left: parent.left; leftMargin: Tokens.s4; verticalCenter: parent.verticalCenter }
-            text: "CONTENIDO"
+            text: card.app.inTrash ? "PAPELERA" : "CONTENIDO"
             color: Tokens.ink
             font.family: Tokens.mono
             font.pixelSize: 12
@@ -57,8 +76,9 @@ Rectangle {
         }
         Text {
             anchors { right: parent.right; rightMargin: Tokens.s4; verticalCenter: parent.verticalCenter }
-            text: card.app.query !== "" ? "FILTRO · " + card.app.query.toUpperCase() : (card.app.showHidden ? "CON OCULTOS" : "")
-            color: Tokens.inkFaint
+            text: card.app.markedCount > 0 ? card.app.markedCount + " MARCADOS"
+                : (card.app.query !== "" ? "FILTRO · " + card.app.query.toUpperCase() : (card.app.showHidden ? "CON OCULTOS" : ""))
+            color: card.app.markedCount > 0 ? Tokens.inkDim : Tokens.inkFaint
             font.family: Tokens.mono
             font.pixelSize: 10
             font.letterSpacing: Tokens.trackMark
@@ -71,7 +91,7 @@ Rectangle {
     }
 
     Item {
-        id: columns
+        id: columnsHead
         anchors { left: parent.left; right: parent.right; top: title.bottom }
         anchors.leftMargin: Tokens.s4
         anchors.rightMargin: Tokens.s4
@@ -79,24 +99,25 @@ Rectangle {
 
         HeadCell {
             anchors.left: parent.left
-            width: parent.width - card.sizeW - card.whenW - card.kindW
+            width: card.app.grid ? 120 : parent.width - card.sizeW - card.whenW - card.kindW
             label: "NOMBRE"
             key: 0
         }
         HeadCell {
-            x: parent.width - card.kindW - card.whenW - card.sizeW
+            x: card.app.grid ? 140 : parent.width - card.kindW - card.whenW - card.sizeW
             width: card.sizeW - Tokens.s5
             label: "TAMAÑO"
             key: 1
-            alignRight: true
+            alignRight: !card.app.grid
         }
         HeadCell {
-            x: parent.width - card.kindW - card.whenW
+            x: card.app.grid ? 260 : parent.width - card.kindW - card.whenW
             width: card.whenW
             label: "MODIFICADO"
             key: 2
         }
         Text {
+            visible: !card.app.grid
             x: parent.width - card.kindW
             anchors.verticalCenter: parent.verticalCenter
             text: "TIPO"
@@ -108,17 +129,18 @@ Rectangle {
     }
 
     Rectangle {
-        anchors { left: parent.left; right: parent.right; top: columns.bottom }
+        anchors { left: parent.left; right: parent.right; top: columnsHead.bottom }
         height: 1
         color: Tokens.lineSoft
     }
 
     ListView {
         id: view
-        anchors { left: parent.left; right: parent.right; top: columns.bottom; bottom: parent.bottom }
+        anchors { left: parent.left; right: parent.right; top: columnsHead.bottom; bottom: parent.bottom }
         anchors.topMargin: 1
         anchors.bottomMargin: 1
-        model: card.app.rows
+        visible: !card.app.grid
+        model: card.app.grid ? [] : card.app.rows
         clip: true
         boundsBehavior: Flickable.StopAtBounds
         ScrollBar.vertical: ScrollRail {
@@ -131,13 +153,15 @@ Rectangle {
             required property var modelData
 
             readonly property bool sel: card.app.current === index
+            readonly property bool marked: card.app.marked[modelData.path] === true
+            readonly property bool lit: sel || marked
 
             width: view.width
             height: 40
 
             Rectangle {
                 anchors.fill: parent
-                color: row.sel ? Tokens.tint16 : (rowHover.hovered ? Tokens.tint5 : "transparent")
+                color: row.sel ? Tokens.tint16 : (row.marked ? Tokens.tint10 : (rowHover.hovered ? Tokens.tint5 : "transparent"))
             }
             Rectangle {
                 anchors { left: parent.left; right: parent.right; bottom: parent.bottom }
@@ -151,7 +175,7 @@ Rectangle {
                 spacing: Tokens.s3
 
                 Text {
-                    visible: row.sel
+                    visible: row.lit
                     text: "//"
                     color: Tokens.inkDim
                     font.family: Tokens.mono
@@ -160,17 +184,17 @@ Rectangle {
                     anchors.verticalCenter: parent.verticalCenter
                 }
                 Icon {
-                    visible: !row.sel
+                    visible: !row.lit
                     name: card.app.iconFor(row.modelData.name, row.modelData.path, row.modelData.isDir)
                     color: Tokens.inkFaint
                     anchors.verticalCenter: parent.verticalCenter
                 }
                 Text {
                     text: row.modelData.name
-                    color: row.sel ? Tokens.ink : (row.modelData.name.charAt(0) === "." ? Tokens.inkFaint : Tokens.inkDim)
+                    color: row.lit ? Tokens.ink : (row.modelData.name.charAt(0) === "." ? Tokens.inkFaint : Tokens.inkDim)
                     font.family: Tokens.ui
                     font.pixelSize: Tokens.fRow
-                    font.weight: row.sel ? Font.Medium : Font.Normal
+                    font.weight: row.lit ? Font.Medium : Font.Normal
                     elide: Text.ElideMiddle
                     width: row.width - card.sizeW - card.whenW - card.kindW - 80
                     anchors.verticalCenter: parent.verticalCenter
@@ -207,18 +231,110 @@ Rectangle {
 
             HoverHandler { id: rowHover }
             TapHandler {
-                onTapped: {
-                    card.app.current = row.index;
-                    card.app.focusList();
-                }
+                id: rowTap
+                onTapped: card.app.click(row.index, rowTap.point.modifiers)
                 onDoubleTapped: card.app.open(row.index)
             }
+        }
+    }
+
+    GridView {
+        id: tiles
+        anchors { left: parent.left; right: parent.right; top: columnsHead.bottom; bottom: parent.bottom }
+        anchors.topMargin: Tokens.s3
+        anchors.leftMargin: Tokens.s3
+        anchors.rightMargin: Tokens.s3
+        anchors.bottomMargin: 1
+        visible: card.app.grid
+        model: card.app.grid ? card.app.rows : []
+        cellWidth: Math.floor(width / card.columns)
+        cellHeight: card.cellH
+        clip: true
+        boundsBehavior: Flickable.StopAtBounds
+        ScrollBar.vertical: ScrollRail {
+            policy: tiles.contentHeight > tiles.height ? ScrollBar.AsNeeded : ScrollBar.AlwaysOff
+        }
+
+        delegate: Item {
+            id: tile
+            required property int index
+            required property var modelData
+
+            readonly property bool sel: card.app.current === index
+            readonly property bool marked: card.app.marked[modelData.path] === true
+            readonly property bool lit: sel || marked
+
+            width: tiles.cellWidth
+            height: tiles.cellHeight
+
+            Rectangle {
+                anchors.fill: parent
+                anchors.margins: 4
+                radius: Tokens.radius
+                color: tile.sel ? Tokens.tint16 : (tile.marked ? Tokens.tint10 : (tileHover.hovered ? Tokens.tint5 : "transparent"))
+                border.width: tile.lit ? Tokens.border : 0
+                border.color: Tokens.line
+            }
+            Item {
+                id: art
+                anchors { top: parent.top; topMargin: 14; horizontalCenter: parent.horizontalCenter }
+                width: 96
+                height: 60
+
+                Image {
+                    id: thumb
+                    anchors.fill: parent
+                    visible: status === Image.Ready
+                    source: !tile.modelData.isDir && Fmt.isImage(tile.modelData.name) ? card.app.url(tile.modelData.path) : ""
+                    asynchronous: true
+                    fillMode: Image.PreserveAspectFit
+                    sourceSize.width: 192
+                    sourceSize.height: 120
+                }
+                Icon {
+                    anchors.centerIn: parent
+                    visible: !thumb.visible
+                    name: card.app.iconFor(tile.modelData.name, tile.modelData.path, tile.modelData.isDir)
+                    size: 34
+                    color: tile.lit ? Tokens.inkDim : Tokens.inkFaint
+                }
+            }
+            Text {
+                anchors { top: art.bottom; topMargin: 8; left: parent.left; right: parent.right }
+                anchors.leftMargin: 10
+                anchors.rightMargin: 10
+                horizontalAlignment: Text.AlignHCenter
+                text: (tile.lit ? "// " : "") + tile.modelData.name
+                color: tile.lit ? Tokens.ink : (tile.modelData.name.charAt(0) === "." ? Tokens.inkFaint : Tokens.inkDim)
+                font.family: Tokens.ui
+                font.pixelSize: 12
+                wrapMode: Text.WrapAnywhere
+                maximumLineCount: 2
+                elide: Text.ElideRight
+            }
+
+            HoverHandler { id: tileHover }
+            TapHandler {
+                id: tileTap
+                onTapped: card.app.click(tile.index, tileTap.point.modifiers)
+                onDoubleTapped: card.app.open(tile.index)
+            }
+        }
+    }
+
+    TapHandler {
+        acceptedButtons: Qt.RightButton
+        onTapped: point => {
+            const i = card.indexAt(point.position.x, point.position.y);
+            const scene = card.mapToItem(null, point.position.x, point.position.y);
+            card.app.rightClick(i, scene.x, scene.y);
         }
     }
 
     Empty {
         anchors.centerIn: view
         visible: card.app.ready && card.app.rows.length === 0
-        caption: card.app.query !== "" ? "Nada coincide con «" + card.app.query + "»." : "Esta carpeta está vacía."
+        caption: card.app.query !== "" ? "Nada coincide con «" + card.app.query + "»."
+            : (card.app.inTrash ? "La papelera está vacía." : "Esta carpeta está vacía.")
     }
 }
