@@ -73,6 +73,9 @@ ShellRoot {
         function keys(): void { app.openKeys(); }
         function invert(): void { app.invertMarks(); }
         function search(text: string): void { app.search(text); }
+        function inside(text: string): void { app.search(text, true); }
+        function link(): void { app.makeLink(); }
+        function checksum(): void { app.checksum(); }
         function drop(dest: string, source: string): void { app.dragging = true; app.dropOn(dest, ["file://" + source]); app.dragging = false; }
         function mark(index: int): void { app.click(index, Qt.ControlModifier); }
         function all(): void { app.markAll(); }

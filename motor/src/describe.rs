@@ -13,6 +13,9 @@ use std::time::{Instant, SystemTime, UNIX_EPOCH};
 use crate::file_name;
 
 const SEARCH_LIMIT: usize = 500;
+const INSIDE_BYTES: u64 = 2 * 1024 * 1024;
+const INSIDE_SECONDS: u64 = 20;
+const INSIDE_SKIP: [&str; 5] = ["node_modules", "target", "__pycache__", "venv", "build"];
 
 fn home() -> PathBuf {
     PathBuf::from(env::var("HOME").unwrap_or_else(|_| "/".into()))
@@ -284,6 +287,71 @@ pub fn search(dir: &Path, text: &str, hidden: bool) -> Result<(), String> {
         }
     }
     Ok(())
+}
+
+/// Whether a text file holds `needle` (already lowercase). Big and binary files are skipped.
+fn holds(path: &Path, size: u64, needle: &str) -> bool {
+    if size == 0 || size > INSIDE_BYTES {
+        return false;
+    }
+    let Ok(bytes) = fs::read(path) else { return false };
+    if bytes.iter().take(2048).any(|b| *b == 0) {
+        return false;
+    }
+    String::from_utf8_lossy(&bytes).to_lowercase().contains(needle)
+}
+
+/// Like `search`, but looks at what the files say instead of their names.
+pub fn inside(dir: &Path, text: &str, hidden: bool) -> Result<(), String> {
+    let needle = text.to_lowercase();
+    let started = Instant::now();
+    let mut found = 0;
+    let mut pending = vec![dir.to_path_buf()];
+    while let Some(current) = pending.pop() {
+        let Ok(entries) = fs::read_dir(&current) else { continue };
+        for entry in entries.flatten() {
+            let name = entry.file_name().to_string_lossy().into_owned();
+            if !hidden && name.starts_with('.') {
+                continue;
+            }
+            let path = entry.path();
+            let Ok(meta) = path.symlink_metadata() else { continue };
+            if meta.is_dir() {
+                if !INSIDE_SKIP.contains(&name.as_str()) {
+                    pending.push(path);
+                }
+                continue;
+            }
+            if !meta.is_file() || !holds(&path, meta.len(), &needle) {
+                continue;
+            }
+            let shown = path.strip_prefix(dir).unwrap_or(&path);
+            println!("f\t{}\t{}\t{}", meta.len(), seconds(meta.modified()), shown.display());
+            found += 1;
+            if found >= SEARCH_LIMIT || started.elapsed().as_secs() >= INSIDE_SECONDS {
+                return Ok(());
+            }
+        }
+        if started.elapsed().as_secs() >= INSIDE_SECONDS {
+            break;
+        }
+    }
+    Ok(())
+}
+
+/// The SHA-256 of a file, as `sha256sum` works it out.
+pub fn sum(path: &Path) -> Result<(), String> {
+    if !path.is_file() {
+        return Err(format!("No es un archivo: {}", path.display()));
+    }
+    let out = output_of("sha256sum", &["--"], Some(path));
+    match out.split_whitespace().next() {
+        Some(digest) if digest.len() == 64 => {
+            println!("{digest}");
+            Ok(())
+        }
+        _ => Err("No se pudo calcular la suma".to_string()),
+    }
 }
 
 fn thumbnail(path: &Path) -> PathBuf {

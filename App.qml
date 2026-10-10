@@ -74,6 +74,8 @@ Item {
     readonly property bool dual: settings.dual
     readonly property var servers: settings.servers
     property string deepQuery: ""
+    property bool deepInside: false
+    property string digest: ""
     property var found: []
     property string appsFor: ""
     property string appsType: ""
@@ -523,19 +525,38 @@ Item {
         else
             transferTo(inside ? "drop" : "copy", dest, paths, (inside ? "SOLTADO EN " : "COPIADO A ") + where + " · " + what);
     }
-    function search(text) {
+    function search(text, inside) {
         const q = String(text).trim();
         if (q === "")
             return;
         deepQuery = q;
+        deepInside = inside === true;
         found = [];
         deep = true;
         rail.filter.clear();
         query = "";
         finder.running = false;
-        finder.command = showHidden ? [engine, "search", path, q, "hidden"] : [engine, "search", path, q];
+        finder.command = [engine, deepInside ? "inside" : "search", path, q].concat(showHidden ? ["hidden"] : []);
         finder.running = true;
         focusList();
+    }
+    function searchInside() {
+        if (inTrash)
+            return;
+        dialog.ask("BUSCAR DENTRO DE LOS ARCHIVOS", "", value => search(value, true));
+    }
+    function makeLink() {
+        const list = picked();
+        if (list.length === 0 || inTrash)
+            return;
+        op(["link", dual && otherPath !== "" ? otherPath : path].concat(list.map(e => e.path)), "ENLAZADO · " + label(list));
+    }
+    function checksum() {
+        if (infoPath === "" || summer.running)
+            return;
+        digest = "…";
+        summer.command = [engine, "sum", infoPath];
+        summer.running = true;
     }
     function endSearch() {
         if (!deep)
@@ -639,6 +660,8 @@ Item {
     function properties() {
         const e = picked().length === 1 ? picked()[0] : null;
         info = {};
+        digest = "";
+        summer.running = false;
         infoPath = e ? e.path : path;
         teller.running = false;
         teller.command = [engine, "info", infoPath];
@@ -784,6 +807,7 @@ Item {
             items.push({ label: "Renombrar" + many, hint: "F2", act: () => rename() });
         if (n > 0)
             items.push({ label: "Duplicar" + many, hint: "CTRL+SHIFT+D", act: () => duplicate() });
+            items.push({ label: dual ? "Enlazar en el otro panel" : "Crear enlace", hint: "CTRL+SHIFT+L", act: () => makeLink() });
         items.push({ label: "Nueva carpeta", hint: "CTRL+SHIFT+N", act: () => newFolder() });
         items.push({ label: "Nuevo archivo", hint: "CTRL+N", act: () => newFile() });
         if (undo)
@@ -858,6 +882,7 @@ Item {
             }
             if (n > 0) {
                 add("Duplicar " + label(list).toLowerCase(), "CTRL+SHIFT+D", () => duplicate());
+                add((dual ? "Enlazar en el otro panel " : "Crear un enlace a ") + label(list).toLowerCase(), "CTRL+SHIFT+L", () => makeLink());
                 add("Copiar " + label(list).toLowerCase(), "CTRL+C", () => hold(false));
                 add("Cortar " + label(list).toLowerCase(), "CTRL+X", () => hold(true));
                 add("Mandar a la papelera " + label(list).toLowerCase(), "SUPR", () => trash());
@@ -879,6 +904,7 @@ Item {
             add("Pegar aquí", "CTRL+V", () => paste());
             add("Nueva carpeta", "CTRL+SHIFT+N", () => newFolder());
             add("Nuevo archivo", "CTRL+N", () => newFile());
+            add("Buscar dentro de los archivos", "CTRL+SHIFT+F", () => searchInside());
             add("Invertir la selección", "CTRL+SHIFT+I", () => invertMarks());
             if (undo)
                 add("Deshacer: " + undo.text.toLowerCase(), "CTRL+Z", () => undoLast());
@@ -1400,6 +1426,12 @@ Item {
         }
     }
     Process {
+        id: summer
+        stdout: StdioCollector {
+            onStreamFinished: app.digest = text.trim() || "no se pudo calcular"
+        }
+    }
+    Process {
         id: previewer
         property string target: ""
         stdout: StdioCollector {
@@ -1532,6 +1564,7 @@ Item {
 
     Shortcut { sequence: "Ctrl+K"; onActivated: app.openPalette() }
     Shortcut { sequence: "Ctrl+F"; onActivated: app.focusFilter() }
+    Shortcut { sequence: "Ctrl+Shift+F"; onActivated: app.searchInside() }
     Shortcut { sequence: "Ctrl+G"; onActivated: app.toggleGrid() }
     Shortcut { sequence: "Ctrl+1"; onActivated: app.setMode("list") }
     Shortcut { sequence: "Ctrl+2"; onActivated: app.setMode("grid") }
@@ -1622,6 +1655,8 @@ Item {
                 app.properties();
             else if (event.key === Qt.Key_D && ctrl && shift)
                 app.duplicate();
+            else if (event.key === Qt.Key_L && ctrl && shift)
+                app.makeLink();
             else if (event.key === Qt.Key_D && ctrl)
                 app.toggleBookmark(app.selected && app.selected.isDir ? app.selected.path : app.path);
             else if (event.key === Qt.Key_N && ctrl && !shift)

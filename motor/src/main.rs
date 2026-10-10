@@ -21,6 +21,7 @@ archivos-motor conflicts DEST SRC...
 archivos-motor rename SRC NAME
 archivos-motor rename-many PATTERN SRC...
 archivos-motor mkdir|touch DIR NAME
+archivos-motor link DIR SRC...
 archivos-motor trash SRC...
 archivos-motor delete SRC...
 archivos-motor untrash ORIGINAL...
@@ -34,6 +35,8 @@ archivos-motor info PATH
 archivos-motor facts PATH
 archivos-motor counts DIR
 archivos-motor search DIR TEXT [hidden]
+archivos-motor inside DIR TEXT [hidden]
+archivos-motor sum PATH
 archivos-motor preview PATH [BYTES]
 archivos-motor apps PATH
 archivos-motor bookmarks list|add|remove [PATH]
@@ -81,6 +84,7 @@ fn main() {
         ("rename-many", [pattern, sources @ ..]) if !sources.is_empty() => rename_many(pattern, sources),
         ("mkdir", [dir, name]) => create(Path::new(dir), name, true),
         ("touch", [dir, name]) => create(Path::new(dir), name, false),
+        ("link", [dir, sources @ ..]) if !sources.is_empty() => link(Path::new(dir), sources),
         ("trash", sources) if !sources.is_empty() => trash(sources),
         ("untrash", originals) if !originals.is_empty() => untrash(originals),
         ("restore", names) if !names.is_empty() => restore(names),
@@ -99,6 +103,9 @@ fn main() {
         ("counts", [dir]) => describe::counts(Path::new(dir)),
         ("search", [dir, text]) => describe::search(Path::new(dir), text, false),
         ("search", [dir, text, _]) => describe::search(Path::new(dir), text, true),
+        ("inside", [dir, text]) => describe::inside(Path::new(dir), text, false),
+        ("inside", [dir, text, _]) => describe::inside(Path::new(dir), text, true),
+        ("sum", [path]) => describe::sum(Path::new(path)),
         ("preview", [path]) => describe::preview(Path::new(path), 4000),
         ("preview", [path, bytes]) => describe::preview(Path::new(path), bytes.parse().unwrap_or(4000)),
         ("apps", [path]) => describe::apps(Path::new(path)),
@@ -226,6 +233,23 @@ fn create(dir: &Path, name: &str, folder: bool) -> Result<(), String> {
     };
     made.map_err(|e| format!("No se pudo crear: {e}"))?;
     report("new", dir, &dest);
+    Ok(())
+}
+
+/// A symbolic link to each source, left in `dir` under the source's own name.
+fn link(dir: &Path, sources: &[String]) -> Result<(), String> {
+    if !dir.is_dir() {
+        return Err(format!("No es una carpeta: {}", dir.display()));
+    }
+    for source in sources {
+        let source = Path::new(source);
+        if !source.is_absolute() || source.symlink_metadata().is_err() {
+            return Err(format!("No existe: {}", source.display()));
+        }
+        let dest = dir.join(free_name(dir, &file_name(source)));
+        std::os::unix::fs::symlink(source, &dest).map_err(|e| format!("No se pudo enlazar: {e}"))?;
+        report("new", dir, &dest);
+    }
     Ok(())
 }
 
@@ -534,6 +558,20 @@ mod tests {
 
     fn text(path: &Path) -> String {
         fs::read_to_string(path).unwrap()
+    }
+
+    #[test]
+    fn links_point_at_their_source_and_never_replace() {
+        let scratch = Scratch::new();
+        let source = scratch.file("nota.txt", "hola");
+        let dir = scratch.0.join("otra");
+        fs::create_dir(&dir).unwrap();
+        let wanted = [source.to_string_lossy().into_owned()];
+        link(&dir, &wanted).unwrap();
+        link(&dir, &wanted).unwrap();
+        assert_eq!(fs::read_link(dir.join("nota.txt")).unwrap(), source);
+        assert_eq!(text(&dir.join("nota (2).txt")), "hola");
+        assert!(link(&dir, &["/no/existe".to_string()]).is_err());
     }
 
     #[test]

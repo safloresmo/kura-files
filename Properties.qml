@@ -123,6 +123,7 @@ Item {
 
             Fact { label: "Ruta"; value: sheet.info.path ? sheet.app.shorten(sheet.info.path) : "" }
             Fact { label: "Enlace a"; value: sheet.info.link || "" }
+            Fact { label: "SHA-256"; value: sheet.app.digest }
             Fact { label: "Tipo"; value: sheet.info.kind === "inode/directory" ? "carpeta" : (sheet.info.kind || "") }
             Fact {
                 label: "Tamaño"
@@ -226,6 +227,11 @@ Item {
                     anchors { right: parent.right; rightMargin: Tokens.s4; verticalCenter: parent.verticalCenter }
                     spacing: Tokens.s2
 
+                    Btn {
+                        visible: sheet.info.kind !== undefined && sheet.info.kind !== "inode/directory" && sheet.app.digest === ""
+                        text: "SHA-256"
+                        onAct: sheet.app.checksum()
+                    }
                     Btn { text: "COPIAR RUTA"; onAct: sheet.app.copyPath(sheet.info.path || sheet.app.path) }
                     Btn { text: "CERRAR"; primary: true; onAct: sheet.close() }
                 }

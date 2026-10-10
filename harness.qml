@@ -46,6 +46,7 @@ ShellRoot {
                 marked: app.markedCount,
                 query: app.query,
                 deep: app.deep,
+                digest: app.digest,
                 grid: app.grid,
                 notice: app.notice,
                 undo: app.undo ? app.undo.text : "",
@@ -79,6 +80,8 @@ ShellRoot {
         function pin(ext: string): void { app.pin(ext); }
         function only(on: bool): void { app.onlyType = on; }
         function search(text: string): void { app.search(text); }
+        function inside(text: string): void { app.search(text, true); }
+        function sum(): void { app.properties(); app.checksum(); }
         function reveal(): void { app.showInFolder(app.selected); }
         function pref(key: string, on: bool): void { app.setPref(key, on); }
         function set(key: string, value: string): void { app.setPref(key, value); }

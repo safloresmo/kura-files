@@ -156,6 +156,17 @@ call search gem; sleep 1;          expect "search finds it below" rows 1
 call click 500 300 1 0; call reveal; sleep 1
 expect "show in folder goes there" here "folder"
 expect "with the cursor on it" selected "hidden-gem.txt"
+call go "$zone"; sleep 0.6
+call inside deep; sleep 1;         expect "searching inside reads the files" names "hidden-gem.txt"
+call key $ESC 0; sleep 0.4
+call click 400 380 1 0; call key 76 $((CTRL + SHIFT)); sleep 1
+[ "$(readlink "$zone/b (2).txt")" = "$zone/b.txt" ] && echo "ok    a link points at its file" || { echo "FAIL  a link points at its file"; failed=1; }
+call key 90 $CTRL; sleep 1
+[ ! -L "$zone/b (2).txt" ] && [ -f "$zone/b.txt" ] && echo "ok    and undo takes only the link" || { echo "FAIL  and undo takes only the link"; failed=1; }
+call click 400 380 1 0; call sum; sleep 1
+expect "properties work out a checksum" digest "$(sha256sum "$zone/b.txt" | cut -c1-64)"
+call key $ESC 0
+call go "$zone/folder"; sleep 0.6
 call pref reopen true
 open_at ""
 expect "reopening starts where it was left" here "folder"
