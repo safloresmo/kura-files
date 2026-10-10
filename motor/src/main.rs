@@ -24,6 +24,8 @@ archivos-motor trash SRC...
 archivos-motor delete SRC...
 archivos-motor untrash ORIGINAL...
 archivos-motor restore NAME...
+archivos-motor trashed
+archivos-motor chmod MODE PATH
 archivos-motor revert (copy|move|new SRC DEST)...
 archivos-motor extract ARCHIVE
 archivos-motor compress zip|tar.gz|tar.xz|7z SRC...
@@ -78,6 +80,8 @@ fn main() {
         ("trash", sources) if !sources.is_empty() => trash(sources),
         ("untrash", originals) if !originals.is_empty() => untrash(originals),
         ("restore", names) if !names.is_empty() => restore(names),
+        ("trashed", []) => trashed(),
+        ("chmod", [mode, path]) => chmod(mode, Path::new(path)),
         ("delete", sources) if !sources.is_empty() => delete(sources),
         ("thumbs", [dir]) => describe::thumbs(Path::new(dir)),
         ("recent", []) => describe::recent(),
@@ -210,35 +214,90 @@ fn home_trash() -> PathBuf {
         .join("Trash")
 }
 
-/// Where a trashed item came from and when it was deleted, read from its record.
-fn trash_record(name: &str) -> Option<(String, String)> {
-    let text = fs::read_to_string(home_trash().join("info").join(format!("{name}.trashinfo"))).ok()?;
-    let field = |key: &str| text.lines().find_map(|line| line.strip_prefix(key)).map(str::to_string);
-    Some((describe::unescape(&field("Path=")?)?, field("DeletionDate=").unwrap_or_default()))
+/// Every trash can in reach: the home one, then the one each mounted disk
+/// keeps for this user. The second field is the folder that disk's records
+/// are relative to.
+fn trash_cans() -> Vec<(PathBuf, Option<PathBuf>)> {
+    use std::os::unix::fs::MetadataExt;
+    let mut cans = vec![(home_trash(), None)];
+    let uid = fs::metadata(env::var("HOME").unwrap_or_else(|_| "/".into())).map(|m| m.uid()).unwrap_or(0);
+    for line in fs::read_to_string("/proc/mounts").unwrap_or_default().lines() {
+        let Some(mount) = line.split(' ').nth(1) else { continue };
+        let top = PathBuf::from(mount.replace("\\040", " "));
+        let can = top.join(format!(".Trash-{uid}"));
+        if can.join("info").is_dir() {
+            cans.push((can, Some(top)));
+        }
+    }
+    cans
 }
 
-/// Put one item of the home trash back where it was, never over something else.
-fn restore_entry(name: &str) -> Result<(), String> {
-    let trash = home_trash();
-    let (original, _) = trash_record(name).ok_or_else(|| format!("No está en la papelera: {name}"))?;
-    let original = PathBuf::from(original);
-    if taken(&original) {
-        return Err(format!("Ya existe: {}", original.display()));
+struct Trashed {
+    can: PathBuf,
+    name: String,
+    original: PathBuf,
+    deleted: String,
+}
+
+/// Where a trashed item came from and when it was deleted, read from its record.
+fn trash_record(can: &Path, top: Option<&Path>, name: &str) -> Option<Trashed> {
+    let text = fs::read_to_string(can.join("info").join(format!("{name}.trashinfo"))).ok()?;
+    let field = |key: &str| text.lines().find_map(|line| line.strip_prefix(key)).map(str::to_string);
+    let path = PathBuf::from(describe::unescape(&field("Path=")?)?);
+    let original = match top {
+        Some(top) if path.is_relative() => top.join(path),
+        _ => path,
+    };
+    Some(Trashed { can: can.to_path_buf(), name: name.to_string(), original, deleted: field("DeletionDate=").unwrap_or_default() })
+}
+
+fn all_trashed() -> Vec<Trashed> {
+    let mut found = Vec::new();
+    for (can, top) in trash_cans() {
+        let Ok(entries) = fs::read_dir(can.join("info")) else { continue };
+        for entry in entries.flatten() {
+            let file = entry.file_name().to_string_lossy().into_owned();
+            if let Some(record) = file.strip_suffix(".trashinfo").and_then(|name| trash_record(&can, top.as_deref(), name)) {
+                found.push(record);
+            }
+        }
     }
-    if let Some(parent) = original.parent() {
+    found
+}
+
+/// Put one trashed item back where it was, never over something else.
+fn restore_entry(item: &Trashed) -> Result<(), String> {
+    if taken(&item.original) {
+        return Err(format!("Ya existe: {}", item.original.display()));
+    }
+    if let Some(parent) = item.original.parent() {
         fs::create_dir_all(parent).map_err(|e| format!("No se pudo crear la carpeta: {e}"))?;
     }
-    fs::rename(trash.join("files").join(name), &original).map_err(|e| format!("No se pudo restaurar: {e}"))?;
-    let _ = fs::remove_file(trash.join("info").join(format!("{name}.trashinfo")));
-    report("move", &trash.join("files").join(name), &original);
+    let held = item.can.join("files").join(&item.name);
+    fs::rename(&held, &item.original).map_err(|e| format!("No se pudo restaurar: {e}"))?;
+    let _ = fs::remove_file(item.can.join("info").join(format!("{}.trashinfo", item.name)));
+    report("move", &held, &item.original);
+    Ok(())
+}
+
+/// What the home trash holds: `NAME<TAB>ORIGINAL<TAB>DELETED` per line.
+fn trashed() -> Result<(), String> {
+    let home = home_trash();
+    for item in all_trashed().iter().filter(|item| item.can == home) {
+        println!("{}\t{}\t{}", item.name, item.original.display(), item.deleted);
+    }
     Ok(())
 }
 
 /// Restore items of the home trash by the name they have inside it.
 fn restore(names: &[String]) -> Result<(), String> {
+    let home = home_trash();
     let mut failed = false;
     for name in names {
-        if let Err(message) = restore_entry(name) {
+        let outcome = trash_record(&home, None, name)
+            .ok_or_else(|| format!("No está en la papelera: {name}"))
+            .and_then(|item| restore_entry(&item));
+        if let Err(message) = outcome {
             eprintln!("{message}");
             failed = true;
         }
@@ -246,25 +305,17 @@ fn restore(names: &[String]) -> Result<(), String> {
     if failed { Err(String::new()) } else { Ok(()) }
 }
 
-/// Bring back from the trash the newest entry that came from each original path.
+/// Bring back from any trash the newest entry that came from each original path.
 fn untrash(originals: &[String]) -> Result<(), String> {
-    let names: Vec<String> = fs::read_dir(home_trash().join("info"))
-        .map(|entries| {
-            entries
-                .flatten()
-                .filter_map(|e| e.file_name().to_string_lossy().strip_suffix(".trashinfo").map(str::to_string))
-                .collect()
-        })
-        .unwrap_or_default();
+    let everything = all_trashed();
     let mut failed = false;
     for original in originals {
-        let newest = names
+        let newest = everything
             .iter()
-            .filter_map(|name| trash_record(name).map(|(path, date)| (name, path, date)))
-            .filter(|(_, path, _)| path == original)
-            .max_by(|a, b| a.2.cmp(&b.2));
+            .filter(|item| item.original == Path::new(original))
+            .max_by(|a, b| a.deleted.cmp(&b.deleted));
         let outcome = match newest {
-            Some((name, _, _)) => restore_entry(name),
+            Some(item) => restore_entry(item),
             None => Err(format!("No está en la papelera: {original}")),
         };
         if let Err(message) = outcome {
@@ -273,6 +324,16 @@ fn untrash(originals: &[String]) -> Result<(), String> {
         }
     }
     if failed { Err(String::new()) } else { Ok(()) }
+}
+
+/// Set the permission bits from an octal string such as 644.
+fn chmod(mode: &str, path: &Path) -> Result<(), String> {
+    use std::os::unix::fs::PermissionsExt;
+    let bits = u32::from_str_radix(mode, 8).map_err(|_| format!("Permisos no válidos: {mode}"))?;
+    if bits > 0o7777 {
+        return Err(format!("Permisos no válidos: {mode}"));
+    }
+    fs::set_permissions(path, fs::Permissions::from_mode(bits)).map_err(|e| format!("No se pudieron cambiar los permisos: {e}"))
 }
 
 /// Undo earlier results: a copy or a new item goes to the trash, a move goes back.
@@ -502,5 +563,16 @@ mod tests {
     fn escapes_survive_a_round_trip() {
         assert_eq!(describe::unescape("/home/sfm/Mis%20cosas/%C3%B1").unwrap(), "/home/sfm/Mis cosas/ñ");
         assert_eq!(describe::unescape("sin escapes").unwrap(), "sin escapes");
+    }
+
+    #[test]
+    fn chmod_sets_and_refuses_bits() {
+        use std::os::unix::fs::PermissionsExt;
+        let dir = Scratch::new();
+        let file = dir.file("guion.sh", "#!/bin/sh");
+        chmod("750", &file).unwrap();
+        assert_eq!(fs::metadata(&file).unwrap().permissions().mode() & 0o777, 0o750);
+        assert!(chmod("rwx", &file).is_err());
+        assert!(chmod("77777", &file).is_err());
     }
 }

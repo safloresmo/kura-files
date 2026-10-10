@@ -10,6 +10,7 @@ Item {
     id: app
 
     readonly property string home: Quickshell.env("HOME") || "/"
+    readonly property string user: Quickshell.env("USER") || ""
     property string path: home
     property var back: []
     property var forward: []
@@ -42,6 +43,8 @@ Item {
     property var activeJob: null
     property var bookmarks: []
     property var info: ({})
+    property var trashInfo: ({})
+    property string infoPath: ""
     property var tabs: [{ path: home, back: [], forward: [] }]
     property int tab: 0
     property var remotes: ({})
@@ -61,8 +64,8 @@ Item {
 
     readonly property string engine: decodeURIComponent(Qt.resolvedUrl("motor/target/release/archivos-motor").toString().replace("file://", ""))
     readonly property var brand: settings.brand === "ryoku"
-        ? { mark: "力", name: "RYOKU FILES", tag: "RYOKU // FILES" }
-        : { mark: settings.ownMark, name: settings.ownName, tag: settings.ownTag }
+        ? { mark: "力", name: "RYOKU FILES", tag: "RYOKU // FILES", title: "Ryoku Files" }
+        : { mark: settings.ownMark, name: settings.ownName, tag: settings.ownTag, title: settings.ownName + " " + settings.ownMark }
 
     readonly property int total: rows.length
     readonly property int markedCount: Object.keys(marked).length
@@ -589,10 +592,29 @@ Item {
     function properties() {
         const e = picked().length === 1 ? picked()[0] : null;
         info = {};
+        infoPath = e ? e.path : path;
         teller.running = false;
-        teller.command = [engine, "info", e ? e.path : path];
+        teller.command = [engine, "info", infoPath];
         teller.running = true;
         sheet.open();
+    }
+    function chmod(mode) {
+        if (infoPath === "")
+            return;
+        run([engine, "chmod", mode, infoPath], "PERMISOS · " + mode);
+        infoAgain.restart();
+    }
+    function trashedWhen(name) {
+        const record = trashInfo[name];
+        return record ? Fmt.when(new Date(record.when)) : "";
+    }
+    function trashedFrom(name) {
+        const record = trashInfo[name];
+        if (!record)
+            return "";
+        const from = shorten(record.from);
+        const cut = from.lastIndexOf("/");
+        return cut > 0 ? from.slice(0, cut) : "/";
     }
     function restore() {
         const list = picked();
@@ -972,6 +994,9 @@ Item {
             mounts.command = [engine, "remote"].concat(servers.map(x => x.uri));
             mounts.running = true;
         }
+        if (inTrash)
+            trashLister.running = false;
+            trashLister.running = true;
         if (grid) {
             painter.running = false;
             painter.command = [engine, "thumbs", path];
@@ -1040,9 +1065,9 @@ Item {
             property bool hidden: false
             property string terminal: "kitty --directory"
             property var views: ({})
-            property string ownMark: "サ"
-            property string ownName: "SFM FILES"
-            property string ownTag: "SAFLORESMO // ARCHIVOS"
+            property string ownMark: "庫"
+            property string ownName: "SFM"
+            property string ownTag: "KURA // FILES"
         }
     }
     Process {
@@ -1187,6 +1212,29 @@ Item {
                         list.push({ path: line.slice(0, cut), name: line.slice(cut + 1) });
                 }
                 app.bookmarks = list;
+            }
+        }
+    }
+    Timer {
+        id: infoAgain
+        interval: 350
+        onTriggered: {
+            teller.running = false;
+            teller.running = true;
+        }
+    }
+    Process {
+        id: trashLister
+        command: [app.engine, "trashed"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const map = {};
+                for (const line of text.split("\n")) {
+                    const cols = line.split("\t");
+                    if (cols.length === 3)
+                        map[cols[0]] = { from: cols[1], when: cols[2] };
+                }
+                app.trashInfo = map;
             }
         }
     }

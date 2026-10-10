@@ -138,6 +138,79 @@ Item {
             Fact { label: "Abierto"; value: sheet.info.accessed ? sheet.stamp(sheet.info.accessed) : "" }
             Fact { label: "Creado"; value: sheet.info.created ? sheet.stamp(sheet.info.created) : "" }
             Fact { label: "Permisos"; value: sheet.info.mode ? sheet.info.mode.replace("\t", " · ") : "" }
+            Item {
+                id: bits
+                readonly property int mode: sheet.info.mode ? parseInt(sheet.info.mode.split("\t")[1], 8) : -1
+                readonly property var who: ["Dueño", "Grupo", "Otros"]
+
+                visible: mode >= 0 && sheet.info.owner === sheet.app.user
+                width: parent.width
+                height: visible ? 44 : 0
+
+                Rectangle {
+                    width: parent.width
+                    height: 1
+                    color: Tokens.lineSoft
+                }
+                Text {
+                    anchors { left: parent.left; leftMargin: Tokens.s4; verticalCenter: parent.verticalCenter }
+                    text: "Cambiar permisos"
+                    color: Tokens.inkDim
+                    font.family: Tokens.ui
+                    font.pixelSize: Tokens.fBody
+                }
+                Row {
+                    anchors { right: parent.right; rightMargin: Tokens.s4; verticalCenter: parent.verticalCenter }
+                    spacing: Tokens.s3
+
+                    Repeater {
+                        model: 3
+
+                        Row {
+                            id: group
+                            required property int index
+                            spacing: 3
+
+                            Text {
+                                text: bits.who[group.index].toUpperCase()
+                                color: Tokens.inkFaint
+                                font.family: Tokens.mono
+                                font.pixelSize: 9
+                                font.letterSpacing: 1
+                                anchors.verticalCenter: parent.verticalCenter
+                                rightPadding: 3
+                            }
+                            Repeater {
+                                model: 3
+
+                                Rectangle {
+                                    id: bit
+                                    required property int index
+                                    readonly property int mask: 1 << ((2 - group.index) * 3 + (2 - index))
+                                    readonly property bool on: (bits.mode & mask) !== 0
+
+                                    width: 22
+                                    height: 22
+                                    radius: Tokens.radius - 2
+                                    color: on ? Tokens.bone : "transparent"
+                                    border.width: Tokens.border
+                                    border.color: on ? Tokens.bone : Tokens.line
+
+                                    Text {
+                                        anchors.centerIn: parent
+                                        text: "rwx".charAt(bit.index)
+                                        color: bit.on ? Tokens.inkOnBone : Tokens.inkFaint
+                                        font.family: Tokens.mono
+                                        font.pixelSize: 11
+                                    }
+                                    HoverHandler { cursorShape: Qt.PointingHandCursor }
+                                    TapHandler { onTapped: sheet.app.chmod(((bits.mode & 0o777) ^ bit.mask).toString(8)) }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
             Fact { label: "Propietario"; value: sheet.info.owner ? sheet.info.owner + " · " + (sheet.info.group || "") : "" }
 
             Item {

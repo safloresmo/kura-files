@@ -6,7 +6,7 @@ import Ryoku.Ui.Singletons
 ShellRoot {
     FloatingWindow {
         id: win
-        title: app.brand.name
+        title: app.brand.title
         implicitWidth: 1320
         implicitHeight: 860
         minimumSize: Qt.size(980, 620)
@@ -48,6 +48,7 @@ ShellRoot {
         function trash(): void { app.trash(); }
         function restore(): void { app.restore(); }
         function undo(): void { app.undoLast(); }
+        function chmod(mode: string): void { app.chmod(mode); }
         function view(mode: string): void { app.setMode(mode); }
         function redo(): void { app.redoLast(); }
         function recent(): void { app.showRecent(); }

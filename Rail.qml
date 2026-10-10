@@ -92,6 +92,7 @@ Item {
                         font.letterSpacing: 2.4
                     }
                     Text {
+                        visible: text !== ""
                         text: rail.app.brand.tag
                         color: Tokens.inkMuted
                         font.family: Tokens.mono
