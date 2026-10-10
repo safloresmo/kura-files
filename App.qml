@@ -68,6 +68,7 @@ Item {
         : { mark: settings.ownMark, name: settings.ownName, tag: settings.ownTag, title: settings.ownName + " " + settings.ownMark }
 
     readonly property int total: rows.length
+    readonly property int folderTotal: dir.count
     readonly property int markedCount: Object.keys(marked).length
     readonly property string trashDir: home + "/.local/share/Trash/files"
     readonly property bool inTrash: path === trashDir
@@ -449,7 +450,7 @@ Item {
         deep = true;
         rail.filter.clear();
         query = "";
-        recents.running = true;
+        sources.loadRecent();
         focusList();
     }
 
@@ -692,7 +693,7 @@ Item {
             menu.popup(x, y, items);
             return;
         }
-        tailnet.running = true;
+        sources.loadTargets();
         if (one) {
             items.push({ label: "Abrir", hint: "ENTER", act: () => open(current) });
             if (one.isDir)
@@ -862,7 +863,7 @@ Item {
         keysSheet.open();
     }
     function openPalette() {
-        tailnet.running = true;
+        sources.loadTargets();
         palette.open();
     }
     function quickLook() {
@@ -978,27 +979,7 @@ Item {
     }
     function refresh() {
         countsReady = false;
-        counter.running = false;
-        counter.command = [engine, "counts", path];
-        counter.running = true;
-        disk.running = false;
-        disk.command = ["df", "-B1", "--output=fstype,avail", path];
-        disk.running = true;
-        blocks.running = true;
-        marks.running = true;
-        if (servers.length > 0) {
-            mounts.running = false;
-            mounts.command = [engine, "remote"].concat(servers.map(x => x.uri));
-            mounts.running = true;
-        }
-        if (inTrash)
-            trashLister.running = false;
-            trashLister.running = true;
-        if (grid) {
-            painter.running = false;
-            painter.command = [engine, "thumbs", path];
-            painter.running = true;
-        }
+        sources.reload();
     }
     onGridChanged: refresh()
 
@@ -1014,7 +995,7 @@ Item {
         anchor = -1;
         query = "";
         rail.filter.clear();
-        pathField.text = shorten(path);
+        head.pathField.text = shorten(path);
         refresh();
     }
     onQueryChanged: rebuild()
@@ -1027,7 +1008,7 @@ Item {
         const start = Quickshell.env("ARCHIVOS_DIR");
         if (start)
             path = clean(start);
-        pathField.text = shorten(path);
+        head.pathField.text = shorten(path);
         refresh();
         focusList();
     }
@@ -1161,87 +1142,12 @@ Item {
             }
         }
     }
-    Process {
-        id: mounts
-        property string wanted: ""
-        stdout: StdioCollector {
-            onStreamFinished: {
-                const map = {};
-                for (const line of text.split("\n")) {
-                    const cut = line.indexOf("\t");
-                    if (cut > 0 && line.length > cut + 1)
-                        map[line.slice(0, cut)] = line.slice(cut + 1);
-                }
-                const fresh = Object.keys(map).find(uri => !app.remotes[uri]);
-                const first = Object.keys(app.remotes).length === 0 && !mounts.wanted;
-                app.remotes = map;
-                if (mounts.wanted && map[mounts.wanted]) {
-                    app.go(map[mounts.wanted]);
-                    mounts.wanted = "";
-                } else if (fresh && !first && app.notice.indexOf("CONECTADO") === 0)
-                    app.go(map[fresh]);
-            }
-        }
-    }
-    Process {
-        id: painter
-        stdout: SplitParser {
-            onRead: line => {
-                const cut = line.indexOf("\t");
-                if (cut <= 0)
-                    return;
-                const next = Object.assign({}, app.thumbs);
-                next[line.slice(0, cut)] = line.slice(cut + 1);
-                app.thumbs = next;
-            }
-        }
-    }
-    Process {
-        id: marks
-        running: true
-        command: [app.engine, "bookmarks", "list"]
-        stdout: StdioCollector {
-            onStreamFinished: {
-                const list = [];
-                for (const line of text.split("\n")) {
-                    const cut = line.indexOf("\t");
-                    if (cut > 0)
-                        list.push({ path: line.slice(0, cut), name: line.slice(cut + 1) });
-                }
-                app.bookmarks = list;
-            }
-        }
-    }
     Timer {
         id: infoAgain
         interval: 350
         onTriggered: {
             teller.running = false;
             teller.running = true;
-        }
-    }
-    Process {
-        id: trashLister
-        command: [app.engine, "trashed"]
-        stdout: StdioCollector {
-            onStreamFinished: {
-                const list = [];
-                for (const line of text.split("\n")) {
-                    const cols = line.split("\t");
-                    if (cols.length !== 5)
-                        continue;
-                    list.push({
-                        name: cols[4].slice(cols[4].lastIndexOf("/") + 1),
-                        path: cols[4],
-                        size: Number(cols[1]),
-                        modified: new Date(cols[2]),
-                        isDir: cols[0] === "d",
-                        from: cols[3]
-                    });
-                }
-                app.trashList = list;
-                app.rebuild();
-            }
         }
     }
     Process {
@@ -1255,23 +1161,6 @@ Item {
                         map[line.slice(0, cut)] = line.slice(cut + 1);
                 }
                 app.info = map;
-            }
-        }
-    }
-    Process {
-        id: tailnet
-        running: true
-        command: ["tailscale", "file", "cp", "--targets"]
-        stdout: StdioCollector {
-            onStreamFinished: {
-                const list = [];
-                for (const line of text.split("\n")) {
-                    const cols = line.split("\t");
-                    if (cols.length >= 2 && cols[1])
-                        list.push({ name: cols[1], online: !(cols[2] || "").startsWith("offline") });
-                }
-                list.sort((a, b) => (a.online === b.online ? a.name.localeCompare(b.name) : (a.online ? -1 : 1)));
-                app.targets = list;
             }
         }
     }
@@ -1301,104 +1190,8 @@ Item {
             if (code === 0)
                 app.go(target);
             else
-                pathField.text = app.shorten(app.path);
+                head.pathField.text = app.shorten(app.path);
             app.focusList();
-        }
-    }
-    Process {
-        id: counter
-        stdout: StdioCollector {
-            onStreamFinished: {
-                const map = {};
-                for (const line of text.split("\n")) {
-                    const cut = line.indexOf("\t");
-                    if (cut > 0)
-                        map[line.slice(cut + 1)] = Number(line.slice(0, cut));
-                }
-                app.counts = map;
-                app.countsReady = true;
-            }
-        }
-    }
-    Process {
-        id: disk
-        stdout: StdioCollector {
-            onStreamFinished: {
-                const row = text.trim().split("\n")[1];
-                const cols = row ? row.trim().split(/\s+/) : [];
-                app.space = cols.length !== 2 ? ""
-                    : cols[0].indexOf("fuse.gvfsd") === 0 ? "EN RED"
-                    : cols[0].toUpperCase() + " · " + Fmt.size(cols[1]).toUpperCase() + " LIBRES";
-            }
-        }
-    }
-    Process {
-        id: userDirs
-        running: true
-        command: ["sh", "-c", "for k in DESKTOP DOCUMENTS DOWNLOAD MUSIC PICTURES VIDEOS; do printf '%s\\t%s\\n' \"$k\" \"$(xdg-user-dir $k)\"; done"]
-        stdout: StdioCollector {
-            onStreamFinished: {
-                const known = {
-                    DESKTOP: ["Escritorio", "desktop", "机上"],
-                    DOCUMENTS: ["Documentos", "doc", "文書"],
-                    DOWNLOAD: ["Descargas", "download", "受信"],
-                    MUSIC: ["Música", "music", "音楽"],
-                    PICTURES: ["Imágenes", "image", "画像"],
-                    VIDEOS: ["Vídeos", "video", "動画"]
-                };
-                const list = [
-                    { name: "Carpeta personal", path: app.home, icon: "home", seal: "自宅" },
-                    { name: "Recientes", path: "", icon: "clock", seal: "最近", special: "recent" }
-                ];
-                for (const line of text.split("\n")) {
-                    const cols = line.split("\t");
-                    const meta = known[cols[0]];
-                    if (!meta || !cols[1] || cols[1] === app.home)
-                        continue;
-                    list.push({ name: meta[0], path: app.clean(cols[1]), icon: meta[1], seal: meta[2] });
-                }
-                list.push({ name: "Papelera", path: app.home + "/.local/share/Trash/files", icon: "trash", seal: "屑籠" });
-                app.places = list;
-            }
-        }
-    }
-    Process {
-        id: blocks
-        running: true
-        command: ["lsblk", "-J", "-b", "-o", "NAME,LABEL,MOUNTPOINTS,SIZE,FSUSE%,RM,HOTPLUG,TYPE,FSTYPE,PATH"]
-        stdout: StdioCollector {
-            onStreamFinished: {
-                const found = [];
-                const skip = ["swap", "crypto_LUKS", "LVM2_member", "linux_raid_member"];
-                const walk = nodes => {
-                    for (const n of nodes || []) {
-                        const points = (n.mountpoints || []).filter(m => m);
-                        const at = points.find(m => m === "/" || m.indexOf("/run/media/") === 0 || m.indexOf("/mnt/") === 0 || m.indexOf("/media/") === 0);
-                        const loose = n.rm === true || n.hotplug === true;
-                        const name = n.label || Fmt.size(n.size) + " · " + n.name;
-                        if (at) {
-                            found.push({
-                                name: at === "/" ? "Sistema" : name,
-                                path: at,
-                                dev: n.path,
-                                used: parseInt(n["fsuse%"]) || 0,
-                                removable: loose,
-                                mounted: true
-                            });
-                        } else if (loose && points.length === 0 && n.fstype && skip.indexOf(n.fstype) < 0 && n.size >= 268435456) {
-                            found.push({ name: name, path: "", dev: n.path, used: 0, removable: true, mounted: false });
-                        }
-                        walk(n.children);
-                    }
-                };
-                try {
-                    walk(JSON.parse(text).blockdevices);
-                } catch (e) {
-                    return;
-                }
-                found.sort((a, b) => (a.path === "/" ? -1 : b.path === "/" ? 1 : a.name.localeCompare(b.name)));
-                app.devices = found;
-            }
         }
     }
     Process {
@@ -1415,33 +1208,6 @@ Item {
                     list.push({
                         name: full.slice(full.lastIndexOf("/") + 1),
                         shown: shown,
-                        path: full,
-                        size: Number(cols[1]),
-                        modified: new Date(Number(cols[2]) * 1000),
-                        isDir: cols[0] === "d"
-                    });
-                }
-                app.found = list;
-                app.rebuild();
-            }
-        }
-    }
-    Process {
-        id: recents
-        command: [app.engine, "recent"]
-        stdout: StdioCollector {
-            onStreamFinished: {
-                if (!app.recent)
-                    return;
-                const list = [];
-                for (const line of text.split("\n")) {
-                    const cols = line.split("\t");
-                    if (cols.length < 4)
-                        continue;
-                    const full = cols.slice(3).join("\t");
-                    list.push({
-                        name: full.slice(full.lastIndexOf("/") + 1),
-                        shown: app.shorten(full),
                         path: full,
                         size: Number(cols[1]),
                         modified: new Date(Number(cols[2]) * 1000),
@@ -1487,12 +1253,6 @@ Item {
             }
         }
     }
-    Timer {
-        interval: 8000
-        running: true
-        repeat: true
-        onTriggered: blocks.running = true
-    }
 
     Shortcut { sequence: "Ctrl+K"; onActivated: app.openPalette() }
     Shortcut { sequence: "Ctrl+F"; onActivated: rail.filter.grabFocus() }
@@ -1513,7 +1273,7 @@ Item {
     Shortcut { sequence: "Ctrl+-"; onActivated: app.setZoom(app.zoom - 0.2) }
     Shortcut { sequence: "Ctrl+0"; onActivated: app.setZoom(1) }
     Shortcut { sequence: "F1"; onActivated: keysSheet.open() }
-    Shortcut { sequence: "Ctrl+L"; onActivated: pathField.grabFocus() }
+    Shortcut { sequence: "Ctrl+L"; onActivated: head.pathField.grabFocus() }
     Shortcut { sequence: "Ctrl+H"; onActivated: app.showHidden = !app.showHidden }
     Shortcut { sequence: "Alt+Left"; onActivated: app.goBack() }
     Shortcut { sequence: "Alt+Right"; onActivated: app.goForward() }
@@ -1630,6 +1390,11 @@ Item {
         }
     }
 
+    Sources {
+        id: sources
+        app: app
+    }
+
     Rail {
         id: rail
         app: app
@@ -1643,193 +1408,17 @@ Item {
         anchors.rightMargin: Tokens.s6
         anchors.topMargin: Tokens.s5
 
-        Item {
-            id: eyebrow
+        PageHead {
+            id: head
+            app: app
             anchors { left: parent.left; right: parent.right; top: parent.top }
-            height: 32
-
-            Row {
-                id: crumbs
-                anchors.verticalCenter: parent.verticalCenter
-                spacing: Tokens.s2
-
-                Text {
-                    text: "— " + app.brand.mark
-                    color: Tokens.inkFaint
-                    font.family: Tokens.jp
-                    font.pixelSize: 11
-                    anchors.verticalCenter: parent.verticalCenter
-                }
-                Repeater {
-                    model: {
-                        const out = [];
-                        let at = "";
-                        let shown = app.shorten(app.path);
-                        const colon = shown.indexOf(":/");
-                        if (colon > 0 && shown.charAt(0) !== "/") {
-                            at = app.path.slice(0, app.path.length - (shown.length - colon - 1)).replace(/\/$/, "");
-                            out.push({ label: shown.slice(0, colon).toUpperCase(), path: at });
-                            shown = shown.slice(colon + 1);
-                        }
-                        const remote = out.length > 0;
-                        const parts = shown.split("/").filter(s => s !== "");
-                        for (const s of parts) {
-                            at = s === "~" ? app.home : at + "/" + s;
-                            out.push({ label: s === "~" ? "INICIO" : s.toUpperCase(), path: at });
-                        }
-                        if (!remote && app.path.indexOf(app.home) !== 0)
-                            out.unshift({ label: "RAÍZ", path: "/" });
-                        return out.slice(-5);
-                    }
-
-                    Row {
-                        id: crumb
-                        required property var modelData
-                        required property int index
-                        spacing: Tokens.s2
-
-                        Text {
-                            visible: crumb.index > 0
-                            text: "/"
-                            color: Tokens.inkFaint
-                            font.family: Tokens.mono
-                            font.pixelSize: 10
-                        }
-                        Text {
-                            text: crumb.modelData.label
-                            color: crumbHover.hovered ? Tokens.ink : Tokens.inkMuted
-                            font.family: Tokens.mono
-                            font.pixelSize: 10
-                            font.letterSpacing: Tokens.trackMark
-                            HoverHandler { id: crumbHover; cursorShape: Qt.PointingHandCursor }
-                            TapHandler { onTapped: app.go(crumb.modelData.path) }
-                        }
-                    }
-                }
-            }
-            Rectangle {
-                anchors { left: crumbs.right; right: actions.left; verticalCenter: parent.verticalCenter }
-                anchors.leftMargin: Tokens.s3
-                anchors.rightMargin: Tokens.s3
-                height: 1
-                color: Tokens.lineSoft
-            }
-            Row {
-                id: actions
-                anchors { right: parent.right; verticalCenter: parent.verticalCenter }
-                spacing: Tokens.s2
-
-                Btn { text: "COMANDOS"; onAct: app.openPalette() }
-                Btn { text: app.grid ? "LISTA" : "CUADRÍCULA"; onAct: app.toggleGrid() }
-                Btn { text: "OCULTOS"; primary: app.showHidden; onAct: app.showHidden = !app.showHidden }
-                Btn { text: "TERMINAL AQUÍ"; onAct: app.terminal(app.path) }
-            }
+            height: implicitHeight
         }
 
-        Text {
-            id: heading
-            anchors { left: parent.left; right: parent.right; top: eyebrow.bottom; topMargin: Tokens.s3 }
-            text: app.title
-            color: Tokens.ink
-            font.family: Tokens.ui
-            font.pixelSize: Tokens.fTitle
-            elide: Text.ElideMiddle
-        }
-        Text {
-            id: blurb
-            anchors { left: parent.left; right: parent.right; top: heading.bottom; topMargin: Tokens.s1 }
-            text: app.inTrash && !app.deep ? Fmt.plural(app.rows.length, "elemento", "elementos") + " en la papelera, de todos los discos."
-                : app.recent ? "Lo último que abriste, esté donde esté."
-                : app.deep ? Fmt.plural(app.rows.length, "resultado", "resultados") + " para «" + app.deepQuery + "» en esta carpeta y sus subcarpetas."
-                : !app.ready ? "Leyendo…"
-                : (dir.count === 0 ? "Sin contenido."
-                    : Fmt.plural(app.dirTotal, "carpeta", "carpetas") + " y " + Fmt.plural(app.fileTotal, "archivo", "archivos") + ".")
-            color: Tokens.inkMuted
-            font.family: Tokens.ui
-            font.pixelSize: Tokens.fBody
-        }
-
-        Row {
-            id: tools
-            anchors { left: parent.left; right: parent.right; top: blurb.bottom; topMargin: Tokens.s4 }
-            spacing: Tokens.s2
-
-            Btn { text: "←"; armed: app.back.length > 0; height: 36; width: 40; onAct: app.goBack() }
-            Btn { text: "→"; armed: app.forward.length > 0; height: 36; width: 40; onAct: app.goForward() }
-            Btn { text: "↑"; armed: app.path !== "/"; height: 36; width: 40; onAct: app.goUp() }
-            Field {
-                id: pathField
-                width: parent.width - 3 * (40 + Tokens.s2)
-                toolbar: true
-                tabular: true
-                placeholder: "Ir a una ruta…"
-                onAccepted: app.tryPath(text)
-            }
-        }
-
-        Row {
+        TabStrip {
             id: tabBar
-            anchors { left: parent.left; right: detail.left; top: tools.bottom; topMargin: Tokens.s3; rightMargin: Tokens.s5 }
-            visible: app.tabs.length > 1
-            height: visible ? 30 : 0
-            spacing: Tokens.s2
-            clip: true
-
-            Repeater {
-                model: app.tabs
-
-                Rectangle {
-                    id: chip
-                    required property var modelData
-                    required property int index
-                    readonly property bool on: app.tab === index
-
-                    width: Math.min(220, chipRow.width + Tokens.s4)
-                    height: 30
-                    radius: Tokens.radius
-                    color: on ? Tokens.bone : (chipHover.hovered ? Tokens.tint10 : "transparent")
-                    border.width: Tokens.border
-                    border.color: on ? Tokens.bone : Tokens.line
-
-                    Row {
-                        id: chipRow
-                        anchors.centerIn: parent
-                        spacing: Tokens.s2
-
-                        Text {
-                            visible: chip.on
-                            text: "//"
-                            color: Tokens.inkOnBoneDim
-                            font.family: Tokens.mono
-                            font.pixelSize: 10
-                            anchors.verticalCenter: parent.verticalCenter
-                        }
-                        Text {
-                            text: app.nameOf(chip.on ? app.path : chip.modelData.path).toUpperCase()
-                            color: chip.on ? Tokens.inkOnBone : Tokens.inkDim
-                            font.family: Tokens.ui
-                            font.pixelSize: 11
-                            font.weight: Font.Medium
-                            font.letterSpacing: Tokens.trackLabel
-                            elide: Text.ElideRight
-                            width: Math.min(implicitWidth, 150)
-                            anchors.verticalCenter: parent.verticalCenter
-                        }
-                        Text {
-                            text: "×"
-                            color: chip.on ? Tokens.inkOnBoneDim : Tokens.inkFaint
-                            font.family: Tokens.ui
-                            font.pixelSize: 14
-                            anchors.verticalCenter: parent.verticalCenter
-                            TapHandler { onTapped: app.closeTab(chip.index) }
-                        }
-                    }
-                    HoverHandler { id: chipHover; cursorShape: Qt.PointingHandCursor }
-                    TapHandler { onTapped: app.showTab(chip.index) }
-                    TapHandler { acceptedButtons: Qt.MiddleButton; onTapped: app.closeTab(chip.index) }
-                }
-            }
-            Btn { text: "+"; width: 34; height: 30; onAct: app.newTab() }
+            app: app
+            anchors { left: parent.left; right: detail.left; top: head.bottom; topMargin: Tokens.s3; rightMargin: Tokens.s5 }
         }
 
         FileList {
@@ -1843,7 +1432,7 @@ Item {
         Detail {
             id: detail
             app: app
-            anchors { right: parent.right; top: tools.bottom; topMargin: Tokens.s4 }
+            anchors { right: parent.right; top: head.bottom; topMargin: Tokens.s4 }
             width: app.dual ? Math.round((page.width - Tokens.s5) / 2) : 340
             visible: !app.dual
         }
@@ -1858,70 +1447,10 @@ Item {
 
     }
 
-    Item {
+    Footer {
         id: foot
+        app: app
         anchors { left: parent.left; right: parent.right; bottom: parent.bottom }
-        height: 52
-
-        Rectangle {
-            width: parent.width
-            height: 1
-            color: Tokens.line
-        }
-        Row {
-            anchors { left: parent.left; leftMargin: Tokens.s5; verticalCenter: parent.verticalCenter }
-            spacing: Tokens.s3
-
-            Text {
-                text: "///"
-                color: Tokens.inkFaint
-                font.family: Tokens.mono
-                font.pixelSize: 10
-                anchors.verticalCenter: parent.verticalCenter
-            }
-            Rectangle {
-                width: 6
-                height: 6
-                color: app.ready ? Tokens.ink : Tokens.inkFaint
-                anchors.verticalCenter: parent.verticalCenter
-            }
-            Text {
-                text: (app.query !== "" ? app.rows.length + " DE " + dir.count + " · " : "")
-                    + Fmt.plural(app.dirTotal, "CARPETA", "CARPETAS") + " · " + Fmt.plural(app.fileTotal, "ARCHIVO", "ARCHIVOS")
-                color: Tokens.ink
-                font.family: Tokens.mono
-                font.pixelSize: 10
-                font.letterSpacing: Tokens.trackMark
-                anchors.verticalCenter: parent.verticalCenter
-            }
-        }
-        Rectangle {
-            visible: app.transfer !== null
-            height: 2
-            width: app.transfer && app.transfer.total > 0 ? parent.width * Math.min(1, app.transfer.done / app.transfer.total) : 0
-            color: Tokens.sun
-        }
-        Btn {
-            id: cancel
-            visible: app.transfer !== null
-            anchors { right: parent.right; rightMargin: Tokens.s6; verticalCenter: parent.verticalCenter }
-            compact: true
-            text: "CANCELAR"
-            onAct: app.cancelTransfer()
-        }
-        Text {
-            anchors { right: cancel.visible ? cancel.left : parent.right; rightMargin: cancel.visible ? Tokens.s3 : Tokens.s6; verticalCenter: parent.verticalCenter }
-            text: app.transfer !== null
-                ? "COPIANDO · " + app.transfer.name.toUpperCase() + " · " + (app.transfer.total > 0 ? Math.floor(100 * app.transfer.done / app.transfer.total) : 0) + "%"
-                : app.notice !== "" ? app.notice : (app.clip ? "PORTAPAPELES · " + app.clip.text + "   " : "") + app.space
-            color: app.transfer !== null ? Tokens.ink : (app.notice !== "" && app.noticeBad ? Tokens.alert : (app.notice !== "" ? Tokens.ink : Tokens.inkMuted))
-            width: parent.width * 0.55
-            horizontalAlignment: Text.AlignRight
-            elide: Text.ElideMiddle
-            font.family: Tokens.mono
-            font.pixelSize: 10
-            font.letterSpacing: Tokens.trackMark
-        }
     }
 
     QuickLook {
