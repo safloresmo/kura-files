@@ -46,6 +46,7 @@ ShellRoot {
                 marked: app.markedCount,
                 query: app.query,
                 deep: app.deep,
+                hidden: app.showHidden,
                 digest: app.digest,
                 grid: app.grid,
                 notice: app.notice,

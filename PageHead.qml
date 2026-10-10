@@ -11,13 +11,62 @@ Item {
     property alias pathField: pathField
     property alias searchField: searchField
     readonly property bool searchShown: head.width >= 640
+    // The minimal header has no row of its own for these, so they sit beside the path.
+    readonly property int toolCount: !app.bare ? 0 : (head.width >= 700 ? 4 : head.width >= 560 ? 3 : head.width >= 420 ? 2 : 1)
 
     implicitHeight: app.showSorter ? sorter.y + sorter.height : tools.y + tools.height
 
+    // A square button with a line icon, for the single row of the minimal header.
+    component Tool: Rectangle {
+        id: tool
+        property string icon: ""
+        property string hint: ""
+        property bool on: false
+        signal act()
+
+        width: 36
+        height: 36
+        radius: Tokens.radius
+        color: on ? Tokens.bone : (toolHover.hovered ? Tokens.tint10 : "transparent")
+        border.width: Tokens.border
+        border.color: on ? Tokens.bone : Tokens.line
+
+        Icon {
+            anchors.centerIn: parent
+            name: tool.icon
+            size: 16
+            color: tool.on ? Tokens.inkOnBone : Tokens.ink
+        }
+        Rectangle {
+            visible: toolHover.hovered
+            anchors { top: parent.bottom; topMargin: 4; right: parent.right }
+            z: 5
+            width: hintText.implicitWidth + 12
+            height: 20
+            radius: Tokens.radius
+            color: Tokens.paper
+            border.width: Tokens.border
+            border.color: Tokens.line
+
+            Text {
+                id: hintText
+                anchors.centerIn: parent
+                text: tool.hint
+                color: Tokens.inkDim
+                font.family: Tokens.mono
+                font.pixelSize: 9
+                font.letterSpacing: 1.2
+            }
+        }
+        HoverHandler { id: toolHover; cursorShape: Qt.PointingHandCursor }
+        TapHandler { onTapped: tool.act() }
+    }
+
     Item {
         id: eyebrow
+        visible: !app.bare
         anchors { left: parent.left; right: parent.right; top: parent.top }
-        height: 32
+        height: app.bare ? 0 : 32
 
         Row {
             id: crumbs
@@ -127,15 +176,16 @@ Item {
 
     Row {
         id: tools
-        anchors { left: parent.left; right: parent.right; top: app.bare ? eyebrow.bottom : (app.short ? heading.bottom : blurb.bottom); topMargin: app.short ? Tokens.s2 : Tokens.s4 }
+        anchors { left: parent.left; right: parent.right; top: app.bare ? eyebrow.bottom : (app.short ? heading.bottom : blurb.bottom); topMargin: app.bare ? 0 : (app.short ? Tokens.s2 : Tokens.s4) }
         spacing: Tokens.s2
+        z: 2
 
         Btn { text: "←"; armed: app.back.length > 0; height: 36; width: 40; onAct: app.goBack() }
         Btn { text: "→"; armed: app.forward.length > 0; height: 36; width: 40; onAct: app.goForward() }
         Btn { text: "↑"; armed: app.path !== "/"; height: 36; width: 40; onAct: app.goUp() }
         Field {
             id: pathField
-            width: parent.width - 3 * (40 + Tokens.s2) - (head.searchShown ? searchField.width + Tokens.s2 : 0) - sorterButton.width - Tokens.s2
+            width: parent.width - 3 * (40 + Tokens.s2) - (head.searchShown ? searchField.width + Tokens.s2 : 0) - sorterButton.width - Tokens.s2 - head.toolCount * (36 + Tokens.s2)
             toolbar: true
             tabular: true
             placeholder: "Ir a una ruta…"
@@ -160,6 +210,10 @@ Item {
             primary: app.showSorter
             onAct: app.setPref("sorter", !app.showSorter)
         }
+        Tool { visible: head.toolCount >= 1; icon: "command"; hint: "COMANDOS"; onAct: app.openPalette() }
+        Tool { visible: head.toolCount >= 2; icon: app.grid ? "rows" : "grid"; hint: app.grid ? "LISTA" : "CUADRÍCULA"; onAct: app.toggleGrid() }
+        Tool { visible: head.toolCount >= 3; icon: "eye"; hint: "OCULTOS"; on: app.showHidden; onAct: app.showHidden = !app.showHidden }
+        Tool { visible: head.toolCount >= 4; icon: "script"; hint: "TERMINAL AQUÍ"; onAct: app.terminal(app.path) }
     }
 
     // How the folder is ordered, and which kinds of file it holds.

@@ -194,6 +194,14 @@ expect "the chips stay out of the way" sorter false
 call click 1318 165 1 0;           expect "until the button brings them out" sorter true
 call click 1318 165 1 0;           expect "and puts them away again" sorter false
 
+echo "-- the minimal header"
+call set header minimal; sleep 0.6
+call click 1306 42 1 0;            expect "its eye shows the hidden files" hidden true
+call click 1306 42 1 0;            expect "and hides them again" hidden false
+call click 1146 42 1 0;            expect "the order button is still there" sorter true
+call click 1146 42 1 0
+call set header full; sleep 0.6
+
 echo "-- two panes"
 fresh
 mkdir -p "$zone/dest"

@@ -1727,7 +1727,7 @@ Item {
         anchors { left: rail.right; right: parent.right; top: parent.top; bottom: foot.top }
         anchors.leftMargin: app.width < 700 ? Tokens.s4 : Tokens.s6
         anchors.rightMargin: app.width < 700 ? Tokens.s4 : Tokens.s6
-        anchors.topMargin: app.short ? Tokens.s3 : Tokens.s5
+        anchors.topMargin: app.short && !app.bare ? Tokens.s3 : Tokens.s5
 
         PageHead {
             id: head
