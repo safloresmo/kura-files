@@ -87,7 +87,7 @@ Item {
     readonly property string engine: decodeURIComponent(Qt.resolvedUrl("motor/target/release/archivos-motor").toString().replace("file://", ""))
     readonly property var brand: settings.brand === "ryoku"
         ? { mark: "力", name: "RYOKU FILES", tag: "RYOKU // FILES", title: "Ryoku Files" }
-        : { mark: settings.ownMark, name: settings.ownName, tag: settings.ownTag, title: settings.ownName + " " + settings.ownMark }
+        : { mark: settings.ownMark, name: settings.ownName, tag: settings.ownTag, title: settings.ownTitle }
 
     readonly property int total: rows.length
     readonly property int folderTotal: dir.count
@@ -1284,8 +1284,9 @@ Item {
             property string terminal: "kitty --directory"
             property var views: ({})
             property string ownMark: "庫"
-            property string ownName: "SFM"
-            property string ownTag: "KURA // FILES"
+            property string ownName: "KURA"
+            property string ownTag: "FILES"
+            property string ownTitle: "Kura Files"
         }
     }
     Process {

@@ -174,6 +174,10 @@ Item {
                     Field { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; width: 240; text: sheet.store.ownTag; onCommitted: value => sheet.app.setPref("ownTag", value) }
                 }
                 Line {
+                    label: "Título de la ventana"
+                    Field { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; width: 240; text: sheet.store.ownTitle; onCommitted: value => sheet.app.setPref("ownTitle", value) }
+                }
+                Line {
                     label: "Símbolo"
                     note: "Una letra o un kanji"
                     Field { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; width: 70; text: sheet.store.ownMark; onCommitted: value => sheet.app.setPref("ownMark", value) }
