@@ -34,6 +34,8 @@ Exec=magick %f %f.jpg
 
 `%f` es el primer archivo, `%F` todos, `%d` su carpeta y `%n` su nombre.
 
+También aparecen ahí los scripts de `~/.local/share/nautilus/scripts`, que reciben la selección como argumentos.
+
 ## Requisitos
 
 Quickshell con los módulos de interfaz del escritorio, Rust para compilar el motor, y `gio`, `bsdtar` y `sha256sum` en el sistema. Los dos servicios usan Python con PyGObject.

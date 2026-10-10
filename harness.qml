@@ -48,6 +48,7 @@ ShellRoot {
                 query: app.query,
                 deep: app.deep,
                 hidden: app.showHidden,
+                hint: app.dialog.hintText,
                 shown: app.shorten(app.path),
                 servers: app.servers.map(x => x.name + " " + x.uri).join(" | "),
                 undos: app.undoStack.length,

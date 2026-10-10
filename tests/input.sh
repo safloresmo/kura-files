@@ -11,7 +11,8 @@ work=$(mktemp -d "${XDG_CACHE_HOME:-$HOME/.cache}/archivos-test.XXXXXX")
 zone=$work/zone
 failed=0
 
-export QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software XDG_CONFIG_HOME=$work/config
+# Its own config and data, so nothing of the user's shows up or gets touched.
+export QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software XDG_CONFIG_HOME=$work/config XDG_DATA_HOME=$work/data
 # The clicks below are placed for the full header.
 mkdir -p "$XDG_CONFIG_HOME/archivos"
 echo '{ "header": "full" }' >"$XDG_CONFIG_HOME/archivos/config.json"
@@ -305,6 +306,28 @@ expect "a refusal offers the administrator" notice "NO SE PUDO · HACE FALTA SER
 call key $ENTER 0; sleep 1
 [ "$(cat "$work/elevated" 2>/dev/null)" = "mkdir $zone/locked Nueva carpetax" ] && echo "ok    and repeats the same step as root" || { echo "FAIL  and repeats the same step as root: $(cat "$work/elevated" 2>/dev/null)"; failed=1; }
 chmod 755 "$zone/locked"
+
+echo "-- renaming several shows what will happen"
+fresh
+open_at "$zone"
+call key 65 $CTRL; call key $F2 0; call key 65 $CTRL; call type "doc {n}"
+expect "the new names are shown before anything moves" hint "folder  →  doc 1
+a.txt  →  doc 2.txt
+b.txt  →  doc 3.txt
+c.txt  →  doc 4.txt"
+call key $ESC 0
+
+echo "-- scripts kept for another file manager"
+mkdir -p "$work/data/nautilus/scripts/Tools"
+printf '#!/bin/bash\nprintf "%%s|" "$@" >"%s/script-ran"\n' "$work" >"$work/data/nautilus/scripts/Tools/Mark"
+chmod +x "$work/data/nautilus/scripts/Tools/Mark"
+pkill -f "qs -p $harness" 2>/dev/null; sleep 0.3
+ARCHIVOS_DIR=$zone qs -p "$harness" >"$work/window.log" 2>&1 &
+sleep 4
+call click 400 380 1 0; call actions; sleep 1
+expect "a script is offered next to the service menus" actions "Tests · Hacer un gemelo | Tools · Mark"
+call act 1; sleep 1
+[ "$(cat "$work/script-ran" 2>/dev/null)" = "$zone/b.txt|" ] && echo "ok    and gets the selection" || { echo "FAIL  and gets the selection: $(cat "$work/script-ran" 2>/dev/null)"; failed=1; }
 
 echo "-- the selection panel"
 open_at "$zone"

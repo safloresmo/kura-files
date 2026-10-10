@@ -273,6 +273,7 @@ Item {
     }
 
     signal quit()
+    property alias dialog: dialog
     property alias serverForm: serverForm
     property alias jobsPanel: jobsPanel
     property alias pickBar: pickBar
@@ -719,6 +720,15 @@ Item {
         marked = {};
         op(["trash"].concat(list.map(e => e.path)), "A LA PAPELERA · " + label(list), ["untrash"].concat(list.map(e => e.path)));
     }
+    // The name a pattern gives the nth of a set, as the engine works it out.
+    function patterned(pattern, index, total, original) {
+        const number = String(index + 1).padStart(String(total).length, "0");
+        let name = pattern.indexOf("{n}") >= 0 ? pattern.split("{n}").join(number) : pattern + " " + number;
+        const dot = original.lastIndexOf(".");
+        if (name.indexOf(".") < 0 && dot > 0)
+            name += original.slice(dot);
+        return name;
+    }
     function rename() {
         const list = picked();
         if (list.length === 0 || inTrash)
@@ -727,6 +737,15 @@ Item {
             dialog.ask("RENOMBRAR " + list.length + " · {n} ES EL NÚMERO", "nombre {n}", pattern => {
                 marked = {};
                 op(["rename-many", pattern].concat(list.map(x => x.path)), "RENOMBRADOS · " + list.length + " ELEMENTOS");
+            });
+            dialog.preview(text => {
+                const pattern = text.trim();
+                if (pattern === "")
+                    return "";
+                const lines = list.slice(0, 4).map((e, i) => e.name + "  →  " + patterned(pattern, i, list.length, e.name));
+                if (list.length > 4)
+                    lines.push("… y " + (list.length - 4) + " más");
+                return lines.join("\n");
             });
             return;
         }

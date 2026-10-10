@@ -15,8 +15,11 @@ Item {
     property bool masked: false
     // Runs when the question is put away without an answer.
     property var refused: null
+    // Turns what is being typed into a line shown under the field.
+    property var hint: null
 
     signal closed()
+    readonly property string hintText: hint !== null && visible ? hint(field.text) : ""
 
     // The same, for something that should not be read over a shoulder.
     function askSecret(title, callback) {
@@ -25,6 +28,7 @@ Item {
     }
     function ask(title, value, callback) {
         masked = false;
+        hint = null;
         heading = title;
         done = callback;
         plain = false;
@@ -61,6 +65,9 @@ Item {
         yes.forceActiveFocus();
     }
     // Say what to do if the question just asked goes unanswered.
+    function preview(callback) {
+        hint = callback;
+    }
     function orElse(callback) {
         refused = callback;
     }
@@ -140,6 +147,16 @@ Item {
                 width: parent.width
                 toolbar: true
                 onAccepted: dialog.accept()
+            }
+            Text {
+                visible: !dialog.plain && dialog.hint !== null
+                width: parent.width
+                wrapMode: Text.WordWrap
+                text: visible ? dialog.hint(field.text) : ""
+                color: Tokens.inkMuted
+                font.family: Tokens.mono
+                font.pixelSize: 11
+                lineHeight: 1.3
             }
             Row {
                 anchors.right: parent.right

@@ -14,6 +14,8 @@ use crate::file_name;
 
 const SEARCH_LIMIT: usize = 500;
 const ACTION_PATHS: usize = 30;
+/// The action id that stands for a whole script, not a section of a menu.
+const SCRIPT: &str = "@script";
 const INSIDE_BYTES: u64 = 2 * 1024 * 1024;
 const INSIDE_SECONDS: u64 = 20;
 const INSIDE_SKIP: [&str; 5] = ["node_modules", "target", "__pycache__", "venv", "build"];
@@ -537,6 +539,29 @@ fn menu_dirs() -> Vec<PathBuf> {
     dirs
 }
 
+/// Where Nautilus keeps its scripts: plain programs run on the selection.
+fn script_root() -> PathBuf {
+    data_dirs().remove(0).join("nautilus/scripts")
+}
+
+/// Every runnable script under a folder, with the subfolder it sits in.
+fn scripts_in(dir: &Path, group: &str, found: &mut Vec<(PathBuf, String)>) {
+    let Ok(entries) = fs::read_dir(dir) else { return };
+    let mut paths: Vec<PathBuf> = entries.flatten().map(|entry| entry.path()).collect();
+    paths.sort();
+    for path in paths {
+        let name = file_name(&path);
+        if name.starts_with('.') {
+            continue;
+        }
+        if path.is_dir() {
+            scripts_in(&path, &name, found);
+        } else if path.metadata().is_ok_and(|meta| meta.permissions().mode() & 0o111 != 0) {
+            found.push((path, group.to_string()));
+        }
+    }
+}
+
 /// The kinds a path answers to, most specific first.
 fn kinds_of(path: &Path) -> Vec<String> {
     if path.is_dir() {
@@ -620,18 +645,25 @@ pub fn actions(paths: &[String]) -> Result<(), String> {
             }
         }
     }
+    let mut scripts = Vec::new();
+    scripts_in(&script_root(), "", &mut scripts);
+    for (script, group) in scripts {
+        println!("{}\t{SCRIPT}\t{group}\t{}", script.display(), file_name(&script));
+    }
     Ok(())
 }
 
 /// How many service menus there are at all, so the window knows whether to offer them.
 pub fn menus() -> Result<(), String> {
-    let count = menu_dirs()
+    let menus = menu_dirs()
         .iter()
         .filter_map(|dir| fs::read_dir(dir).ok())
         .flat_map(|entries| entries.flatten())
         .filter(|entry| entry.file_name().to_string_lossy().ends_with(".desktop"))
         .count();
-    println!("{count}");
+    let mut scripts = Vec::new();
+    scripts_in(&script_root(), "", &mut scripts);
+    println!("{}", menus + scripts.len());
     Ok(())
 }
 
@@ -664,6 +696,21 @@ pub fn filled(exec: &str, paths: &[String]) -> String {
 
 /// Run one action of a service menu on the paths, without waiting for it.
 pub fn act(file: &Path, id: &str, paths: &[String]) -> Result<(), String> {
+    let folder = Path::new(paths.first().map(String::as_str).unwrap_or("/")).parent().unwrap_or(Path::new("/"));
+    if id == SCRIPT {
+        if !file.starts_with(script_root()) {
+            return Err(format!("No es un script: {}", file.display()));
+        }
+        // Scripts get the selection as arguments and, as Nautilus does, in the environment.
+        return Command::new(file)
+            .args(paths)
+            .env("NAUTILUS_SCRIPT_SELECTED_FILE_PATHS", paths.iter().map(|path| format!("{path}\n")).collect::<String>())
+            .env("NAUTILUS_SCRIPT_CURRENT_URI", encode(&folder.to_string_lossy()))
+            .current_dir(folder)
+            .spawn()
+            .map(|_| ())
+            .map_err(|e| format!("No se pudo lanzar: {e}"));
+    }
     if !menu_dirs().iter().any(|dir| file.parent() == Some(dir.as_path())) {
         return Err(format!("No es un menú de servicio: {}", file.display()));
     }
@@ -672,7 +719,7 @@ pub fn act(file: &Path, id: &str, paths: &[String]) -> Result<(), String> {
     Command::new("sh")
         .arg("-c")
         .arg(filled(&exec, paths))
-        .current_dir(Path::new(paths.first().map(String::as_str).unwrap_or("/")).parent().unwrap_or(Path::new("/")))
+        .current_dir(folder)
         .spawn()
         .map(|_| ())
         .map_err(|e| format!("No se pudo lanzar: {e}"))
