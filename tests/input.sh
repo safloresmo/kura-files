@@ -74,6 +74,7 @@ open_at "$zone"
 echo "-- selection"
 expect "starts with four rows" names "folder | a.txt | b.txt | c.txt"
 call click 500 340 1 0;            expect "click selects" selected "a.txt"
+sleep 0.6;                         expect "a text file reports its lines" facts "Líneas=1"
 call click 500 420 1 $CTRL;        expect "ctrl+click marks two" marked 2
 call click 500 380 1 0;            expect "plain click drops the marks" marked 0
 call click 500 420 1 $SHIFT;       expect "shift+click marks a range" marked 2

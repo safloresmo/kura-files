@@ -24,6 +24,7 @@ Item {
     property var devices: []
     property var counts: ({})
     property var flags: ({})
+    property var facts: []
     property bool countsReady: false
     property string space: ""
     property int dirTotal: 0
@@ -915,6 +916,12 @@ Item {
     function loadPreview() {
         const e = entry(current);
         previewer.running = false;
+        facter.running = false;
+        if (facter.target !== (e ? e.path : path))
+            facts = [];
+        facter.target = e ? e.path : path;
+        facter.command = [engine, "facts", facter.target];
+        facter.running = true;
         if (!e || e.isDir) {
             preview = { kind: "none" };
             return;
@@ -1049,6 +1056,7 @@ Item {
     onGridChanged: refresh()
 
     onPathChanged: {
+        Qt.callLater(loadPreview);
         const view = settings.views[path];
         sortKey = view ? view.sortKey || 0 : 0;
         sortReversed = view ? view.sortReversed === true : false;
@@ -1263,6 +1271,24 @@ Item {
                     return;
                 const slash = found.charAt(found.length - 1) === "/" ? "/" : "";
                 head.pathField.text = app.shorten(app.clean(found)) + (app.clean(found) === "/" ? "" : slash);
+            }
+        }
+    }
+    Process {
+        id: facter
+        property string target: ""
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const now = app.entry(app.current);
+                if ((now ? now.path : app.path) !== facter.target)
+                    return;
+                const list = [];
+                for (const line of text.split("\n")) {
+                    const cut = line.indexOf("\t");
+                    if (cut > 0)
+                        list.push({ label: line.slice(0, cut), value: line.slice(cut + 1) });
+                }
+                app.facts = list;
             }
         }
     }

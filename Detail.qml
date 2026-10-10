@@ -168,6 +168,15 @@ Rectangle {
             label: "Modificado"
             value: card.item ? Fmt.when(card.item.modified) : ""
         }
+        Repeater {
+            model: card.app.facts
+
+            Fact {
+                required property var modelData
+                label: modelData.label
+                value: modelData.value
+            }
+        }
 
         Item {
             width: parent.width

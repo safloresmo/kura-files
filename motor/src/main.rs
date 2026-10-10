@@ -30,6 +30,7 @@ archivos-motor revert (copy|move|new SRC DEST)...
 archivos-motor extract ARCHIVE
 archivos-motor compress zip|tar.gz|tar.xz|7z SRC...
 archivos-motor info PATH
+archivos-motor facts PATH
 archivos-motor counts DIR
 archivos-motor search DIR TEXT [hidden]
 archivos-motor preview PATH [BYTES]
@@ -92,6 +93,7 @@ fn main() {
         ("extract", [archive]) => extract(Path::new(archive)),
         ("compress", [format, sources @ ..]) if !sources.is_empty() => compress(format, sources),
         ("info", [path]) => describe::info(Path::new(path)),
+        ("facts", [path]) => describe::facts(Path::new(path)),
         ("counts", [dir]) => describe::counts(Path::new(dir)),
         ("search", [dir, text]) => describe::search(Path::new(dir), text, false),
         ("search", [dir, text, _]) => describe::search(Path::new(dir), text, true),

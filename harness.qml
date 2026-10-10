@@ -52,6 +52,7 @@ ShellRoot {
                 bookmarks: app.bookmarks.length,
                 names: app.rows.slice(0, 40).map(e => e.name).join(" | "),
                 dual: app.dual,
+                facts: app.facts.map(f => f.label + "=" + f.value).join("; "),
                 typed: app.typedPath,
                 looking: app.looking,
                 preview: app.preview.kind,

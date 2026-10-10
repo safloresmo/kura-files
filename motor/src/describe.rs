@@ -116,6 +116,89 @@ pub fn info(path: &Path) -> Result<(), String> {
     Ok(())
 }
 
+fn clock(seconds: f64) -> String {
+    let total = seconds.round() as u64;
+    if total >= 3600 {
+        format!("{}:{:02}:{:02}", total / 3600, total % 3600 / 60, total % 60)
+    } else {
+        format!("{}:{:02}", total / 60, total % 60)
+    }
+}
+
+/// The few things worth knowing at a glance beyond size and date, by kind of
+/// file: `LABEL<TAB>VALUE` per line. Slow or missing tools just add nothing.
+pub fn facts(path: &Path) -> Result<(), String> {
+    if path.is_dir() {
+        if path.join(".git").exists() {
+            let branch = Command::new("git")
+                .arg("-C")
+                .arg(path)
+                .args(["rev-parse", "--abbrev-ref", "HEAD"])
+                .output()
+                .map(|out| String::from_utf8_lossy(&out.stdout).trim().to_string())
+                .unwrap_or_default();
+            let changes = Command::new("git")
+                .arg("-C")
+                .arg(path)
+                .args(["status", "--porcelain"])
+                .output()
+                .map(|out| String::from_utf8_lossy(&out.stdout).lines().count())
+                .unwrap_or(0);
+            if !branch.is_empty() {
+                let state = match changes {
+                    0 => "al día".to_string(),
+                    1 => "1 cambio".to_string(),
+                    n => format!("{n} cambios"),
+                };
+                println!("Repositorio\t{branch} · {state}");
+            }
+        }
+        return Ok(());
+    }
+    let kind = mime(path);
+    if kind.starts_with("image/") {
+        let mut first = path.as_os_str().to_os_string();
+        first.push("[0]");
+        let size = Command::new("identify")
+            .args(["-format", "%w × %h"])
+            .arg(first)
+            .output()
+            .map(|out| String::from_utf8_lossy(&out.stdout).trim().to_string())
+            .unwrap_or_default();
+        if !size.is_empty() {
+            println!("Dimensiones\t{size} px");
+        }
+    } else if kind.starts_with("video/") || kind.starts_with("audio/") {
+        let probe = Command::new("ffprobe")
+            .args(["-v", "error", "-show_entries", "format=duration:stream=width,height", "-of", "default=noprint_wrappers=1"])
+            .arg(path)
+            .output()
+            .map(|out| String::from_utf8_lossy(&out.stdout).into_owned())
+            .unwrap_or_default();
+        let field = |key: &str| probe.lines().find_map(|line| line.strip_prefix(key)).and_then(|v| v.parse::<f64>().ok());
+        if let (Some(w), Some(h)) = (field("width="), field("height=")) {
+            println!("Dimensiones\t{} × {} px", w as u64, h as u64);
+        }
+        if let Some(duration) = field("duration=") {
+            println!("Duración\t{}", clock(duration));
+        }
+    } else if kind == "application/pdf" {
+        let pages = Command::new("pdfinfo")
+            .arg(path)
+            .output()
+            .map(|out| String::from_utf8_lossy(&out.stdout).into_owned())
+            .unwrap_or_default();
+        if let Some(count) = pages.lines().find_map(|line| line.strip_prefix("Pages:")) {
+            println!("Páginas\t{}", count.trim());
+        }
+    } else if kind.starts_with("text/") && path.metadata().map(|m| m.len() < 4_000_000).unwrap_or(false) {
+        if let Ok(text) = fs::read(path) {
+            println!("Líneas\t{}", text.iter().filter(|&&byte| byte == b'\n').count());
+        }
+    }
+    Ok(())
+}
+
 /// What a listing cannot tell by name: `COUNT<TAB>PATH` for how many entries
 /// a sub folder holds, `link<TAB>PATH` for a symbolic link and `exec<TAB>PATH`
 /// for a file that can be run.
