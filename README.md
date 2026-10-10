@@ -31,6 +31,7 @@ Gestor de archivos de escritorio para Linux: interfaz en QML sobre Quickshell y 
 ## Qué hace
 
 - Lista, lista compacta, cuadrícula y galería, con miniaturas y vista rápida.
+- Vista previa de imágenes, vídeo, PDF y texto, y de cualquier formato que tenga un generador de miniaturas instalado (modelos 3D con `f3d`, por ejemplo).
 - Pestañas, doble panel, marcadores, recientes y papelera con restaurar.
 - Copiar, mover, renombrar (también en lote), duplicar, enlazar, comprimir y extraer, con deshacer y rehacer. Nunca sobrescribe.
 - Búsqueda por nombre, dentro del contenido y en toda la carpeta personal con índice (hace falta `plocate`), filtro por tipo y orden por nombre, tamaño, fecha o tipo.

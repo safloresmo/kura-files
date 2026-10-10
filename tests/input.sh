@@ -435,6 +435,16 @@ echo more >>"$zone/b.txt"
 call git "commit --quiet -a -m second"; sleep 1.5
 [ "$(git -C "$zone" log --oneline | wc -l)" = 2 ] && echo "ok    and git runs on the repository" || { echo "FAIL  and git runs on the repository"; failed=1; }
 
+echo "-- formats a thumbnailer draws"
+fresh
+printf 'solid x\nendsolid x\n' >"$zone/part.stl"
+mkdir -p "$XDG_DATA_HOME/thumbnailers"
+printf '[Thumbnailer Entry]\nExec=cp %s/docs/captura.png %%o\nMimeType=model/stl;\n' "$root" >"$XDG_DATA_HOME/thumbnailers/models.thumbnailer"
+open_at "$zone"
+call click 400 472 1 0; sleep 1.5
+expect "a model gets a picture from the installed thumbnailer" preview "image"
+rm -f "$XDG_DATA_HOME/thumbnailers/models.thumbnailer"
+
 echo "-- the selection panel"
 open_at "$zone"
 expect "nothing picked, no panel" detail false

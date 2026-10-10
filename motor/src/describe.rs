@@ -609,18 +609,84 @@ fn render(path: &Path, pdf: bool) -> Option<PathBuf> {
     made(&thumb).then_some(thumb)
 }
 
+/// The command of an installed thumbnailer that takes a file of these kinds.
+/// This is how the desktop learns to draw new formats: a program for 3D
+/// models, say, brings a `.thumbnailer` file, and from then on they have pictures.
+fn thumbnailer_for(kinds: &[String]) -> Option<String> {
+    for dir in data_dirs() {
+        let Ok(entries) = fs::read_dir(dir.join("thumbnailers")) else { continue };
+        let mut files: Vec<PathBuf> = entries.flatten().map(|entry| entry.path()).collect();
+        files.sort();
+        for file in files {
+            let Ok(text) = fs::read_to_string(&file) else { continue };
+            let section = "Thumbnailer Entry";
+            let takes_it = key_of(&text, section, "MimeType")
+                .unwrap_or_default()
+                .split(';')
+                .any(|kind| !kind.is_empty() && kinds.iter().any(|mine| mine == kind.trim()));
+            if !takes_it {
+                continue;
+            }
+            if let Some(exec) = key_of(&text, section, "Exec") {
+                return Some(exec);
+            }
+        }
+    }
+    None
+}
+
+/// The cached picture a thumbnailer makes of a file, made on first use.
+fn render_with(path: &Path, exec: &str) -> Option<PathBuf> {
+    let thumb = thumbnail(path);
+    if !made(&thumb) {
+        let _ = fs::create_dir_all(thumb.parent().unwrap_or(Path::new("/")));
+        let source = path.to_string_lossy();
+        let mut command = String::new();
+        let mut chars = exec.chars();
+        while let Some(c) = chars.next() {
+            if c != '%' {
+                command.push(c);
+                continue;
+            }
+            match chars.next() {
+                Some('i') => command.push_str(&quoted(&source)),
+                Some('u') => command.push_str(&quoted(&encode(&source))),
+                Some('o') => command.push_str(&quoted(&thumb.to_string_lossy())),
+                Some('s') => command.push_str("512"),
+                Some('%') => command.push('%'),
+                _ => {}
+            }
+        }
+        let _ = Command::new("sh").arg("-c").arg(command).output();
+    }
+    made(&thumb).then_some(thumb)
+}
+
 /// Pictures for every video and PDF in a folder: `PATH<TAB>THUMBNAIL`, as each is ready.
 pub fn thumbs(dir: &Path) -> Result<(), String> {
     const VIDEO: [&str; 6] = ["mp4", "mkv", "webm", "mov", "avi", "m4v"];
+    const DRAWN: [&str; 22] = [
+        "stl", "3mf", "obj", "ply", "glb", "gltf", "step", "stp", "fbx", "dae", "blend", "off", "amf", "docx", "odt", "xlsx", "ods",
+        "pptx", "odp", "epub", "ttf", "otf",
+    ];
     let entries = fs::read_dir(dir).map_err(|e| format!("No se pudo leer: {e}"))?;
     for entry in entries.flatten() {
         let path = entry.path();
         let ext = path.extension().map(|e| e.to_string_lossy().to_lowercase()).unwrap_or_default();
         let pdf = ext == "pdf";
-        if !path.is_file() || !(pdf || VIDEO.contains(&ext.as_str())) {
+        if !path.is_file() {
             continue;
         }
-        if let Some(thumb) = render(&path, pdf) {
+        // Formats only a thumbnailer can draw are tried by extension, so a
+        // folder of plain files costs nothing.
+        let picture = if pdf || VIDEO.contains(&ext.as_str()) {
+            render(&path, pdf)
+        } else if DRAWN.contains(&ext.as_str()) {
+            drawn(&path)
+        } else {
+            None
+        };
+        if let Some(thumb) = picture {
             println!("{}\t{}", path.display(), thumb.display());
         }
     }
@@ -647,6 +713,16 @@ pub fn remote(uris: &[String]) -> Result<(), String> {
 }
 
 /// First line says how to show the file: `image PATH`, `text` and the start of it, or `none`.
+/// A picture of a file from whichever thumbnailer knows its kind. Plain text
+/// is left alone: it reads better as text.
+fn drawn(path: &Path) -> Option<PathBuf> {
+    let kinds = kinds_of(path);
+    if kinds.first().is_some_and(|kind| kind.starts_with("text/")) {
+        return None;
+    }
+    render_with(path, &thumbnailer_for(&kinds)?)
+}
+
 pub fn preview(path: &Path, bytes: usize) -> Result<(), String> {
     if !path.is_file() {
         println!("none");
@@ -665,6 +741,8 @@ pub fn preview(path: &Path, bytes: usize) -> Result<(), String> {
             Some(thumb) => println!("image {}", thumb.display()),
             None => println!("none"),
         }
+    } else if let Some(thumb) = drawn(path) {
+        println!("image {}", thumb.display());
     } else if textual {
         let mut buffer = Vec::new();
         fs::File::open(path)
