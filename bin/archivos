@@ -4,8 +4,24 @@
 set -eu
 
 root=$(dirname "$(dirname "$(readlink -f "$0")")")
+me=$(basename "$0")
+
+# A line for the person at the terminal: Spanish where the system speaks it, English elsewhere.
+say() {
+    case ${LC_ALL:-${LC_MESSAGES:-${LANG:-es}}} in
+        es*) printf '%s\n' "$1" ;;
+        *) printf '%s\n' "$2" ;;
+    esac
+}
 
 usage() {
+    case ${LC_ALL:-${LC_MESSAGES:-${LANG:-es}}} in
+        es*) usage_es ;;
+        *) usage_en ;;
+    esac | sed "s/^archivos/$me/"
+}
+
+usage_es() {
     cat <<'TEXT'
 archivos [RUTA]                 abre el gestor; si ya está abierto, lo lleva a RUTA
 archivos mostrar RUTA           abre la carpeta que contiene RUTA y la señala
@@ -36,10 +52,43 @@ archivos pruebas                corre las pruebas del motor y las de la ventana
 TEXT
 }
 
+usage_en() {
+    cat <<'TEXT'
+archivos [PATH]                 open the file manager; if it is open, take it to PATH
+archivos show PATH              open the folder that holds PATH, with the cursor on it
+archivos go PATH                take the open window to PATH
+archivos filter [TEXT]          filter the folder on show
+archivos search TEXT            search by name in the folder and below
+archivos inside TEXT            search for text files that contain TEXT
+archivos where TEXT             search by name in the whole home folder, at once
+archivos state                  what the window shows, as JSON
+archivos view                   switch between list and grid
+archivos commands               open the command palette
+
+archivos devices                Tailscale machines that can be sent to
+archivos send MACHINE FILE...   send files over Tailscale
+
+archivos copy DEST SOURCE...    copy without overwriting
+archivos move DEST SOURCE...    move without overwriting
+archivos rename SOURCE NAME
+archivos folder WHERE NAME      make a folder
+archivos trash SOURCE...        send to the trash
+archivos compress FORMAT SOURCE...   zip, tar.gz, tar.xz or 7z
+archivos extract ARCHIVE        extract into a new folder
+archivos info PATH              what is known about a file or folder
+
+archivos language [CODE]        a template to translate, or what a language still lacks
+archivos build                  build the engine (needed the first time)
+archivos tests                  run the engine's tests and the window's
+
+The Spanish names of the commands work too.
+TEXT
+}
+
 motor=$root/motor/target/release/archivos-motor
 
 engine() {
-    [ -x "$motor" ] || { echo "Falta compilar el motor: archivos compilar" >&2; exit 1; }
+    [ -x "$motor" ] || { say "Falta compilar el motor: $me compilar" "The engine is not built yet: $me build" >&2; exit 1; }
     exec "$motor" "$@"
 }
 
@@ -72,7 +121,7 @@ raise() {
 }
 
 need_window() {
-    running || { echo "El gestor no está abierto." >&2; exit 1; }
+    running || { say "El gestor no está abierto." "The file manager is not open." >&2; exit 1; }
 }
 
 # A path as the window wants it: absolute, and without the file:// of a URI.
@@ -103,7 +152,7 @@ open_at() {
         raise
         return 0
     fi
-    [ -x "$motor" ] || { echo "Falta compilar el motor: archivos compilar" >&2; exit 1; }
+    [ -x "$motor" ] || { say "Falta compilar el motor: $me compilar" "The engine is not built yet: $me build" >&2; exit 1; }
     [ -n "$dir" ] && export ARCHIVOS_DIR=$dir
     [ -n "$item" ] && export ARCHIVOS_SHOW=$item
     exec qs -p "$root"
@@ -111,43 +160,43 @@ open_at() {
 
 case ${1:-} in
     "") open_at ;;
-    ayuda | -h | --help) usage ;;
-    mostrar) open_at "${2:?falta la ruta}" item ;;
-    ir) need_window; window go "$(readlink -f -- "${2:?falta la ruta}")" ;;
-    filtro) need_window; window filter "${2:-}" ;;
-    buscar) need_window; window search "${2:?falta el texto}" ;;
-    dentro) need_window; window inside "${2:?falta el texto}" ;;
-    donde) need_window; window everywhere "${2:?falta el texto}" ;;
-    estado) need_window; window state ;;
-    vista) need_window; window grid ;;
-    comandos) need_window; window palette ;;
-    dispositivos) tailscale file cp --targets ;;
-    enviar)
-        [ $# -ge 3 ] || { echo "uso: archivos enviar EQUIPO ARCHIVO..." >&2; exit 2; }
+    ayuda | help | -h | --help) usage ;;
+    mostrar | show) open_at "${2:?PATH}" item ;;
+    ir | go) need_window; window go "$(readlink -f -- "${2:?PATH}")" ;;
+    filtro | filter) need_window; window filter "${2:-}" ;;
+    buscar | search) need_window; window search "${2:?TEXT}" ;;
+    dentro | inside) need_window; window inside "${2:?TEXT}" ;;
+    donde | where) need_window; window everywhere "${2:?TEXT}" ;;
+    estado | state) need_window; window state ;;
+    vista | view) need_window; window grid ;;
+    comandos | commands) need_window; window palette ;;
+    dispositivos | devices) tailscale file cp --targets ;;
+    enviar | send)
+        [ $# -ge 3 ] || { say "uso: $me enviar EQUIPO ARCHIVO..." "usage: $me send MACHINE FILE..." >&2; exit 2; }
         target=$2
         shift 2
         exec tailscale file cp -- "$@" "$target:"
         ;;
-    copiar) shift; engine copy "$@" ;;
-    mover) shift; engine move "$@" ;;
-    renombrar) shift; engine rename "$@" ;;
-    carpeta) shift; engine mkdir "$@" ;;
-    papelera) shift; engine trash "$@" ;;
-    comprimir) shift; engine compress "$@" ;;
-    extraer) shift; engine extract "$@" ;;
+    copiar | copy) shift; engine copy "$@" ;;
+    mover | move) shift; engine move "$@" ;;
+    renombrar | rename) shift; engine rename "$@" ;;
+    carpeta | folder) shift; engine mkdir "$@" ;;
+    papelera | trash) shift; engine trash "$@" ;;
+    comprimir | compress) shift; engine compress "$@" ;;
+    extraer | extract) shift; engine extract "$@" ;;
     info) shift; engine info "$@" ;;
-    idioma)
+    idioma | language)
         # Every text there is, taken from the English file, which has them all.
         if [ -z "${2:-}" ]; then
             jq 'with_entries(select(.key != "_")) | with_entries(.value = (if .key == "name" then "Nombre del idioma" else "" end))' "$root/idiomas/en.json"
         else
             mine=${XDG_CONFIG_HOME:-$HOME/.config}/archivos/idiomas/$2.json
             [ -f "$root/idiomas/$2.json" ] && mine=$root/idiomas/$2.json
-            [ -f "$mine" ] || { echo "No hay idioma $2." >&2; exit 1; }
+            [ -f "$mine" ] || { say "No hay idioma $2." "There is no language $2." >&2; exit 1; }
             jq -r --slurpfile have "$mine" 'keys[] | select(. != "_" and (($have[0][.] // "") == ""))' "$root/idiomas/en.json"
         fi
         ;;
-    compilar) exec cargo build --release --manifest-path "$root/motor/Cargo.toml" ;;
-    pruebas) cargo test --manifest-path "$root/motor/Cargo.toml" && exec "$root/tests/input.sh" ;;
+    compilar | build) exec cargo build --release --manifest-path "$root/motor/Cargo.toml" ;;
+    pruebas | tests) cargo test --manifest-path "$root/motor/Cargo.toml" && exec "$root/tests/input.sh" ;;
     *) open_at "$1" ;;
 esac

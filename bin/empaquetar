@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# Pack a release: the program as it is in git, plus the engine already built
+# so that whoever downloads it needs no compiler.
+#   bin/empaquetar VERSION        writes kura-files-VERSION-x86_64.tar.gz in dist/
+set -euo pipefail
+
+root=$(dirname "$(dirname "$(readlink -f "$0")")")
+version=${1:?VERSION}
+name=kura-files-$version-x86_64
+work=$(mktemp -d)
+trap 'rm -rf "$work"' EXIT
+
+# Linked statically and for any x86-64 processor, so it runs on other distributions.
+RUSTFLAGS="-C target-feature=+crt-static -C target-cpu=x86-64" \
+    cargo build --release --quiet --target x86_64-unknown-linux-gnu \
+    --manifest-path "$root/motor/Cargo.toml" --target-dir "$work/target"
+
+git -C "$root" archive --format=tar --prefix="$name/" HEAD | tar -x -C "$work"
+mkdir -p "$work/$name/motor/target/release"
+cp "$work/target/x86_64-unknown-linux-gnu/release/archivos-motor" "$work/$name/motor/target/release/"
+mkdir -p "$root/dist"
+tar -C "$work" -czf "$root/dist/$name.tar.gz" "$name"
+echo "$root/dist/$name.tar.gz"

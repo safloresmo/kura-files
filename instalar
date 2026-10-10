@@ -1,72 +1,93 @@
 #!/usr/bin/env bash
 # Set Kura Files up for this user: build the engine, put the command on the
 # path and add the launcher. Nothing is written outside the home folder.
-#   ./instalar                    lo básico
-#   ./instalar --servicios        además, «mostrar en carpeta» y selector de archivos
-#   ./instalar --por-defecto      además, gestor de archivos por defecto
-#   ./instalar --quitar           deshace lo anterior
+#   ./instalar                             lo básico · the basics
+#   ./instalar --servicios | --services    «mostrar en carpeta» y selector de archivos · show in folder and file chooser
+#   ./instalar --por-defecto | --default   gestor de archivos por defecto · default file manager
+#   ./instalar --quitar | --remove         deshace lo anterior · undo all of it
 set -euo pipefail
 
 root=$(dirname "$(readlink -f "$0")")
+
+# Spanish where the system speaks it, English elsewhere.
+say() {
+    case ${LC_ALL:-${LC_MESSAGES:-${LANG:-es}}} in
+        es*) printf '%s\n' "$1" ;;
+        *) printf '%s\n' "$2" ;;
+    esac
+}
 bin=${XDG_BIN_HOME:-$HOME/.local/bin}
 data=${XDG_DATA_HOME:-$HOME/.local/share}
 launcher=$data/applications/archivos.desktop
+icon=$data/icons/hicolor/scalable/apps/kura-files.svg
 services=$data/dbus-1/services
 portal=$data/xdg-desktop-portal/portals/kura.portal
 
 with_services=0 as_default=0 remove=0
 for arg in "$@"; do
     case $arg in
-        --servicios) with_services=1 ;;
-        --por-defecto) as_default=1 ;;
-        --quitar) remove=1 ;;
+        --servicios | --services) with_services=1 ;;
+        --por-defecto | --default) as_default=1 ;;
+        --quitar | --remove) remove=1 ;;
         -h | --help | ayuda) sed -n '2,8p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
-        *) echo "No conozco la opción $arg" >&2; exit 2 ;;
+        *) say "No conozco la opción $arg" "Unknown option $arg" >&2; exit 2 ;;
     esac
 done
 
 if [ "$remove" = 1 ]; then
-    [ "$(readlink -f "$bin/archivos" 2>/dev/null)" = "$root/bin/archivos" ] && rm -f "$bin/archivos"
+    for name in archivos kura; do
+        [ "$(readlink -f "$bin/$name" 2>/dev/null)" = "$root/bin/archivos" ] && rm -f "$bin/$name"
+    done
+    rm -f "$icon"
     rm -f "$launcher" "$services/org.freedesktop.FileManager1.service" \
         "$services/org.freedesktop.impl.portal.desktop.kura.service" "$portal"
-    echo "Quitado. Tus ajustes siguen en ${XDG_CONFIG_HOME:-$HOME/.config}/archivos."
+    say "Quitado. Tus ajustes siguen en ${XDG_CONFIG_HOME:-$HOME/.config}/archivos." "Removed. Your settings are still in ${XDG_CONFIG_HOME:-$HOME/.config}/archivos."
     exit 0
 fi
 
 missing=0
 need() {
     command -v "$1" >/dev/null 2>&1 && return 0
-    echo "Falta $1: $2" >&2
+    say "Falta $1: $2" "Missing $1: $3" >&2
     missing=1
 }
-need qs "Quickshell, que dibuja la ventana"
-need cargo "Rust, para compilar el motor"
-need gio "GLib y GVFS: papelera, discos, red y «abrir con»"
-need bsdtar "libarchive, para comprimir y extraer"
-need jq "para hablar con la ventana abierta"
-need wl-copy "wl-clipboard, para copiar y pegar"
-[ "$missing" = 0 ] || { echo "Instala lo que falta y vuelve a intentarlo." >&2; exit 1; }
+need qs "Quickshell, que dibuja la ventana" "Quickshell, which draws the window"
+[ -x "$root/motor/target/release/archivos-motor" ] || need cargo "Rust, para compilar el motor" "Rust, to build the engine"
+need gio "GLib y GVFS: papelera, discos, red y «abrir con»" "GLib and GVFS: trash, disks, network and open with"
+need bsdtar "libarchive, para comprimir y extraer" "libarchive, to compress and extract"
+need jq "para hablar con la ventana abierta" "to talk to the open window"
+need wl-copy "wl-clipboard, para copiar y pegar" "wl-clipboard, to copy and paste"
+[ "$missing" = 0 ] || { say "Instala lo que falta y vuelve a intentarlo." "Install what is missing and try again." >&2; exit 1; }
 for extra in plocate git python3; do
-    command -v "$extra" >/dev/null 2>&1 || echo "Opcional, no está: $extra"
+    command -v "$extra" >/dev/null 2>&1 || say "Opcional, no está: $extra" "Optional, not found: $extra"
 done
 
-echo "Compilando el motor…"
-cargo build --release --quiet --manifest-path "$root/motor/Cargo.toml"
+# A download that brings the engine already built needs no compiler.
+if command -v cargo >/dev/null 2>&1 && [ -d "$root/motor/src" ]; then
+    say "Compilando el motor…" "Building the engine…"
+    cargo build --release --quiet --manifest-path "$root/motor/Cargo.toml"
+fi
 
 mkdir -p "$bin" "$(dirname "$launcher")"
 ln -sfn "$root/bin/archivos" "$bin/archivos"
+ln -sfn "$root/bin/archivos" "$bin/kura"
+mkdir -p "$(dirname "$icon")"
+cp "$root/icono/kura-files.svg" "$icon"
 cat >"$launcher" <<DESKTOP
 [Desktop Entry]
 Type=Application
 Name=Kura Files
-GenericName=Gestor de archivos
-Comment=Explora y ordena tus archivos
+GenericName=File Manager
+GenericName[es]=Gestor de archivos
+Comment=Browse and organise your files
+Comment[es]=Explora y ordena tus archivos
 Exec=$root/bin/archivos %f
-Icon=system-file-manager
+Icon=kura-files
 Terminal=false
 Categories=System;FileTools;FileManager;
 MimeType=inode/directory;
-Keywords=archivos;carpetas;files;
+Keywords=files;file;folder;folders;explorer;manager;browser;archivos;archivo;carpetas;carpeta;ficheros;explorador;gestor;kura;
+Keywords[es]=archivos;archivo;carpetas;carpeta;ficheros;explorador;gestor;files;file;kura;
 StartupWMClass=org.quickshell
 DESKTOP
 command -v update-desktop-database >/dev/null 2>&1 && update-desktop-database "$(dirname "$launcher")" 2>/dev/null || true
@@ -79,22 +100,22 @@ if [ "$with_services" = 1 ]; then
         printf '[D-BUS Service]\nName=org.freedesktop.impl.portal.desktop.kura\nExec=%s/bin/archivos-portal\n' "$root" \
             >"$services/org.freedesktop.impl.portal.desktop.kura.service"
         printf '[portal]\nDBusName=org.freedesktop.impl.portal.desktop.kura\nInterfaces=org.freedesktop.impl.portal.FileChooser;\n' >"$portal"
-        echo "Servicios puestos. Para que los programas usen su selector de archivos, añade"
+        say "Servicios puestos. Para que los programas usen su selector de archivos, añade" "Services in place. For programs to use its file chooser, add"
         echo "  org.freedesktop.impl.portal.FileChooser=kura"
-        echo "bajo [preferred] en ${XDG_CONFIG_HOME:-$HOME/.config}/xdg-desktop-portal/portals.conf"
-        echo "y reinicia el servicio: systemctl --user restart xdg-desktop-portal"
+        say "bajo [preferred] en ${XDG_CONFIG_HOME:-$HOME/.config}/xdg-desktop-portal/portals.conf" "under [preferred] in ${XDG_CONFIG_HOME:-$HOME/.config}/xdg-desktop-portal/portals.conf"
+        say "y reinicia el servicio: systemctl --user restart xdg-desktop-portal" "and restart the service: systemctl --user restart xdg-desktop-portal"
     else
-        echo "Los servicios necesitan Python con PyGObject; no se han puesto." >&2
+        say "Los servicios necesitan Python con PyGObject; no se han puesto." "The services need Python with PyGObject; they were not set up." >&2
     fi
 fi
 
 if [ "$as_default" = 1 ]; then
     xdg-mime default archivos.desktop inode/directory
-    echo "Kura Files abre ahora las carpetas."
+    say "Kura Files abre ahora las carpetas." "Kura Files now opens folders."
 fi
 
 case ":$PATH:" in
     *":$bin:"*) ;;
-    *) echo "Ojo: $bin no está en tu PATH; añádelo para poder escribir «archivos»." ;;
+    *) say "Ojo: $bin no está en tu PATH; añádelo para poder escribir «archivos»." "Note: $bin is not in your PATH; add it to be able to type «kura»." ;;
 esac
-echo "Listo. Ábrelo con: archivos"
+say "Listo. Ábrelo con: archivos" "Done. Open it with: kura"

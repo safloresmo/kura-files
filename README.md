@@ -1,3 +1,5 @@
+<p align="center"><img src="icono/kura-files.svg" width="112" alt="Kura Files"></p>
+
 # Kura Files 庫
 
 Gestor de archivos de escritorio para Linux: interfaz en QML sobre Quickshell y un motor en Rust sin dependencias. Funciona en cualquier compositor Wayland.
@@ -141,7 +143,9 @@ cd kura-files
 ./instalar
 ```
 
-`./instalar` compila el motor, pone la orden `archivos` en `~/.local/bin` y añade el lanzador. No escribe nada fuera de tu carpeta personal. Con `--servicios` añade «mostrar en carpeta» y el selector de archivos para otros programas; con `--por-defecto` lo deja como gestor de archivos; con `--quitar` lo deshace todo menos tus ajustes.
+Sin Rust: descarga el paquete de la última [versión publicada](https://github.com/safloresmo/kura-files/releases), que trae el motor ya compilado, descomprímelo y ejecuta `./instalar` dentro.
+
+`./instalar` compila el motor, pone las órdenes `archivos` y `kura` (son la misma) en `~/.local/bin` y añade el lanzador con su icono. No escribe nada fuera de tu carpeta personal. Con `--servicios` añade «mostrar en carpeta» y el selector de archivos para otros programas; con `--por-defecto` lo deja como gestor de archivos; con `--quitar` lo deshace todo menos tus ajustes. Las mismas opciones existen en inglés (`--services`, `--default`, `--remove`), igual que las órdenes de `kura` (`kura help`).
 
 ## Uso
 
