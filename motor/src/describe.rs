@@ -116,14 +116,22 @@ pub fn info(path: &Path) -> Result<(), String> {
     Ok(())
 }
 
-/// How many entries each sub folder holds.
+/// What a listing cannot tell by name: `COUNT<TAB>PATH` for how many entries
+/// a sub folder holds, `link<TAB>PATH` for a symbolic link and `exec<TAB>PATH`
+/// for a file that can be run.
 pub fn counts(dir: &Path) -> Result<(), String> {
     let entries = fs::read_dir(dir).map_err(|e| format!("No se pudo leer: {e}"))?;
     for entry in entries.flatten() {
         let path = entry.path();
+        let Ok(meta) = path.symlink_metadata() else { continue };
+        if meta.file_type().is_symlink() {
+            println!("link\t{}", path.display());
+        }
         if path.is_dir() {
             let count = fs::read_dir(&path).map(|inner| inner.count()).unwrap_or(0);
             println!("{count}\t{}", path.display());
+        } else if meta.is_file() && meta.permissions().mode() & 0o111 != 0 {
+            println!("exec\t{}", path.display());
         }
     }
     Ok(())

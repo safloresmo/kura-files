@@ -48,6 +48,17 @@ running() {
     window state >/dev/null 2>&1
 }
 
+# Bring the open window to the front, where the compositor lets us.
+raise() {
+    command -v hyprctl >/dev/null 2>&1 && command -v jq >/dev/null 2>&1 || return 0
+    local pid address
+    pid=$(pgrep -f "^qs -p $root\$" | head -1)
+    [ -n "$pid" ] || return 0
+    address=$(hyprctl clients -j 2>/dev/null | jq -r --argjson pid "$pid" '.[] | select(.pid == $pid) | .address' | head -1)
+    [ -n "$address" ] && hyprctl eval "hl.dispatch(hl.dsp.focus({ window = \"address:$address\" }))" >/dev/null 2>&1
+    return 0
+}
+
 need_window() {
     running || { echo "El gestor no está abierto." >&2; exit 1; }
 }
@@ -60,6 +71,7 @@ open_at() {
     fi
     if running; then
         [ -n "$dir" ] && window go "$dir"
+        raise
         return 0
     fi
     [ -x "$motor" ] || { echo "Falta compilar el motor: archivos compilar" >&2; exit 1; }

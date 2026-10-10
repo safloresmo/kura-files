@@ -201,12 +201,14 @@ Rectangle {
                     visible: !row.lit
                     name: card.app.iconFor(row.modelData.name, row.modelData.path, row.modelData.isDir)
                     size: card.app.compact ? 15 : 18
-                    color: Tokens.inkFaint
+                    color: card.app.toneFor(row.modelData.name, row.modelData.path, row.modelData.isDir)
                     anchors.verticalCenter: parent.verticalCenter
                 }
                 Text {
-                    text: row.modelData.shown || row.modelData.name
-                    color: row.lit ? Tokens.ink : (row.modelData.name.charAt(0) === "." ? Tokens.inkFaint : Tokens.inkDim)
+                    readonly property string flag: card.app.flagFor(row.modelData.path)
+                    text: (row.modelData.shown || row.modelData.name) + (flag !== "" ? "  " + flag : "")
+                    color: row.lit ? Tokens.ink
+                        : (row.modelData.name.charAt(0) === "." ? Tokens.inkFaint : (row.modelData.isDir ? Tokens.ink : Tokens.inkDim))
                     font.family: Tokens.ui
                     font.pixelSize: card.app.compact ? 13 : Tokens.fRow
                     font.weight: row.lit ? Font.Medium : Font.Normal
@@ -348,7 +350,7 @@ Rectangle {
                     visible: !thumb.visible
                     name: card.app.iconFor(tile.modelData.name, tile.modelData.path, tile.modelData.isDir)
                     size: Math.round(34 * card.factor)
-                    color: tile.lit ? Tokens.inkDim : Tokens.inkFaint
+                    color: card.app.toneFor(tile.modelData.name, tile.modelData.path, tile.modelData.isDir)
                 }
             }
             Text {

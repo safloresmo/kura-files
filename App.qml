@@ -23,6 +23,7 @@ Item {
     property var places: [{ name: "Carpeta personal", path: home, icon: "home", seal: "自宅" }]
     property var devices: []
     property var counts: ({})
+    property var flags: ({})
     property bool countsReady: false
     property string space: ""
     property int dirTotal: 0
@@ -945,7 +946,29 @@ Item {
                     return p.icon;
             }
         }
+        if (!isDir && flags[filePath] === "exec" && Fmt.icon(name, false) === "file")
+            return "script";
         return Fmt.icon(name, isDir);
+    }
+    // Each family of files gets its own tone from the theme, so a folder full
+    // of mixed things can be read at a glance.
+    function toneFor(name, filePath, isDir) {
+        const tone = flags[filePath] === "exec" && Fmt.tone(name, isDir) === "plain" ? "code" : Fmt.tone(name, isDir);
+        if (tone === "folder")
+            return Tokens.sun;
+        if (tone === "media")
+            return Tokens.role("tertiary", "#f2bc85");
+        if (tone === "archive")
+            return Tokens.role("error", "#ffb4ab");
+        if (tone === "code")
+            return Tokens.role("secondary", "#b8c9d5");
+        if (tone === "system")
+            return Tokens.role("outline", "#8b9297");
+        return Tokens.inkFaint;
+    }
+    function flagFor(filePath) {
+        const flag = flags[filePath];
+        return flag === "link" ? "→" : (flag === "exec" ? "*" : "");
     }
     function countLabel(dirPath, long) {
         if (!countsReady || deep)

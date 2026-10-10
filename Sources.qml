@@ -141,11 +141,19 @@ Item {
         stdout: StdioCollector {
             onStreamFinished: {
                 const map = {};
+                const flags = {};
                 for (const line of text.split("\n")) {
                     const cut = line.indexOf("\t");
-                    if (cut > 0)
-                        map[line.slice(cut + 1)] = Number(line.slice(0, cut));
+                    if (cut <= 0)
+                        continue;
+                    const what = line.slice(0, cut);
+                    const where = line.slice(cut + 1);
+                    if (what === "link" || what === "exec")
+                        flags[where] = what;
+                    else
+                        map[where] = Number(what);
                 }
+                app.flags = flags;
                 app.counts = map;
                 app.countsReady = true;
             }

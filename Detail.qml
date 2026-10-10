@@ -121,7 +121,7 @@ Rectangle {
                     visible: !preview.visible && !excerpt.visible
                     name: card.item ? card.app.iconFor(card.item.name, card.item.path, card.item.isDir) : "folder"
                     size: 44
-                    color: card.item ? Tokens.sun : Tokens.inkFaint
+                    color: card.item ? card.app.toneFor(card.item.name, card.item.path, card.item.isDir) : Tokens.inkFaint
                 }
             }
         }

@@ -111,7 +111,7 @@ Rectangle {
                 Icon {
                     name: pane.app.iconFor(row.modelData.name, row.modelData.path, row.modelData.isDir)
                     size: 16
-                    color: Tokens.inkFaint
+                    color: pane.app.toneFor(row.modelData.name, row.modelData.path, row.modelData.isDir)
                     anchors.verticalCenter: parent.verticalCenter
                 }
                 Text {
