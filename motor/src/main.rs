@@ -457,7 +457,8 @@ fn extract(archive: &Path) -> Result<(), String> {
             .unwrap_or(false);
     }
     if !done {
-        let _ = fs::remove_dir(&target);
+        // The folder is ours, made a moment ago: take the half extracted files with it.
+        let _ = fs::remove_dir_all(&target);
         return Err(format!("No se pudo extraer: {name}"));
     }
     report("new", archive, &target);
@@ -688,5 +689,14 @@ mod tests {
         rename_many("y {n}", &sources).unwrap();
         assert_eq!(text(&dir.0.join("y 1.txt")), "1");
         assert_eq!(text(&dir.0.join("y 2.txt")), "2");
+    }
+
+    #[test]
+    fn replace_never_trashes_the_source_itself() {
+        let dir = Scratch::new();
+        let only = dir.file("a.txt", "único");
+        transfer::run("copy", &dir.0, &[only.to_string_lossy().into_owned()], "--replace").unwrap();
+        assert_eq!(text(&only), "único");
+        assert_eq!(text(&dir.0.join("a (2).txt")), "único");
     }
 }

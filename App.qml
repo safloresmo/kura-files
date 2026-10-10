@@ -235,7 +235,7 @@ Item {
     }
     function erase() {
         const list = picked();
-        if (list.length === 0)
+        if (list.length === 0 || inTrash)
             return;
         dialog.confirm("ELIMINAR PARA SIEMPRE", "Se eliminará " + label(list).toLowerCase() + " sin pasar por la papelera. No se puede deshacer.",
             () => {

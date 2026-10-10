@@ -91,7 +91,10 @@ pub fn run(mode: &str, dest: &Path, sources: &[String], policy: &str) -> Result<
             return Err(String::new());
         }
         let wanted = file_name(&source);
-        let clash = taken(&dest.join(&wanted));
+        // An item copied into the folder it already lives in is its own
+        // namesake: never a conflict to skip, and never something to replace.
+        let itself = dest.join(&wanted).canonicalize().ok() == source.canonicalize().ok();
+        let clash = !itself && taken(&dest.join(&wanted));
         if clash && policy == "--skip" {
             continue;
         }
