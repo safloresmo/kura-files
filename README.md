@@ -14,10 +14,28 @@ Gestor de archivos de escritorio para Linux: interfaz en QML sobre Quickshell y 
 - Discos y servidores de red (SFTP y otros por GVFS).
 - Envío de archivos por Tailscale y LocalSend.
 - Paleta de comandos (Ctrl+K) y hoja de atajos (F1).
+- Atiende «mostrar en carpeta» de otros programas (`bin/archivos-servicio`).
+
+## Acciones
+
+El clic derecho ofrece los menús de servicio que entiende Dolphin (`kio/servicemenus`) y los que pongas en `~/.config/archivos/acciones/`. Uno propio es un archivo `.desktop`:
+
+```ini
+[Desktop Entry]
+Type=Service
+MimeType=image/*;
+Actions=a-jpg;
+
+[Desktop Action a-jpg]
+Name=Convertir a JPG
+Exec=magick %f %f.jpg
+```
+
+`%f` es el primer archivo, `%F` todos, `%d` su carpeta y `%n` su nombre.
 
 ## Requisitos
 
-Quickshell con los módulos de interfaz del escritorio, Rust para compilar el motor, y `gio`, `bsdtar` y `sha256sum` en el sistema.
+Quickshell con los módulos de interfaz del escritorio, Rust para compilar el motor, y `gio`, `bsdtar` y `sha256sum` en el sistema. El servicio usa Python con PyGObject.
 
 ## Uso
 

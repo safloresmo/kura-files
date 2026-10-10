@@ -47,6 +47,7 @@ ShellRoot {
                 query: app.query,
                 deep: app.deep,
                 hidden: app.showHidden,
+                actions: app.actions.map(a => (a.group !== "" ? a.group + " · " : "") + a.name).join(" | "),
                 detail: app.showDetail,
                 digest: app.digest,
                 grid: app.grid,
@@ -84,6 +85,9 @@ ShellRoot {
         function search(text: string): void { app.search(text); }
         function inside(text: string): void { app.search(text, true); }
         function sum(): void { app.properties(); app.checksum(); }
+        function point(path: string): void { app.showPath(path); }
+        function actions(): void { app.loadActions(app.picked().map(e => e.path)); }
+        function act(index: int): void { app.actionEntries(app.picked().map(e => e.path))[index].act(); }
         function reveal(): void { app.showInFolder(app.selected); }
         function pref(key: string, on: bool): void { app.setPref(key, on); }
         function set(key: string, value: string): void { app.setPref(key, value); }

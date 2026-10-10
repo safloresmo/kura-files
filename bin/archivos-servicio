@@ -1,0 +1,72 @@
+#!/usr/bin/env python3
+"""Answer org.freedesktop.FileManager1, so "show in folder" in other
+programs opens this file manager. Started by D-Bus on demand; leaves when idle."""
+
+import os
+import subprocess
+import sys
+
+from gi.repository import Gio, GLib
+
+NAME = "org.freedesktop.FileManager1"
+PATH = "/org/freedesktop/FileManager1"
+IDLE_SECONDS = 30
+INTERFACE = """
+<node>
+  <interface name="org.freedesktop.FileManager1">
+    <method name="ShowFolders">
+      <arg type="as" name="URIs" direction="in"/>
+      <arg type="s" name="StartupId" direction="in"/>
+    </method>
+    <method name="ShowItems">
+      <arg type="as" name="URIs" direction="in"/>
+      <arg type="s" name="StartupId" direction="in"/>
+    </method>
+    <method name="ShowItemProperties">
+      <arg type="as" name="URIs" direction="in"/>
+      <arg type="s" name="StartupId" direction="in"/>
+    </method>
+  </interface>
+</node>
+"""
+
+launcher = os.path.join(os.path.dirname(os.path.realpath(__file__)), "archivos")
+loop = GLib.MainLoop()
+idle = 0
+
+
+def rest():
+    """Leave after a quiet while; D-Bus starts us again when needed."""
+    global idle
+    if idle:
+        GLib.source_remove(idle)
+    idle = GLib.timeout_add_seconds(IDLE_SECONDS, loop.quit)
+
+
+def local(uri):
+    return Gio.File.new_for_uri(uri).get_path() if "://" in uri else uri
+
+
+def on_call(connection, sender, path, interface, method, parameters, invocation):
+    uris = parameters.unpack()[0]
+    target = next((p for p in map(local, uris) if p), None)
+    if target:
+        # One window shows one place, so the first item is the one shown.
+        command = [launcher, target] if method == "ShowFolders" else [launcher, "mostrar", target]
+        subprocess.Popen(command, start_new_session=True)
+    invocation.return_value(None)
+    rest()
+
+
+def on_bus(connection, name):
+    node = Gio.DBusNodeInfo.new_for_xml(INTERFACE)
+    connection.register_object(PATH, node.interfaces[0], on_call, None, None)
+
+
+def on_lost(connection, name):
+    sys.exit(1)
+
+
+Gio.bus_own_name(Gio.BusType.SESSION, NAME, Gio.BusNameOwnerFlags.NONE, on_bus, None, on_lost)
+rest()
+loop.run()

@@ -194,6 +194,35 @@ expect "the chips stay out of the way" sorter false
 call click 1318 165 1 0;           expect "until the button brings them out" sorter true
 call click 1318 165 1 0;           expect "and puts them away again" sorter false
 
+echo "-- pointing at a file"
+call go "$zone/folder"; sleep 0.6
+call point "$zone/c.txt"; sleep 1
+expect "another program can ask for a file's folder" here "zone"
+expect "and finds the cursor on the file" selected "c.txt"
+
+echo "-- actions from service menus"
+mkdir -p "$XDG_CONFIG_HOME/archivos/acciones"
+cat >"$XDG_CONFIG_HOME/archivos/acciones/twin.desktop" <<'MENU'
+[Desktop Entry]
+Type=Service
+MimeType=text/plain;
+Actions=twin;
+X-KDE-Submenu=Tests
+
+[Desktop Action twin]
+Name=Make a twin
+Name[es]=Hacer un gemelo
+Exec=cp %f %d/twin-of-%n
+MENU
+open_at "$zone"
+call click 400 380 1 0; call actions; sleep 1
+expect "a menu for text offers itself to a text file" actions "Tests · Hacer un gemelo"
+call act 0; sleep 1
+[ -f "$zone/twin-of-b.txt" ] && echo "ok    and runs on the file" || { echo "FAIL  and runs on the file"; failed=1; }
+rm -f "$zone/twin-of-b.txt"
+call click 400 312 1 0; call actions; sleep 1
+expect "but not to a folder" actions ""
+
 echo "-- the selection panel"
 open_at "$zone"
 expect "nothing picked, no panel" detail false

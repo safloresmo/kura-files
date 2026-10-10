@@ -8,6 +8,7 @@ root=$(dirname "$(dirname "$(readlink -f "$0")")")
 usage() {
     cat <<'TEXT'
 archivos [RUTA]                 abre el gestor; si ya está abierto, lo lleva a RUTA
+archivos mostrar RUTA           abre la carpeta que contiene RUTA y la señala
 archivos ir RUTA                lleva la ventana abierta a RUTA
 archivos filtro [TEXTO]         filtra la carpeta que se está viendo
 archivos buscar TEXTO           busca por nombre en la carpeta y sus subcarpetas
@@ -63,25 +64,44 @@ need_window() {
     running || { echo "El gestor no está abierto." >&2; exit 1; }
 }
 
+# A path as the window wants it: absolute, and without the file:// of a URI.
+plain() {
+    local path=$1
+    case $path in
+        file://*) path=$(printf '%b' "$(printf '%s' "${path#file://}" | sed 's/%\([0-9A-Fa-f][0-9A-Fa-f]\)/\\x\1/g')") ;;
+    esac
+    readlink -f -- "$path"
+}
+
+# Open the window at a folder; a file opens its folder with the cursor on it.
 open_at() {
-    local dir=${1:-}
+    local dir=${1:-} item=
     if [ -n "$dir" ]; then
-        dir=$(readlink -f -- "$dir")
-        [ -d "$dir" ] || dir=$(dirname -- "$dir")
+        dir=$(plain "$dir")
+        if [ ! -d "$dir" ] || [ "${2:-}" = item ]; then
+            item=$dir
+            dir=$(dirname -- "$dir")
+        fi
     fi
     if running; then
-        [ -n "$dir" ] && window go "$dir"
+        if [ -n "$item" ]; then
+            window point "$item"
+        elif [ -n "$dir" ]; then
+            window go "$dir"
+        fi
         raise
         return 0
     fi
     [ -x "$motor" ] || { echo "Falta compilar el motor: archivos compilar" >&2; exit 1; }
     [ -n "$dir" ] && export ARCHIVOS_DIR=$dir
+    [ -n "$item" ] && export ARCHIVOS_SHOW=$item
     exec qs -p "$root"
 }
 
 case ${1:-} in
     "") open_at ;;
     ayuda | -h | --help) usage ;;
+    mostrar) open_at "${2:?falta la ruta}" item ;;
     ir) need_window; window go "$(readlink -f -- "${2:?falta la ruta}")" ;;
     filtro) need_window; window filter "${2:-}" ;;
     buscar) need_window; window search "${2:?falta el texto}" ;;

@@ -13,6 +13,7 @@ use std::time::{Instant, SystemTime, UNIX_EPOCH};
 use crate::file_name;
 
 const SEARCH_LIMIT: usize = 500;
+const ACTION_PATHS: usize = 30;
 const INSIDE_BYTES: u64 = 2 * 1024 * 1024;
 const INSIDE_SECONDS: u64 = 20;
 const INSIDE_SKIP: [&str; 5] = ["node_modules", "target", "__pycache__", "venv", "build"];
@@ -523,6 +524,158 @@ pub fn apps(path: &Path) -> Result<(), String> {
         println!("{}\t{name}", desktop.display());
     }
     Ok(())
+}
+
+/// Where service menus live: the ones other file managers install, and our own.
+fn menu_dirs() -> Vec<PathBuf> {
+    let config = env::var("XDG_CONFIG_HOME").map(PathBuf::from).unwrap_or_else(|_| home().join(".config"));
+    let mut dirs = vec![config.join("archivos/acciones")];
+    for data in data_dirs() {
+        dirs.push(data.join("kio/servicemenus"));
+        dirs.push(data.join("kservices5/ServiceMenus"));
+    }
+    dirs
+}
+
+/// The kinds a path answers to, most specific first.
+fn kinds_of(path: &Path) -> Vec<String> {
+    if path.is_dir() {
+        return vec!["inode/directory".into()];
+    }
+    let listing = output_of("gio", &["info", "-a", "standard::content-type"], Some(path));
+    let named = listing
+        .lines()
+        .find_map(|line| line.split_once("standard::content-type: ").map(|(_, kind)| kind.trim().to_string()))
+        .unwrap_or_default();
+    let mut kinds = vec![named, mime(path)];
+    if kinds.iter().any(|kind| kind.starts_with("text/")) {
+        kinds.push("text/plain".into());
+    }
+    kinds.retain(|kind| !kind.is_empty());
+    kinds
+}
+
+/// Whether a menu's MimeType pattern takes a path of these kinds.
+fn takes(pattern: &str, kinds: &[String]) -> bool {
+    let folder = kinds.iter().any(|kind| kind == "inode/directory");
+    match pattern {
+        "all/all" | "*/*" => true,
+        "all/allfiles" | "application/octet-stream" => !folder,
+        _ => kinds.iter().any(|kind| match pattern.strip_suffix("/*") {
+            Some(group) => kind.split('/').next() == Some(group),
+            None => kind == pattern,
+        }),
+    }
+}
+
+/// A key of one section of a desktop file, in Spanish when it has it.
+fn key_of(text: &str, section: &str, key: &str) -> Option<String> {
+    let mut inside = false;
+    let (mut plain, mut local) = (None, None);
+    for line in text.lines().map(str::trim) {
+        if line.starts_with('[') {
+            inside = line == format!("[{section}]");
+        } else if inside {
+            if let Some((name, value)) = line.split_once('=') {
+                if name.trim() == key {
+                    plain = Some(value.trim().to_string());
+                } else if name.trim() == format!("{key}[es]") {
+                    local = Some(value.trim().to_string());
+                }
+            }
+        }
+    }
+    local.or(plain)
+}
+
+/// The service menu actions that apply to every one of the paths:
+/// `FILE  ID  SUBMENU  NAME` per line.
+pub fn actions(paths: &[String]) -> Result<(), String> {
+    let kinds: Vec<Vec<String>> = paths.iter().take(ACTION_PATHS).map(|path| kinds_of(Path::new(path))).collect();
+    let mut seen: Vec<String> = Vec::new();
+    for dir in menu_dirs() {
+        let Ok(entries) = fs::read_dir(&dir) else { continue };
+        let mut files: Vec<PathBuf> = entries.flatten().map(|entry| entry.path()).collect();
+        files.sort();
+        for file in files {
+            let name = file_name(&file);
+            if !name.ends_with(".desktop") || seen.contains(&name) {
+                continue;
+            }
+            seen.push(name);
+            let Ok(text) = fs::read_to_string(&file) else { continue };
+            let main = "Desktop Entry";
+            let patterns = key_of(&text, main, "MimeType").unwrap_or_default();
+            let fits = kinds
+                .iter()
+                .all(|kinds| patterns.split(';').any(|pattern| !pattern.is_empty() && takes(pattern.trim(), kinds)));
+            if !fits {
+                continue;
+            }
+            let submenu = key_of(&text, main, "X-KDE-Submenu").unwrap_or_default();
+            for id in key_of(&text, main, "Actions").unwrap_or_default().split(';').filter(|id| !id.is_empty()) {
+                let section = format!("Desktop Action {id}");
+                let (Some(label), Some(_)) = (key_of(&text, &section, "Name"), key_of(&text, &section, "Exec")) else { continue };
+                println!("{}\t{id}\t{submenu}\t{label}", file.display());
+            }
+        }
+    }
+    Ok(())
+}
+
+/// How many service menus there are at all, so the window knows whether to offer them.
+pub fn menus() -> Result<(), String> {
+    let count = menu_dirs()
+        .iter()
+        .filter_map(|dir| fs::read_dir(dir).ok())
+        .flat_map(|entries| entries.flatten())
+        .filter(|entry| entry.file_name().to_string_lossy().ends_with(".desktop"))
+        .count();
+    println!("{count}");
+    Ok(())
+}
+
+fn quoted(text: &str) -> String {
+    format!("'{}'", text.replace('\'', "'\\''"))
+}
+
+/// An Exec line with its field codes filled in, ready for the shell.
+pub fn filled(exec: &str, paths: &[String]) -> String {
+    let first = paths.first().map(String::as_str).unwrap_or("");
+    let all = paths.iter().map(|path| quoted(path)).collect::<Vec<_>>().join(" ");
+    let mut out = String::new();
+    let mut chars = exec.chars();
+    while let Some(c) = chars.next() {
+        if c != '%' {
+            out.push(c);
+            continue;
+        }
+        match chars.next() {
+            Some('f' | 'u') => out.push_str(&quoted(first)),
+            Some('F' | 'U') => out.push_str(&all),
+            Some('d') => out.push_str(&quoted(&Path::new(first).parent().unwrap_or(Path::new("/")).to_string_lossy())),
+            Some('n') => out.push_str(&quoted(&file_name(Path::new(first)))),
+            Some('%') => out.push('%'),
+            _ => {}
+        }
+    }
+    out
+}
+
+/// Run one action of a service menu on the paths, without waiting for it.
+pub fn act(file: &Path, id: &str, paths: &[String]) -> Result<(), String> {
+    if !menu_dirs().iter().any(|dir| file.parent() == Some(dir.as_path())) {
+        return Err(format!("No es un menú de servicio: {}", file.display()));
+    }
+    let text = fs::read_to_string(file).map_err(|e| format!("No se pudo leer: {e}"))?;
+    let exec = key_of(&text, &format!("Desktop Action {id}"), "Exec").ok_or_else(|| format!("No existe la acción: {id}"))?;
+    Command::new("sh")
+        .arg("-c")
+        .arg(filled(&exec, paths))
+        .current_dir(Path::new(paths.first().map(String::as_str).unwrap_or("/")).parent().unwrap_or(Path::new("/")))
+        .spawn()
+        .map(|_| ())
+        .map_err(|e| format!("No se pudo lanzar: {e}"))
 }
 
 fn encode(path: &str) -> String {

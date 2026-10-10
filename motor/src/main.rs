@@ -39,6 +39,9 @@ archivos-motor inside DIR TEXT [hidden]
 archivos-motor sum PATH
 archivos-motor preview PATH [BYTES]
 archivos-motor apps PATH
+archivos-motor menus
+archivos-motor actions PATH...
+archivos-motor act MENU ID PATH...
 archivos-motor bookmarks list|add|remove [PATH]
 archivos-motor thumbs DIR
 archivos-motor recent
@@ -108,6 +111,9 @@ fn main() {
         ("sum", [path]) => describe::sum(Path::new(path)),
         ("preview", [path]) => describe::preview(Path::new(path), 4000),
         ("preview", [path, bytes]) => describe::preview(Path::new(path), bytes.parse().unwrap_or(4000)),
+        ("menus", []) => describe::menus(),
+        ("actions", paths) if !paths.is_empty() => describe::actions(paths),
+        ("act", [menu, id, paths @ ..]) if !paths.is_empty() => describe::act(Path::new(menu), id, paths),
         ("apps", [path]) => describe::apps(Path::new(path)),
         ("bookmarks", [action, rest @ ..]) => describe::bookmarks(action, rest.first().map(String::as_str)),
         _ => {
@@ -572,6 +578,14 @@ mod tests {
         assert_eq!(fs::read_link(dir.join("nota.txt")).unwrap(), source);
         assert_eq!(text(&dir.join("nota (2).txt")), "hola");
         assert!(link(&dir, &["/no/existe".to_string()]).is_err());
+    }
+
+    #[test]
+    fn exec_lines_get_their_paths_quoted() {
+        let paths = ["/tmp/a b.png".to_string(), "/tmp/it's.png".to_string()];
+        assert_eq!(describe::filled("convert %f out.jpg", &paths), "convert '/tmp/a b.png' out.jpg");
+        assert_eq!(describe::filled("pack %F", &paths), "pack '/tmp/a b.png' '/tmp/it'\\''s.png'");
+        assert_eq!(describe::filled("cd %d && echo 100%% %n", &paths), "cd '/tmp' && echo 100% 'a b.png'");
     }
 
     #[test]

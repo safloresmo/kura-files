@@ -81,6 +81,10 @@ Item {
     property string digest: ""
     property var found: []
     property string appsFor: ""
+    // Service menus: what other file managers call actions, read from their folders and ours.
+    property int menuCount: 0
+    property var actions: []
+    property string actionsFor: ""
     property string appsType: ""
     property var targets: []
     property var preview: ({ kind: "none" })
@@ -758,6 +762,29 @@ Item {
         appFinder.command = [engine, "apps", filePath];
         appFinder.running = true;
     }
+    function loadActions(paths) {
+        const key = paths.join("\n");
+        if (actionsFor === key)
+            return;
+        actions = [];
+        actionsFor = key;
+        actionFinder.running = false;
+        actionFinder.command = [engine, "actions"].concat(paths);
+        actionFinder.running = true;
+    }
+    function actionEntries(paths) {
+        if (actionsFor !== paths.join("\n") || actions.length === 0)
+            return [{ label: "Sin acciones para esto", armed: false }];
+        return actions.map(a => ({
+            label: (a.group !== "" ? a.group + " · " : "") + a.name,
+            act: () => run([engine, "act", a.file, a.id].concat(paths), "ACCIÓN · " + a.name.toUpperCase())
+        }));
+    }
+    function openActionsFolder() {
+        const dir = home + "/.config/archivos/acciones";
+        Quickshell.execDetached(["mkdir", "-p", dir]);
+        go(dir);
+    }
     function mount(d) {
         say("MONTANDO " + d.name.toUpperCase() + "…");
         run(["udisksctl", "mount", "-b", d.dev], "MONTADO · " + d.name.toUpperCase());
@@ -793,6 +820,12 @@ Item {
                 items.push({ label: "Abrir con", sub: () => appEntries(one) });
             }
             items.push({ label: "Vista rápida", hint: "ESPACIO", armed: !one.isDir, act: () => look.open() });
+            items.push({ sep: true });
+        }
+        if (n > 0 && menuCount > 0) {
+            const paths = list.map(e => e.path);
+            loadActions(paths);
+            items.push({ label: "Acciones" + many, sub: () => actionEntries(paths) });
             items.push({ sep: true });
         }
         if (n > 0) {
@@ -916,6 +949,7 @@ Item {
         add("Filtrar esta carpeta", "CTRL+F", () => focusFilter());
         if (deep)
             add("Cerrar la búsqueda", "ESC", () => endSearch());
+        add("Abrir la carpeta de acciones propias", "ACCIÓN", () => openActionsFolder());
         add("Terminal aquí", "ACCIÓN", () => terminal(path));
         add("Copiar la ruta de esta carpeta", "ACCIÓN", () => copyPath(path));
         add("Subir una carpeta", "ALT+↑", () => goUp());
@@ -1178,6 +1212,10 @@ Item {
         else
             go(parent);
     }
+    // Go to the folder that holds `p` and leave the cursor on it.
+    function showPath(p) {
+        showInFolder({ path: clean(p) });
+    }
     function refresh() {
         countsReady = false;
         sources.reload();
@@ -1227,6 +1265,11 @@ Item {
         else if (settings.reopen && settings.lastPath !== "") {
             settled = true;
             path = settings.lastPath;
+        }
+        const shown = Quickshell.env("ARCHIVOS_SHOW");
+        if (shown) {
+            wanted = clean(shown);
+            forget.restart();
         }
         head.pathField.text = shorten(path);
         refresh();
@@ -1521,6 +1564,28 @@ Item {
                 }
                 app.found = list;
                 app.rebuild();
+            }
+        }
+    }
+    Process {
+        id: menuCounter
+        command: [app.engine, "menus"]
+        running: true
+        stdout: StdioCollector {
+            onStreamFinished: app.menuCount = Number(text.trim()) || 0
+        }
+    }
+    Process {
+        id: actionFinder
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const list = [];
+                for (const line of text.split("\n")) {
+                    const cols = line.split("\t");
+                    if (cols.length >= 4)
+                        list.push({ file: cols[0], id: cols[1], group: cols[2], name: cols.slice(3).join(" ") });
+                }
+                app.actions = list;
             }
         }
     }
