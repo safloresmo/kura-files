@@ -59,11 +59,36 @@ Cualquier valor se puede fijar en `~/.config/archivos/tema.json`:
 
 Las claves son `paper`, `paperLift`, `ink`, `inkDim`, `bone`, `inkOnBone`, `sun`, `ui`, `mono` y `scale`.
 
+## Instalación
+
+Primero, lo que necesita. Las listas de paquetes son orientativas: los nombres cambian entre versiones.
+
+```sh
+# Arch y derivadas
+sudo pacman -S quickshell rust glib2 gvfs libarchive jq wl-clipboard python-gobject plocate
+
+# Debian y Ubuntu (Quickshell no está empaquetado: se compila aparte)
+sudo apt install cargo libglib2.0-bin gvfs gvfs-backends libarchive-tools jq wl-clipboard python3-gi plocate
+
+# Fedora (Quickshell está en COPR)
+sudo dnf install cargo glib2 gvfs bsdtar jq wl-clipboard python3-gobject plocate
+```
+
+Después:
+
+```sh
+git clone https://github.com/safloresmo/kura-files
+cd kura-files
+./instalar
+```
+
+`./instalar` compila el motor, pone la orden `archivos` en `~/.local/bin` y añade el lanzador. No escribe nada fuera de tu carpeta personal. Con `--servicios` añade «mostrar en carpeta» y el selector de archivos para otros programas; con `--por-defecto` lo deja como gestor de archivos; con `--quitar` lo deshace todo menos tus ajustes.
+
 ## Uso
 
 ```sh
-bin/archivos compilar      # compila el motor
-bin/archivos [carpeta]     # abre la ventana
-bin/archivos ayuda         # el resto de órdenes
-bin/archivos pruebas       # pruebas del motor y de la ventana
+archivos [carpeta]     # abre la ventana
+archivos ayuda         # el resto de órdenes
+archivos compilar      # vuelve a compilar el motor tras actualizar
+archivos pruebas       # pruebas del motor y de la ventana
 ```

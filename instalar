@@ -1,0 +1,100 @@
+#!/usr/bin/env bash
+# Set Kura Files up for this user: build the engine, put the command on the
+# path and add the launcher. Nothing is written outside the home folder.
+#   ./instalar                    lo básico
+#   ./instalar --servicios        además, «mostrar en carpeta» y selector de archivos
+#   ./instalar --por-defecto      además, gestor de archivos por defecto
+#   ./instalar --quitar           deshace lo anterior
+set -euo pipefail
+
+root=$(dirname "$(readlink -f "$0")")
+bin=${XDG_BIN_HOME:-$HOME/.local/bin}
+data=${XDG_DATA_HOME:-$HOME/.local/share}
+launcher=$data/applications/archivos.desktop
+services=$data/dbus-1/services
+portal=$data/xdg-desktop-portal/portals/kura.portal
+
+with_services=0 as_default=0 remove=0
+for arg in "$@"; do
+    case $arg in
+        --servicios) with_services=1 ;;
+        --por-defecto) as_default=1 ;;
+        --quitar) remove=1 ;;
+        -h | --help | ayuda) sed -n '2,8p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+        *) echo "No conozco la opción $arg" >&2; exit 2 ;;
+    esac
+done
+
+if [ "$remove" = 1 ]; then
+    [ "$(readlink -f "$bin/archivos" 2>/dev/null)" = "$root/bin/archivos" ] && rm -f "$bin/archivos"
+    rm -f "$launcher" "$services/org.freedesktop.FileManager1.service" \
+        "$services/org.freedesktop.impl.portal.desktop.kura.service" "$portal"
+    echo "Quitado. Tus ajustes siguen en ${XDG_CONFIG_HOME:-$HOME/.config}/archivos."
+    exit 0
+fi
+
+missing=0
+need() {
+    command -v "$1" >/dev/null 2>&1 && return 0
+    echo "Falta $1: $2" >&2
+    missing=1
+}
+need qs "Quickshell, que dibuja la ventana"
+need cargo "Rust, para compilar el motor"
+need gio "GLib y GVFS: papelera, discos, red y «abrir con»"
+need bsdtar "libarchive, para comprimir y extraer"
+need jq "para hablar con la ventana abierta"
+need wl-copy "wl-clipboard, para copiar y pegar"
+[ "$missing" = 0 ] || { echo "Instala lo que falta y vuelve a intentarlo." >&2; exit 1; }
+for extra in plocate git python3; do
+    command -v "$extra" >/dev/null 2>&1 || echo "Opcional, no está: $extra"
+done
+
+echo "Compilando el motor…"
+cargo build --release --quiet --manifest-path "$root/motor/Cargo.toml"
+
+mkdir -p "$bin" "$(dirname "$launcher")"
+ln -sfn "$root/bin/archivos" "$bin/archivos"
+cat >"$launcher" <<DESKTOP
+[Desktop Entry]
+Type=Application
+Name=Kura Files
+GenericName=Gestor de archivos
+Comment=Explora y ordena tus archivos
+Exec=$root/bin/archivos %f
+Icon=system-file-manager
+Terminal=false
+Categories=System;FileTools;FileManager;
+MimeType=inode/directory;
+Keywords=archivos;carpetas;files;
+StartupWMClass=org.quickshell
+DESKTOP
+command -v update-desktop-database >/dev/null 2>&1 && update-desktop-database "$(dirname "$launcher")" 2>/dev/null || true
+
+if [ "$with_services" = 1 ]; then
+    if python3 -c 'import gi' 2>/dev/null; then
+        mkdir -p "$services" "$(dirname "$portal")"
+        printf '[D-BUS Service]\nName=org.freedesktop.FileManager1\nExec=%s/bin/archivos-servicio\n' "$root" \
+            >"$services/org.freedesktop.FileManager1.service"
+        printf '[D-BUS Service]\nName=org.freedesktop.impl.portal.desktop.kura\nExec=%s/bin/archivos-portal\n' "$root" \
+            >"$services/org.freedesktop.impl.portal.desktop.kura.service"
+        printf '[portal]\nDBusName=org.freedesktop.impl.portal.desktop.kura\nInterfaces=org.freedesktop.impl.portal.FileChooser;\n' >"$portal"
+        echo "Servicios puestos. Para que los programas usen su selector de archivos, añade"
+        echo "  org.freedesktop.impl.portal.FileChooser=kura"
+        echo "bajo [preferred] en ${XDG_CONFIG_HOME:-$HOME/.config}/xdg-desktop-portal/portals.conf"
+        echo "y reinicia el servicio: systemctl --user restart xdg-desktop-portal"
+    else
+        echo "Los servicios necesitan Python con PyGObject; no se han puesto." >&2
+    fi
+fi
+
+if [ "$as_default" = 1 ]; then
+    xdg-mime default archivos.desktop inode/directory
+    echo "Kura Files abre ahora las carpetas."
+fi
+
+case ":$PATH:" in
+    *":$bin:"*) ;;
+    *) echo "Ojo: $bin no está en tu PATH; añádelo para poder escribir «archivos»." ;;
+esac
+echo "Listo. Ábrelo con: archivos"

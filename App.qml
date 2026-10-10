@@ -1296,7 +1296,7 @@ Item {
             "model": "#8fd7e8", "print": "#86d6c2", "board": "#a5d6a0", "draft": "#9fc3e8", "chip": "#b9df9a",
             "script": "#c8dc8c", "web": "#8cc3ff", "code": "#b3b8f5", "shader": "#c9a8f2", "data": "#9db4f2",
             "config": "#b8c9d5", "notebook": "#f2c078", "diff": "#e8d28a", "container": "#7fc6f0", "git": "#f0a080",
-            "pdf": "#f09a9a", "doc": "#cfd3d6", "book": "#d8c3a5", "sheet": "#9bd3a4", "slides": "#f0b27a", "log": "#a8b0b6",
+            "pdf": "#f09a9a", "doc": "#cfd3d6", "word": "#86b4f2", "markup": "#9fe0c8", "book": "#d8c3a5", "sheet": "#9bd3a4", "slides": "#f0b27a", "log": "#a8b0b6",
             "font": "#d0c8e8", "mail": "#a6c8ee", "calendar": "#f0a8a8", "contact": "#c3d6a8", "map": "#9fd6b5",
             "link": "#9fcde9", "seal": "#d8c890", "info": "#9fcde9",
             "key": "#e6d27a", "lock": "#e0c060", "lib": "#9aa3ab", "trash": "#8b9297"
