@@ -1000,6 +1000,8 @@ Item {
             items.push({ label: "Acciones" + many, sub: () => actionEntries(paths) });
             items.push({ sep: true });
         }
+        if (n > 0)
+            items.push({ label: "Etiqueta" + many, sub: () => labelEntries() });
         if (n > 0) {
             items.push({ label: "Copiar" + many, hint: "CTRL+C", act: () => hold(false) });
             items.push({ label: "Cortar" + many, hint: "CTRL+X", act: () => hold(true) });
@@ -1267,6 +1269,80 @@ Item {
         else
             rail.filter.grabFocus();
     }
+    // Colour labels: a file or folder can wear one, kept by path in the settings.
+    readonly property var labelHues: [
+        { key: "red", name: "Rojo", hue: "#e8707a" }, { key: "orange", name: "Naranja", hue: "#e8a25c" },
+        { key: "yellow", name: "Amarillo", hue: "#e6cf6a" }, { key: "green", name: "Verde", hue: "#8fd18a" },
+        { key: "blue", name: "Azul", hue: "#7fb4f0" }, { key: "purple", name: "Morado", hue: "#c39af0" }
+    ]
+    readonly property var labels: settings.labels
+    // The colours in use, with how many things wear each.
+    readonly property var labelCounts: {
+        const counts = {};
+        for (const p in labels)
+            counts[labels[p]] = (counts[labels[p]] || 0) + 1;
+        return labelHues.filter(h => counts[h.key] > 0).map(h => ({ key: h.key, name: h.name, hue: h.hue, count: counts[h.key] }));
+    }
+    function labelHue(filePath) {
+        const key = labels[filePath];
+        if (key === undefined)
+            return "";
+        const found = labelHues.find(h => h.key === key);
+        return found ? found.hue : "";
+    }
+    function saveLabels(next) {
+        settings.labels = next;
+        settingsFile.writeAdapter();
+    }
+    // Put a colour on what is picked; an empty key takes it off.
+    function setLabel(key) {
+        const next = Object.assign({}, labels);
+        for (const e of picked()) {
+            if (key === "")
+                delete next[e.path];
+            else
+                next[e.path] = key;
+        }
+        saveLabels(next);
+        if (deepQuery.indexOf("etiqueta ") === 0 && deep)
+            showLabel(labelShown);
+    }
+    // A label follows its file when the file is renamed or moved.
+    function carryLabels(results) {
+        let next = null;
+        for (let i = 0; i + 2 < results.length; i += 3) {
+            const from = results[i + 1], to = results[i + 2];
+            if (results[i] !== "move" || labels[from] === undefined)
+                continue;
+            next = next || Object.assign({}, labels);
+            next[to] = next[from];
+            delete next[from];
+        }
+        if (next)
+            saveLabels(next);
+    }
+    property string labelShown: ""
+    // Everything that wears one colour, wherever it lives.
+    function showLabel(key) {
+        const hue = labelHues.find(h => h.key === key);
+        if (!hue)
+            return;
+        labelShown = key;
+        deepQuery = "etiqueta " + hue.name.toLowerCase();
+        deepInside = false;
+        recent = false;
+        deep = true;
+        rail.filter.clear();
+        query = "";
+        found = [];
+        labelLister.command = [engine, "stat"].concat(Object.keys(labels).filter(p => labels[p] === key));
+        labelLister.running = true;
+        focusList();
+    }
+    function labelEntries() {
+        return labelHues.map(h => ({ label: h.name, act: () => setLabel(h.key) }))
+            .concat([{ sep: true }, { label: "Quitar la etiqueta", act: () => setLabel("") }]);
+    }
     function flagFor(filePath) {
         const flag = flags[filePath];
         const mark = flag === "link" ? "→" : (flag === "exec" ? "*" : "");
@@ -1497,6 +1573,7 @@ Item {
             id: settings
             property bool grid: false
             property var servers: []
+            property var labels: ({})
             property bool dual: false
             property bool hidden: false
             property bool sorter: false
@@ -1619,6 +1696,7 @@ Item {
                         Qt.callLater(app.rebuild);
                     }
                 }
+                app.carryLabels(results);
                 if (undoArgs === "auto")
                     results.length > 0 && app.pushUndo({ text: okText, args: ["revert"].concat(results), again: again });
                 else if (undoArgs !== null && code === 0)
@@ -1836,6 +1914,30 @@ Item {
             app.peeks = next;
             app.say("");
             app.go(dir);
+        }
+    }
+    Process {
+        id: labelLister
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const list = [];
+                for (const line of text.split("\n")) {
+                    const cols = line.split("\t");
+                    if (cols.length < 4)
+                        continue;
+                    const full = cols.slice(3).join("\t");
+                    list.push({
+                        name: full.slice(full.lastIndexOf("/") + 1),
+                        shown: app.shorten(full),
+                        path: full,
+                        size: Number(cols[1]),
+                        modified: new Date(Number(cols[2]) * 1000),
+                        isDir: cols[0] === "d"
+                    });
+                }
+                app.found = list;
+                app.rebuild();
+            }
         }
     }
     Process {

@@ -43,6 +43,7 @@ archivos-motor inside DIR TEXT [hidden]
 archivos-motor sum PATH
 archivos-motor preview PATH [BYTES]
 archivos-motor apps PATH
+archivos-motor stat PATH...
 archivos-motor menus
 archivos-motor pack-list
 archivos-motor pack-add ADDRESS
@@ -120,6 +121,7 @@ fn main() {
         ("sum", [path]) => describe::sum(Path::new(path)),
         ("preview", [path]) => describe::preview(Path::new(path), 4000),
         ("preview", [path, bytes]) => describe::preview(Path::new(path), bytes.parse().unwrap_or(4000)),
+        ("stat", paths) => describe::stat(paths),
         ("menus", []) => describe::menus(),
         ("pack-list", []) => describe::pack_list(),
         ("pack-add", [address]) => describe::pack_add(address),

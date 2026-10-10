@@ -474,6 +474,53 @@ Item {
                 HoverHandler { id: addHover; cursorShape: Qt.PointingHandCursor }
                 TapHandler { onTapped: rail.app.addServer() }
             }
+
+            Item { visible: rail.app.labelCounts.length > 0; width: 1; height: visible ? Tokens.s2 : 0 }
+            GroupHead { visible: rail.app.labelCounts.length > 0; height: visible ? 34 : 0; number: devicesHead.number + 2; label: "ETIQUETAS" }
+
+            Repeater {
+                model: rail.app.labelCounts
+
+                Item {
+                    id: tagRow
+                    required property var modelData
+                    readonly property bool sel: rail.app.deep && rail.app.labelShown === modelData.key && rail.app.deepQuery.indexOf("etiqueta ") === 0
+
+                    width: list.width
+                    height: 34
+
+                    Rectangle {
+                        anchors.fill: parent
+                        radius: Tokens.radius
+                        color: tagRow.sel ? Tokens.tint10 : (tagHover.hovered ? Tokens.tint5 : "transparent")
+                    }
+                    Rectangle {
+                        x: Tokens.s3 + 4
+                        width: 10
+                        height: 10
+                        radius: 5
+                        color: tagRow.modelData.hue
+                        anchors.verticalCenter: parent.verticalCenter
+                    }
+                    Text {
+                        x: Tokens.s3 + 24
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: tagRow.modelData.name
+                        color: tagRow.sel ? Tokens.ink : Tokens.inkDim
+                        font.family: Tokens.ui
+                        font.pixelSize: Tokens.fRow
+                    }
+                    Text {
+                        anchors { right: parent.right; rightMargin: Tokens.s3; verticalCenter: parent.verticalCenter }
+                        text: tagRow.modelData.count
+                        color: Tokens.inkFaint
+                        font.family: Tokens.mono
+                        font.pixelSize: 10
+                    }
+                    HoverHandler { id: tagHover; cursorShape: Qt.PointingHandCursor }
+                    TapHandler { onTapped: rail.app.showLabel(tagRow.modelData.key) }
+                }
+            }
         }
     }
 }

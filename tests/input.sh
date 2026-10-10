@@ -343,6 +343,17 @@ call act 1; sleep 1
 call unpack kit; sleep 1.5
 expect "removing the pack takes it away" packs ""
 
+echo "-- colour labels"
+fresh
+open_at "$zone"
+call click 400 380 1 0; call label red
+expect "a file can wear a colour" labels "red:1"
+call key $F2 0; call key 65 $CTRL; call type renamed.txt; call key $ENTER 0; sleep 1
+call go "$zone/folder"; sleep 0.6; call showLabel red; sleep 1
+expect "the colour follows a rename and gathers its files" names "renamed.txt"
+call click 400 312 1 0; call label ""
+expect "and comes off" labels ""
+
 echo "-- the selection panel"
 open_at "$zone"
 expect "nothing picked, no panel" detail false

@@ -216,6 +216,15 @@ Rectangle {
                     elide: Text.ElideRight
                     anchors.verticalCenter: parent.verticalCenter
                 }
+                Rectangle {
+                    readonly property string hue: card.app.labelHue(row.modelData.path)
+                    visible: hue !== ""
+                    width: 8
+                    height: 8
+                    radius: 4
+                    color: hue !== "" ? hue : "transparent"
+                    anchors.verticalCenter: parent.verticalCenter
+                }
                 Text {
                     readonly property string flag: card.app.flagFor(row.modelData.path)
                     text: (row.modelData.shown || row.modelData.name) + (flag !== "" ? "  " + flag : "")

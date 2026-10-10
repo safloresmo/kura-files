@@ -262,6 +262,16 @@ pub fn counts(dir: &Path) -> Result<(), String> {
     Ok(())
 }
 
+/// The same line a search gives, for each of the paths that still exists.
+pub fn stat(paths: &[String]) -> Result<(), String> {
+    for path in paths {
+        let Ok(meta) = Path::new(path).symlink_metadata() else { continue };
+        let kind = if meta.is_dir() { 'd' } else { 'f' };
+        println!("{kind}\t{}\t{}\t{path}", meta.len(), seconds(meta.modified()));
+    }
+    Ok(())
+}
+
 pub fn search(dir: &Path, text: &str, hidden: bool) -> Result<(), String> {
     let needle = text.to_lowercase();
     let mut found = 0;

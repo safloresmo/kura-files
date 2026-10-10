@@ -48,6 +48,7 @@ ShellRoot {
                 query: app.query,
                 deep: app.deep,
                 hidden: app.showHidden,
+                labels: app.labelCounts.map(l => l.key + ":" + l.count).join(" "),
                 packs: app.packs.map(p => p.name + ":" + p.count).join(" "),
                 hint: app.dialog.hintText,
                 shown: app.shorten(app.path),
@@ -106,6 +107,8 @@ ShellRoot {
         function peek(): void { app.peek(); }
         function pack(address: string): void { app.packJob(["pack-add", address], "ACCIONES INSTALADAS"); }
         function unpack(name: string): void { app.packJob(["pack-remove", name], "ACCIONES QUITADAS"); }
+        function label(key: string): void { app.setLabel(key); }
+        function showLabel(key: string): void { app.showLabel(key); }
         function reveal(): void { app.showInFolder(app.selected); }
         function pref(key: string, on: bool): void { app.setPref(key, on); }
         function set(key: string, value: string): void { app.setPref(key, value); }
