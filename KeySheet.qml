@@ -21,7 +21,7 @@ Item {
             ["Ctrl+I", "Propiedades"], ["Ctrl+D", "Marcador"]] },
         { name: "VER Y BUSCAR", keys: [
             ["Espacio · ← →", "Vista rápida y pasar de archivo"], ["Ctrl+G", "Lista o cuadrícula"], ["Ctrl+1 a Ctrl+4", "Lista, cuadrícula, compacta, galería"], ["Ctrl+más · Ctrl+menos", "Zoom"], ["Ctrl+H", "Ocultos"],
-            ["Ctrl+F · / · escribir", "Filtrar la carpeta"], ["Ctrl+Shift+F", "Buscar dentro de los archivos"], ["Ctrl+K", "Comandos"], ["Ctrl+,", "Ajustes"], ["F1", "Esta hoja"], ["Ctrl+Q", "Salir"]] }
+            ["Ctrl+F · / · escribir", "Filtrar la carpeta"], ["Ctrl+Shift+F", "Buscar dentro de los archivos"], ["Ctrl+Alt+F", "Buscar en toda la carpeta personal"], ["Ctrl+K", "Comandos"], ["Ctrl+,", "Ajustes"], ["F1", "Esta hoja"], ["Ctrl+Q", "Salir"]] }
     ]
 
     signal closed()

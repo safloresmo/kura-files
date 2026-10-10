@@ -13,6 +13,7 @@ archivos ir RUTA                lleva la ventana abierta a RUTA
 archivos filtro [TEXTO]         filtra la carpeta que se está viendo
 archivos buscar TEXTO           busca por nombre en la carpeta y sus subcarpetas
 archivos dentro TEXTO           busca archivos de texto que contengan TEXTO
+archivos donde TEXTO            busca por nombre en toda la carpeta personal, al instante
 archivos estado                 lo que muestra la ventana, en JSON
 archivos vista                  cambia entre lista y cuadrícula
 archivos comandos               abre la paleta de comandos
@@ -106,6 +107,7 @@ case ${1:-} in
     filtro) need_window; window filter "${2:-}" ;;
     buscar) need_window; window search "${2:?falta el texto}" ;;
     dentro) need_window; window inside "${2:?falta el texto}" ;;
+    donde) need_window; window everywhere "${2:?falta el texto}" ;;
     estado) need_window; window state ;;
     vista) need_window; window grid ;;
     comandos) need_window; window palette ;;

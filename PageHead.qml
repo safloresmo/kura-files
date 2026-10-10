@@ -164,7 +164,7 @@ Item {
         anchors { left: parent.left; right: parent.right; top: heading.bottom; topMargin: Tokens.s1 }
         text: app.inTrash && !app.deep ? Fmt.plural(app.rows.length, "elemento", "elementos") + " en la papelera, de todos los discos."
             : app.recent ? "Lo último que abriste, esté donde esté."
-            : app.deep ? Fmt.plural(app.rows.length, "resultado", "resultados") + (app.deepInside ? " con «" : " para «") + app.deepQuery + (app.deepInside ? "» dentro, en esta carpeta y sus subcarpetas." : "» en esta carpeta y sus subcarpetas.")
+            : app.deep ? Fmt.plural(app.rows.length, "resultado", "resultados") + (app.deepInside ? " con «" : " para «") + app.deepQuery + (app.deepInside ? "» dentro, en esta carpeta y sus subcarpetas." : app.deepWide ? "» en toda tu carpeta personal." : "» en esta carpeta y sus subcarpetas.")
             : !app.ready ? "Leyendo…"
             : app.unreadable ? "No se puede leer."
             : (app.folderTotal === 0 ? "Sin contenido."

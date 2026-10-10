@@ -94,6 +94,7 @@ ShellRoot {
         function only(on: bool): void { app.onlyType = on; }
         function search(text: string): void { app.search(text); }
         function inside(text: string): void { app.search(text, true); }
+        function everywhere(text: string): void { app.searchEverywhere(text); }
         function sum(): void { app.properties(); app.checksum(); }
         function point(path: string): void { app.showPath(path); }
         function actions(): void { app.loadActions(app.picked().map(e => e.path)); }

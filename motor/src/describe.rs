@@ -14,6 +14,8 @@ use crate::file_name;
 
 const SEARCH_LIMIT: usize = 500;
 const ACTION_PATHS: usize = 30;
+const INDEX_SECONDS: u64 = 6 * 60 * 60;
+const INDEX_SKIP: &str = ".git .cache node_modules target";
 /// The action id that stands for a whole script, not a section of a menu.
 const SCRIPT: &str = "@script";
 const INSIDE_BYTES: u64 = 2 * 1024 * 1024;
@@ -268,6 +270,67 @@ pub fn stat(paths: &[String]) -> Result<(), String> {
         let Ok(meta) = Path::new(path).symlink_metadata() else { continue };
         let kind = if meta.is_dir() { 'd' } else { 'f' };
         println!("{kind}\t{}\t{}\t{path}", meta.len(), seconds(meta.modified()));
+    }
+    Ok(())
+}
+
+fn index_file() -> PathBuf {
+    let cache = env::var("XDG_CACHE_HOME").map(PathBuf::from).unwrap_or_else(|_| home().join(".cache"));
+    cache.join("archivos/indice.db")
+}
+
+/// Write the index of every name under the home folder that `everywhere` reads.
+pub fn index() -> Result<(), String> {
+    let file = index_file();
+    if let Some(dir) = file.parent() {
+        fs::create_dir_all(dir).map_err(|e| format!("No se pudo crear la carpeta: {e}"))?;
+    }
+    let done = Command::new("updatedb")
+        .args(["-l", "0", "--prunenames", INDEX_SKIP, "-U"])
+        .arg(home())
+        .arg("-o")
+        .arg(&file)
+        .status()
+        .map(|status| status.success())
+        .unwrap_or(false);
+    if done { Ok(()) } else { Err("No se pudo hacer el índice: hace falta plocate".to_string()) }
+}
+
+/// Find names anywhere under the home folder, at once, from the index. An
+/// index that is missing or hours old is made again first.
+pub fn everywhere(text: &str, hidden: bool) -> Result<(), String> {
+    let file = index_file();
+    let fresh = file
+        .metadata()
+        .and_then(|meta| meta.modified())
+        .ok()
+        .and_then(|time| time.elapsed().ok())
+        .is_some_and(|age| age.as_secs() < INDEX_SECONDS);
+    if !fresh {
+        index()?;
+    }
+    let out = Command::new("plocate")
+        .arg("-d")
+        .arg(&file)
+        .args(["-i", "-b", "-l", "4000", "--"])
+        .arg(text)
+        .output()
+        .map_err(|e| format!("No se pudo buscar: {e}"))?;
+    let base = home();
+    let mut found = 0;
+    for path in String::from_utf8_lossy(&out.stdout).lines() {
+        let inner = Path::new(path).strip_prefix(&base).unwrap_or(Path::new(path));
+        if !hidden && inner.components().any(|part| part.as_os_str().to_string_lossy().starts_with('.')) {
+            continue;
+        }
+        // The index may be hours old: what is gone is left out.
+        let Ok(meta) = Path::new(path).symlink_metadata() else { continue };
+        let kind = if meta.is_dir() { 'd' } else { 'f' };
+        println!("{kind}\t{}\t{}\t{path}", meta.len(), seconds(meta.modified()));
+        found += 1;
+        if found >= SEARCH_LIMIT {
+            break;
+        }
     }
     Ok(())
 }

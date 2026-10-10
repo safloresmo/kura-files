@@ -354,6 +354,18 @@ expect "the colour follows a rename and gathers its files" names "renamed.txt"
 call click 400 312 1 0; call label ""
 expect "and comes off" labels ""
 
+echo "-- searching the whole home folder"
+if command -v plocate >/dev/null 2>&1; then
+    mkdir -p "$work/home/far/away"; echo x >"$work/home/far/away/needle-in-hay.txt"
+    pkill -f "qs -p $harness" 2>/dev/null; sleep 0.3
+    HOME=$work/home XDG_CACHE_HOME=$work/cache ARCHIVOS_DIR=$zone qs -p "$harness" >"$work/window.log" 2>&1 &
+    sleep 4
+    call everywhere needle-in; sleep 2
+    expect "a name is found far from the folder on show" names "needle-in-hay.txt"
+else
+    echo "skip  plocate is not installed"
+fi
+
 echo "-- the selection panel"
 open_at "$zone"
 expect "nothing picked, no panel" detail false

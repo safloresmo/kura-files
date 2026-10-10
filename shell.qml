@@ -74,6 +74,7 @@ ShellRoot {
         function invert(): void { app.invertMarks(); }
         function search(text: string): void { app.search(text); }
         function inside(text: string): void { app.search(text, true); }
+        function everywhere(text: string): void { app.searchEverywhere(text); }
         function link(): void { app.makeLink(); }
         function checksum(): void { app.checksum(); }
         function drop(dest: string, source: string): void { app.dragging = true; app.dropOn(dest, ["file://" + source]); app.dragging = false; }

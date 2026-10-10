@@ -97,6 +97,8 @@ Item {
     readonly property var servers: settings.servers
     property string deepQuery: ""
     property bool deepInside: false
+    // The results come from everywhere under the home folder, not from below this one.
+    property bool deepWide: false
     property string digest: ""
     property var found: []
     property string appsFor: ""
@@ -654,6 +656,7 @@ Item {
             return;
         deepQuery = q;
         deepInside = inside === true;
+        deepWide = false;
         found = [];
         deep = true;
         rail.filter.clear();
@@ -661,6 +664,26 @@ Item {
         finder.running = false;
         finder.command = [engine, deepInside ? "inside" : "search", path, q].concat(showHidden ? ["hidden"] : []);
         finder.running = true;
+        focusList();
+    }
+    // Names anywhere under the home folder, from an index, so it answers at once.
+    function searchEverywhere(text) {
+        const q = String(text === undefined ? "" : text).trim();
+        if (q === "") {
+            dialog.ask("BUSCAR EN TODA TU CARPETA PERSONAL", "", value => searchEverywhere(value));
+            return;
+        }
+        deepQuery = q;
+        deepInside = false;
+        deepWide = true;
+        recent = false;
+        found = [];
+        deep = true;
+        rail.filter.clear();
+        query = "";
+        labelLister.running = false;
+        labelLister.command = [engine, "everywhere", q].concat(showHidden ? ["hidden"] : []);
+        labelLister.running = true;
         focusList();
     }
     function searchInside() {
@@ -1111,6 +1134,8 @@ Item {
             add("Nueva carpeta", "CTRL+SHIFT+N", () => newFolder());
             add("Nuevo archivo", "CTRL+N", () => newFile());
             add("Buscar dentro de los archivos", "CTRL+SHIFT+F", () => searchInside());
+            add("Buscar en toda tu carpeta personal", "CTRL+ALT+F", () => searchEverywhere());
+            add("Rehacer el índice de búsqueda", "ACCIÓN", () => run([engine, "index"], "ÍNDICE REHECHO"));
             add("Invertir la selección", "CTRL+SHIFT+I", () => invertMarks());
             if (undo)
                 add("Deshacer: " + undo.text.toLowerCase(), "CTRL+Z", () => undoLast());
@@ -1330,6 +1355,7 @@ Item {
         labelShown = key;
         deepQuery = "etiqueta " + hue.name.toLowerCase();
         deepInside = false;
+        deepWide = true;
         recent = false;
         deep = true;
         rail.filter.clear();
@@ -2029,6 +2055,7 @@ Item {
     Shortcut { sequence: "Ctrl+K"; onActivated: app.openPalette() }
     Shortcut { sequence: "Ctrl+F"; onActivated: app.focusFilter() }
     Shortcut { sequence: "Ctrl+Shift+F"; onActivated: app.searchInside() }
+    Shortcut { sequence: "Ctrl+Alt+F"; onActivated: app.searchEverywhere() }
     Shortcut { sequence: "Ctrl+G"; onActivated: app.toggleGrid() }
     Shortcut { sequence: "Ctrl+1"; onActivated: app.setMode("list") }
     Shortcut { sequence: "Ctrl+2"; onActivated: app.setMode("grid") }

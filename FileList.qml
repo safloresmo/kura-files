@@ -470,7 +470,7 @@ Rectangle {
         visible: card.app.ready && card.app.rows.length === 0
         caption: card.app.unreadable && !card.app.deep ? "No tienes permiso para ver esta carpeta."
             : card.app.recent ? "Todavía no hay nada reciente."
-            : card.app.deep ? (card.app.deepInside ? "Ningún archivo de texto contiene «" : "Nada coincide con «") + card.app.deepQuery + "» en las subcarpetas."
+            : card.app.deep ? (card.app.deepInside ? "Ningún archivo de texto contiene «" : "Nada coincide con «") + card.app.deepQuery + (card.app.deepWide ? "»." : "» en las subcarpetas.")
             : card.app.query !== "" ? "Nada coincide con «" + card.app.query + "»."
             : (card.app.inTrash ? "La papelera está vacía." : "Esta carpeta está vacía.")
     }
