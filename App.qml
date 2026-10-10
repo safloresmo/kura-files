@@ -1252,6 +1252,9 @@ Item {
 
     // The view reads a sorted, filtered copy of the folder model.
     function rebuild() {
+        // A huge folder is put together once, when all of it has been read.
+        if (!deep && !inTrash && dir.status === FolderListModel.Loading && dir.count > 5000)
+            return;
         const keep = selected ? selected.path : "";
         const list = [];
         let dirs = 0;
@@ -1300,6 +1303,8 @@ Item {
             if (matches(e.name))
                 list.push(e);
         }
+        for (const e of list)
+            e.key = Fmt.sortKey(e.shown || e.name);
         const flip = sortReversed ? -1 : 1;
         // Recent items arrive newest first; keep that until a column is chosen.
         const asGiven = recent && sortKey === 0 && !sortReversed;
@@ -1317,7 +1322,7 @@ Item {
                 d = b.modified - a.modified;
             else if (sortKey === 3)
                 d = Fmt.kind(a.name, a.isDir).localeCompare(Fmt.kind(b.name, b.isDir));
-            return flip * (d || Fmt.compare(a.shown || a.name, b.shown || b.name));
+            return flip * (d || Fmt.compareKeys(a.key, b.key));
         });
         dirTotal = dirs;
         fileTotal = regular;
