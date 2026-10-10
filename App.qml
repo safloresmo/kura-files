@@ -936,6 +936,22 @@ Item {
             act: () => run([engine, "act", a.file, a.id].concat(paths), "ACCIÓN · " + a.name.toUpperCase())
         }));
     }
+    // Packs of actions fetched from a repository: { name, url, count }.
+    property var packs: []
+    function packJob(args, okText) {
+        say("TRAYENDO…");
+        packer.okText = okText;
+        packer.command = [engine].concat(args);
+        packer.running = true;
+    }
+    function installPack() {
+        dialog.ask("INSTALAR ACCIONES · DIRECCIÓN DEL REPOSITORIO", "https://github.com/", url => packJob(["pack-add", url], "ACCIONES INSTALADAS"));
+        dialog.preview(() => "Se copian a tu equipo y aparecen en el clic derecho. Son programas de otra persona: instala solo los de quien te fíes.");
+    }
+    function removePack(p) {
+        dialog.confirm("QUITAR ACCIONES", "Se borrará «" + p.name + "» con sus " + p.count + " acciones.",
+            () => packJob(["pack-remove", p.name], "ACCIONES QUITADAS · " + p.name.toUpperCase()), "QUITAR");
+    }
     function openActionsFolder() {
         const dir = home + "/.config/archivos/acciones";
         Quickshell.execDetached(["mkdir", "-p", dir]);
@@ -1108,6 +1124,11 @@ Item {
         if (deep)
             add("Cerrar la búsqueda", "ESC", () => endSearch());
         add("Abrir la carpeta de acciones propias", "ACCIÓN", () => openActionsFolder());
+        add("Instalar acciones desde un repositorio", "ACCIÓN", () => installPack());
+        for (const p of packs) {
+            add("Actualizar las acciones de " + p.name, "ACCIONES", () => packJob(["pack-add", p.url], "ACTUALIZADAS · " + p.name.toUpperCase()));
+            add("Quitar las acciones de " + p.name, "ACCIONES", () => removePack(p));
+        }
         add("Terminal aquí", "ACCIÓN", () => terminal(path));
         add("Copiar la ruta de esta carpeta", "ACCIÓN", () => copyPath(path));
         add("Subir una carpeta", "ALT+↑", () => goUp());
@@ -1823,6 +1844,35 @@ Item {
         running: true
         stdout: StdioCollector {
             onStreamFinished: app.menuCount = Number(text.trim()) || 0
+        }
+    }
+    Process {
+        id: packLister
+        command: [app.engine, "pack-list"]
+        running: true
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const list = [];
+                for (const line of text.split("\n")) {
+                    const cols = line.split("\t");
+                    if (cols.length === 3)
+                        list.push({ name: cols[0], url: cols[1], count: Number(cols[2]) });
+                }
+                app.packs = list;
+            }
+        }
+    }
+    Process {
+        id: packer
+        property string okText: ""
+        stderr: StdioCollector { id: packErrors }
+        onExited: code => {
+            const why = packErrors.text.trim().split("\n").pop();
+            app.say(code === 0 ? okText : "NO SE PUDO" + (why ? " · " + why.toUpperCase() : ""), code !== 0);
+            // What is on offer changed: count again and forget what was listed.
+            app.actionsFor = "";
+            menuCounter.running = true;
+            packLister.running = true;
         }
     }
     Process {

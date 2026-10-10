@@ -536,7 +536,114 @@ fn menu_dirs() -> Vec<PathBuf> {
         dirs.push(data.join("kio/servicemenus"));
         dirs.push(data.join("kservices5/ServiceMenus"));
     }
+    // An installed pack may bring service menus of its own, at its top or one folder down.
+    for pack in packs() {
+        dirs.push(pack.clone());
+        for entry in fs::read_dir(&pack).into_iter().flatten().flatten() {
+            let path = entry.path();
+            if path.is_dir() && !file_name(&path).starts_with('.') {
+                dirs.push(path);
+            }
+        }
+    }
     dirs
+}
+
+/// Where packs of actions fetched from a repository are kept.
+fn pack_root() -> PathBuf {
+    data_dirs().remove(0).join("archivos/acciones")
+}
+
+fn packs() -> Vec<PathBuf> {
+    let mut found: Vec<PathBuf> = fs::read_dir(pack_root())
+        .into_iter()
+        .flatten()
+        .flatten()
+        .map(|entry| entry.path())
+        .filter(|path| path.is_dir() && !file_name(path).starts_with('.'))
+        .collect();
+    found.sort();
+    found
+}
+
+/// Every script on offer: the ones Nautilus keeps, and each pack's own.
+fn all_scripts() -> Vec<(PathBuf, String)> {
+    let mut found = Vec::new();
+    scripts_in(&script_root(), "", &mut found);
+    for pack in packs() {
+        let name = file_name(&pack);
+        // Only what sits at the top of a pack is meant to be run by hand.
+        for entry in fs::read_dir(&pack).into_iter().flatten().flatten() {
+            let path = entry.path();
+            let file = file_name(&path);
+            let runnable = path.is_file() && path.metadata().is_ok_and(|meta| meta.permissions().mode() & 0o111 != 0);
+            if runnable && !file.starts_with('.') && !file.starts_with("install") && !file.ends_with(".desktop") {
+                found.push((path, name.clone()));
+            }
+        }
+    }
+    found.sort();
+    found
+}
+
+/// The address a pack was fetched from.
+fn origin_of(pack: &Path) -> String {
+    Command::new("git")
+        .arg("-C")
+        .arg(pack)
+        .args(["config", "--get", "remote.origin.url"])
+        .output()
+        .map(|out| String::from_utf8_lossy(&out.stdout).trim().to_string())
+        .unwrap_or_default()
+}
+
+/// The installed packs: `NAME  ADDRESS  SCRIPTS` per line.
+pub fn pack_list() -> Result<(), String> {
+    let scripts = all_scripts();
+    for pack in packs() {
+        let count = scripts.iter().filter(|(path, _)| path.starts_with(&pack)).count();
+        println!("{}\t{}\t{count}", file_name(&pack), origin_of(&pack));
+    }
+    Ok(())
+}
+
+/// Fetch a pack of actions from a git repository, or bring it up to date.
+pub fn pack_add(address: &str) -> Result<(), String> {
+    let address = address.trim().trim_end_matches('/');
+    if !(address.starts_with("https://") || address.starts_with("file:///")) || address.contains(char::is_whitespace) {
+        return Err("La dirección tiene que empezar por https://".to_string());
+    }
+    let name = address.rsplit('/').next().unwrap_or("").trim_end_matches(".git").to_string();
+    if !crate::valid_name(&name) || name.starts_with('.') {
+        return Err(format!("No sirve como nombre: {name}"));
+    }
+    let root = pack_root();
+    fs::create_dir_all(&root).map_err(|e| format!("No se pudo crear la carpeta: {e}"))?;
+    let target = root.join(&name);
+    let mut git = Command::new("git");
+    // A private repository must fail, not sit waiting for a name and a password.
+    git.env("GIT_ASKPASS", "true").stdin(std::process::Stdio::null());
+    if target.is_dir() {
+        git.arg("-C").arg(&target).args(["pull", "--quiet", "--ff-only"]);
+    } else {
+        git.args(["clone", "--quiet", "--depth", "1", address]).arg(&target);
+    }
+    let out = git.output().map_err(|e| format!("No se pudo usar git: {e}"))?;
+    if !out.status.success() {
+        let why = String::from_utf8_lossy(&out.stderr);
+        return Err(format!("No se pudo traer: {}", why.lines().last().unwrap_or("").trim()));
+    }
+    println!("{name}");
+    Ok(())
+}
+
+/// Forget a pack: its folder goes away.
+pub fn pack_remove(name: &str) -> Result<(), String> {
+    let target = pack_root().join(name);
+    if !crate::valid_name(name) || name.starts_with('.') || !target.is_dir() {
+        return Err(format!("No está instalado: {name}"));
+    }
+    fs::remove_dir_all(&target).map_err(|e| format!("No se pudo quitar: {e}"))
 }
 
 /// Where Nautilus keeps its scripts: plain programs run on the selection.
@@ -645,9 +752,7 @@ pub fn actions(paths: &[String]) -> Result<(), String> {
             }
         }
     }
-    let mut scripts = Vec::new();
-    scripts_in(&script_root(), "", &mut scripts);
-    for (script, group) in scripts {
+    for (script, group) in all_scripts() {
         println!("{}\t{SCRIPT}\t{group}\t{}", script.display(), file_name(&script));
     }
     Ok(())
@@ -661,9 +766,7 @@ pub fn menus() -> Result<(), String> {
         .flat_map(|entries| entries.flatten())
         .filter(|entry| entry.file_name().to_string_lossy().ends_with(".desktop"))
         .count();
-    let mut scripts = Vec::new();
-    scripts_in(&script_root(), "", &mut scripts);
-    println!("{}", menus + scripts.len());
+    println!("{}", menus + all_scripts().len());
     Ok(())
 }
 
@@ -698,7 +801,7 @@ pub fn filled(exec: &str, paths: &[String]) -> String {
 pub fn act(file: &Path, id: &str, paths: &[String]) -> Result<(), String> {
     let folder = Path::new(paths.first().map(String::as_str).unwrap_or("/")).parent().unwrap_or(Path::new("/"));
     if id == SCRIPT {
-        if !file.starts_with(script_root()) {
+        if !all_scripts().iter().any(|(script, _)| script == file) {
             return Err(format!("No es un script: {}", file.display()));
         }
         // Scripts get the selection as arguments and, as Nautilus does, in the environment.

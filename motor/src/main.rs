@@ -44,6 +44,9 @@ archivos-motor sum PATH
 archivos-motor preview PATH [BYTES]
 archivos-motor apps PATH
 archivos-motor menus
+archivos-motor pack-list
+archivos-motor pack-add ADDRESS
+archivos-motor pack-remove NAME
 archivos-motor actions PATH...
 archivos-motor act MENU ID PATH...
 archivos-motor bookmarks list|add|remove [PATH]
@@ -118,6 +121,9 @@ fn main() {
         ("preview", [path]) => describe::preview(Path::new(path), 4000),
         ("preview", [path, bytes]) => describe::preview(Path::new(path), bytes.parse().unwrap_or(4000)),
         ("menus", []) => describe::menus(),
+        ("pack-list", []) => describe::pack_list(),
+        ("pack-add", [address]) => describe::pack_add(address),
+        ("pack-remove", [name]) => describe::pack_remove(name),
         ("actions", paths) if !paths.is_empty() => describe::actions(paths),
         ("act", [menu, id, paths @ ..]) if !paths.is_empty() => describe::act(Path::new(menu), id, paths),
         ("apps", [path]) => describe::apps(Path::new(path)),

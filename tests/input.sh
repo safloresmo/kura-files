@@ -329,6 +329,20 @@ expect "a script is offered next to the service menus" actions "Tests · Hacer u
 call act 1; sleep 1
 [ "$(cat "$work/script-ran" 2>/dev/null)" = "$zone/b.txt|" ] && echo "ok    and gets the selection" || { echo "FAIL  and gets the selection: $(cat "$work/script-ran" 2>/dev/null)"; failed=1; }
 
+echo "-- a pack of actions from a repository"
+mkdir -p "$work/origin/kit"
+printf '#!/bin/bash\ntouch "$1.stamped"\n' >"$work/origin/kit/Stamp"; chmod +x "$work/origin/kit/Stamp"
+echo notes >"$work/origin/kit/README.md"
+(cd "$work/origin/kit" && git init -q && git add -A && git -c user.name=t -c user.email=t@t commit -qm kit)
+call pack "file://$work/origin/kit"; sleep 2
+expect "the pack is fetched and its scripts counted" packs "kit:1"
+call click 400 380 1 0; call actions; sleep 1
+expect "its script joins the actions" actions "Tests · Hacer un gemelo | kit · Stamp | Tools · Mark"
+call act 1; sleep 1
+[ -f "$zone/b.txt.stamped" ] && echo "ok    and runs on the file" || { echo "FAIL  and runs on the file"; failed=1; }
+call unpack kit; sleep 1.5
+expect "removing the pack takes it away" packs ""
+
 echo "-- the selection panel"
 open_at "$zone"
 expect "nothing picked, no panel" detail false

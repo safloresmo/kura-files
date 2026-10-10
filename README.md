@@ -36,6 +36,8 @@ Exec=magick %f %f.jpg
 
 También aparecen ahí los scripts de `~/.local/share/nautilus/scripts`, que reciben la selección como argumentos.
 
+Un repositorio de scripts se instala entero desde la paleta de comandos, con «Instalar acciones desde un repositorio»: se clona en `~/.local/share/archivos/acciones/` y sus programas pasan al mismo menú. Desde ahí también se actualiza o se quita.
+
 ## Requisitos
 
 Quickshell con los módulos de interfaz del escritorio, Rust para compilar el motor, y `gio`, `bsdtar` y `sha256sum` en el sistema. Los dos servicios usan Python con PyGObject.
