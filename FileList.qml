@@ -197,11 +197,23 @@ Rectangle {
                     width: 18
                     anchors.verticalCenter: parent.verticalCenter
                 }
-                Icon {
+                FileIcon {
                     visible: !row.lit
-                    name: card.app.iconFor(row.modelData.name, row.modelData.path, row.modelData.isDir)
+                    app: card.app
+                    name: row.modelData.name
+                    path: row.modelData.path
+                    isDir: row.modelData.isDir
                     size: card.app.compact ? 15 : 18
+                    anchors.verticalCenter: parent.verticalCenter
+                }
+                Text {
+                    width: 34
+                    text: card.app.tagFor(row.modelData.name, row.modelData.isDir)
                     color: card.app.toneFor(row.modelData.name, row.modelData.path, row.modelData.isDir)
+                    font.family: Tokens.mono
+                    font.pixelSize: 8
+                    font.letterSpacing: 0.6
+                    elide: Text.ElideRight
                     anchors.verticalCenter: parent.verticalCenter
                 }
                 Text {
@@ -213,7 +225,7 @@ Rectangle {
                     font.pixelSize: card.app.compact ? 13 : Tokens.fRow
                     font.weight: row.lit ? Font.Medium : Font.Normal
                     elide: Text.ElideMiddle
-                    width: row.width - card.sizeW - card.whenW - card.kindW - 80
+                    width: row.width - card.sizeW - card.whenW - card.kindW - 126
                     anchors.verticalCenter: parent.verticalCenter
                 }
             }
@@ -345,12 +357,37 @@ Rectangle {
                     sourceSize.width: 384
                     sourceSize.height: 240
                 }
-                Icon {
+                FileIcon {
+                    id: tileIcon
                     anchors.centerIn: parent
                     visible: !thumb.visible
-                    name: card.app.iconFor(tile.modelData.name, tile.modelData.path, tile.modelData.isDir)
-                    size: Math.round(34 * card.factor)
-                    color: card.app.toneFor(tile.modelData.name, tile.modelData.path, tile.modelData.isDir)
+                    app: card.app
+                    large: true
+                    name: tile.modelData.name
+                    path: tile.modelData.path
+                    isDir: tile.modelData.isDir
+                    size: Math.round((card.app.iconStyle === "line" ? 34 : 46) * card.factor)
+                }
+                Rectangle {
+                    readonly property string tag: card.app.tagFor(tile.modelData.name, tile.modelData.isDir)
+                    visible: tag !== "" && !tileIcon.written
+                    anchors { right: parent.right; bottom: parent.bottom }
+                    width: tagText.implicitWidth + 8
+                    height: 14
+                    radius: 3
+                    color: Tokens.paper
+                    border.width: Tokens.border
+                    border.color: card.app.toneFor(tile.modelData.name, tile.modelData.path, tile.modelData.isDir)
+
+                    Text {
+                        id: tagText
+                        anchors.centerIn: parent
+                        text: parent.tag
+                        color: card.app.toneFor(tile.modelData.name, tile.modelData.path, tile.modelData.isDir)
+                        font.family: Tokens.mono
+                        font.pixelSize: 8
+                        font.letterSpacing: 0.6
+                    }
                 }
             }
             Text {

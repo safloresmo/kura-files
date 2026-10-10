@@ -167,6 +167,20 @@ call go "$zone/soon/deeper"; sleep 0.6; expect "inside the folder" here "deeper"
 rm -rf "$zone/soon"
 call key 16777268 0; sleep 1.5;     expect "refreshing climbs out of a deleted folder" here "zone"
 
+echo "-- sorting by kind"
+fresh
+for name in one.stl two.stl one.3mf; do echo x >"$zone/$name"; done
+open_at "$zone"
+expect "the folder's kinds are counted" types "txt:3 stl:2 3mf:1"
+call pin 3mf;                      expect "a pinned kind comes first" names "one.3mf | folder | a.txt | b.txt | c.txt | one.stl | two.stl"
+call only true;                    expect "and can be shown alone" names "one.3mf"
+call pin 3mf;                      expect "unpinning shows everything again" rows 7
+call key 70 $CTRL; call type stl;  expect "the search beside the path filters" names "one.stl | two.stl"
+call key $ESC 0; call key $ENTER 0
+expect "the chips stay out of the way" sorter false
+call click 1318 165 1 0;           expect "until the button brings them out" sorter true
+call click 1318 165 1 0;           expect "and puts them away again" sorter false
+
 echo "-- two panes"
 fresh
 mkdir -p "$zone/dest"

@@ -192,6 +192,21 @@ Item {
                     }
                 }
                 Line {
+                    label: "Iconos"
+                    note: "Línea, hoja con la extensión escrita, o los del sistema"
+                    Seg {
+                        anchors.right: parent.right
+                        anchors.verticalCenter: parent.verticalCenter
+                        options: ["LÍNEA", "HOJA", "SISTEMA"]
+                        current: sheet.store.iconStyle === "sheet" ? "HOJA" : (sheet.store.iconStyle === "system" ? "SISTEMA" : "LÍNEA")
+                        onChose: key => sheet.app.setPref("iconStyle", key === "HOJA" ? "sheet" : (key === "SISTEMA" ? "system" : "line"))
+                    }
+                }
+                Line {
+                    label: "Orden y tipos bajo la ruta"
+                    Sw { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; on: sheet.store.sorter; onToggled: value => sheet.app.setPref("sorter", value) }
+                }
+                Line {
                     label: "Abrir donde lo dejé"
                     note: "En vez de la carpeta personal"
                     Sw { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; on: sheet.store.reopen; onToggled: value => sheet.app.setPref("reopen", value) }

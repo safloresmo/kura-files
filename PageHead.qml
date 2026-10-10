@@ -9,8 +9,10 @@ Item {
 
     required property var app
     property alias pathField: pathField
+    property alias searchField: searchField
+    readonly property bool searchShown: head.width >= 640
 
-    implicitHeight: tools.y + tools.height
+    implicitHeight: app.showSorter ? sorter.y + sorter.height : tools.y + tools.height
 
     Item {
         id: eyebrow
@@ -132,12 +134,114 @@ Item {
         Btn { text: "↑"; armed: app.path !== "/"; height: 36; width: 40; onAct: app.goUp() }
         Field {
             id: pathField
-            width: parent.width - 3 * (40 + Tokens.s2)
+            width: parent.width - 3 * (40 + Tokens.s2) - (head.searchShown ? searchField.width + Tokens.s2 : 0) - sorterButton.width - Tokens.s2
             toolbar: true
             tabular: true
             placeholder: "Ir a una ruta…"
             onAccepted: app.tryPath(text)
             Keys.onTabPressed: app.completePath(text)
+        }
+        Field {
+            id: searchField
+            visible: head.searchShown
+            width: 220
+            toolbar: true
+            placeholder: "Buscar por nombre…"
+            onEdited: t => app.query = t
+            onAccepted: app.focusList()
+        }
+        // Opens the order and kind chips; a dot says something is set while they are hidden.
+        Btn {
+            id: sorterButton
+            height: 36
+            width: 92
+            text: "ORDENAR" + (!app.showSorter && (app.pinType !== "" || app.sortKey !== 0 || app.sortReversed) ? " •" : "")
+            primary: app.showSorter
+            onAct: app.setPref("sorter", !app.showSorter)
+        }
+    }
+
+    // How the folder is ordered, and which kinds of file it holds.
+    component Chip: Rectangle {
+        id: chip
+        property string label: ""
+        property bool on: false
+        signal act()
+
+        width: chipText.implicitWidth + 18
+        height: 26
+        radius: Tokens.radius
+        color: on ? Tokens.bone : (chipHover.hovered ? Tokens.tint10 : "transparent")
+        border.width: Tokens.border
+        border.color: on ? Tokens.bone : Tokens.line
+
+        Text {
+            id: chipText
+            anchors.centerIn: parent
+            text: chip.label
+            color: chip.on ? Tokens.inkOnBone : Tokens.inkDim
+            font.family: Tokens.mono
+            font.pixelSize: 9
+            font.letterSpacing: 1.2
+        }
+        HoverHandler { id: chipHover; cursorShape: Qt.PointingHandCursor }
+        TapHandler { onTapped: chip.act() }
+    }
+
+    Row {
+        id: sorter
+        visible: app.showSorter
+        anchors { left: parent.left; right: parent.right; top: tools.bottom; topMargin: Tokens.s2 }
+        height: 26
+        spacing: 6
+        clip: true
+
+        Text {
+            text: "ORDEN"
+            color: Tokens.inkFaint
+            font.family: Tokens.mono
+            font.pixelSize: 9
+            font.letterSpacing: Tokens.trackMark
+            anchors.verticalCenter: parent.verticalCenter
+            rightPadding: 4
+        }
+        Repeater {
+            model: ["NOMBRE", "TAMAÑO", "FECHA", "TIPO"]
+
+            Chip {
+                required property string modelData
+                required property int index
+                label: modelData + (app.sortKey === index ? (app.sortReversed ? " ▴" : " ▾") : "")
+                on: app.sortKey === index
+                onAct: app.sortBy(index)
+            }
+        }
+        Text {
+            visible: app.typeCounts.length > 0
+            text: "TIPOS"
+            color: Tokens.inkFaint
+            font.family: Tokens.mono
+            font.pixelSize: 9
+            font.letterSpacing: Tokens.trackMark
+            anchors.verticalCenter: parent.verticalCenter
+            leftPadding: Tokens.s3
+            rightPadding: 4
+        }
+        Repeater {
+            model: app.typeCounts
+
+            Chip {
+                required property var modelData
+                label: modelData.ext.toUpperCase() + " " + modelData.count
+                on: app.pinType === modelData.ext
+                onAct: app.pin(modelData.ext)
+            }
+        }
+        Chip {
+            visible: app.pinType !== ""
+            label: "SOLO ESTOS"
+            on: app.onlyType
+            onAct: app.onlyType = !app.onlyType
         }
     }
 }

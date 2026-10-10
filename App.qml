@@ -28,6 +28,13 @@ Item {
     property bool unreadable: false
     // A path to put the cursor on as soon as it shows up in the list.
     property string wanted: ""
+    // Sorting by kind: the extensions found in the folder, one of them
+    // optionally floated to the top or shown alone.
+    property var typeCounts: []
+    property string pinType: ""
+    property bool onlyType: false
+    readonly property bool showSorter: settings.sorter
+    readonly property string iconStyle: settings.iconStyle
     property bool settled: false
     property var facts: []
     property bool countsReady: false
@@ -883,7 +890,7 @@ Item {
         add("Ver como lista compacta", "CTRL+3", () => setMode("compact"));
         add("Ver como galería", "CTRL+4", () => setMode("gallery"));
         add(showHidden ? "Esconder los ocultos" : "Mostrar los ocultos", "CTRL+H", () => showHidden = !showHidden);
-        add("Filtrar esta carpeta", "CTRL+F", () => rail.filter.grabFocus());
+        add("Filtrar esta carpeta", "CTRL+F", () => focusFilter());
         if (deep)
             add("Cerrar la búsqueda", "ESC", () => endSearch());
         add("Terminal aquí", "ACCIÓN", () => terminal(path));
@@ -902,6 +909,7 @@ Item {
         }
         if (width < 860)
             add(railForced ? "Esconder el panel lateral" : "Mostrar el panel lateral", "F9", () => railForced = !railForced);
+        add(showSorter ? "Esconder el orden y los tipos" : "Mostrar el orden y los tipos", "ACCIÓN", () => setPref("sorter", !showSorter));
         add("Pestaña nueva", "CTRL+T", () => newTab());
         if (tabs.length > 1)
             add("Cerrar la pestaña", "CTRL+W", () => closeTab(tab));
@@ -985,19 +993,44 @@ Item {
     }
     // Each family of files gets its own tone from the theme, so a folder full
     // of mixed things can be read at a glance.
+    // One colour per kind of file, soft enough to sit on the dark page. Folders
+    // take the theme's accent and plain files stay neutral.
+    readonly property var hues: ({
+            "image": "#f2bc85", "vector": "#f0a868", "video": "#f29b8a", "music": "#e7a6d0", "wave": "#d99ad6",
+            "subtitle": "#e9c4a0", "list": "#c9c2b0", "game": "#d7a3e8",
+            "archive": "#f0a58f", "package": "#e0b872", "disc": "#d6b08c", "download": "#a9c4d8",
+            "model": "#8fd7e8", "print": "#86d6c2", "board": "#a5d6a0", "draft": "#9fc3e8", "chip": "#b9df9a",
+            "script": "#c8dc8c", "web": "#8cc3ff", "code": "#b3b8f5", "shader": "#c9a8f2", "data": "#9db4f2",
+            "config": "#b8c9d5", "notebook": "#f2c078", "diff": "#e8d28a", "container": "#7fc6f0", "git": "#f0a080",
+            "pdf": "#f09a9a", "doc": "#cfd3d6", "book": "#d8c3a5", "sheet": "#9bd3a4", "slides": "#f0b27a", "log": "#a8b0b6",
+            "font": "#d0c8e8", "mail": "#a6c8ee", "calendar": "#f0a8a8", "contact": "#c3d6a8", "map": "#9fd6b5",
+            "link": "#9fcde9", "seal": "#d8c890", "info": "#9fcde9",
+            "key": "#e6d27a", "lock": "#e0c060", "lib": "#9aa3ab", "trash": "#8b9297"
+        })
     function toneFor(name, filePath, isDir) {
-        const tone = flags[filePath] === "exec" && Fmt.tone(name, isDir) === "plain" ? "code" : Fmt.tone(name, isDir);
-        if (tone === "folder")
+        const glyph = iconFor(name, filePath, isDir);
+        if (isDir)
             return Tokens.sun;
-        if (tone === "media")
-            return Tokens.role("tertiary", "#f2bc85");
-        if (tone === "archive")
-            return Tokens.role("error", "#ffb4ab");
-        if (tone === "code")
-            return Tokens.role("secondary", "#b8c9d5");
-        if (tone === "system")
-            return Tokens.role("outline", "#8b9297");
-        return Tokens.inkFaint;
+        return hues[glyph] || Tokens.inkFaint;
+    }
+    // The extension as a short tag, so two files with the same icon still differ.
+    function tagFor(name, isDir) {
+        return isDir ? "" : Fmt.tag(name);
+    }
+    function pin(ext) {
+        if (pinType === ext) {
+            pinType = "";
+            onlyType = false;
+        } else {
+            pinType = ext;
+        }
+    }
+    // The name filter lives in the page head when there is room, else in the rail.
+    function focusFilter() {
+        if (head.searchShown)
+            head.searchField.grabFocus();
+        else
+            rail.filter.grabFocus();
     }
     function flagFor(filePath) {
         const flag = flags[filePath];
@@ -1047,7 +1080,24 @@ Item {
                 });
             }
         }
+        const kinds = {};
         for (const e of source) {
+            if (!e.isDir) {
+                const ext = Fmt.suffix(e.name);
+                if (ext !== "")
+                    kinds[ext] = (kinds[ext] || 0) + 1;
+            }
+        }
+        typeCounts = Object.keys(kinds).map(ext => ({ ext: ext, count: kinds[ext] }))
+            .sort((a, b) => b.count - a.count || a.ext.localeCompare(b.ext)).slice(0, 12);
+        if (pinType !== "" && kinds[pinType] === undefined) {
+            pinType = "";
+            onlyType = false;
+        }
+        const pinned = e => pinType !== "" && !e.isDir && Fmt.suffix(e.name) === pinType;
+        for (const e of source) {
+            if (onlyType && pinType !== "" && !pinned(e))
+                continue;
             if (e.isDir)
                 dirs++;
             else
@@ -1061,6 +1111,8 @@ Item {
         list.sort((a, b) => {
             if (asGiven)
                 return 0;
+            if (pinned(a) !== pinned(b))
+                return pinned(a) ? -1 : 1;
             if (a.isDir !== b.isDir)
                 return a.isDir ? -1 : 1;
             let d = 0;
@@ -1111,6 +1163,8 @@ Item {
     onGridChanged: refresh()
 
     onPathChanged: {
+        pinType = "";
+        onlyType = false;
         if (settled && settings.reopen && settings.lastPath !== path)
             setPref("lastPath", path);
         unreadable = false;
@@ -1130,7 +1184,15 @@ Item {
         head.pathField.text = shorten(path);
         refresh();
     }
-    onQueryChanged: filterSoon.restart()
+    onQueryChanged: {
+        filterSoon.restart();
+        if (rail.filter.text !== query && !rail.filter.focused)
+            rail.filter.text = query;
+        if (head.searchField.text !== query && !head.searchField.focused)
+            head.searchField.text = query;
+    }
+    onPinTypeChanged: rebuild()
+    onOnlyTypeChanged: rebuild()
     onCurrentChanged: loadPreview()
     onRowsChanged: loadPreview()
     onSortKeyChanged: rebuild()
@@ -1189,6 +1251,8 @@ Item {
             property var servers: []
             property bool dual: false
             property bool hidden: false
+            property bool sorter: false
+            property string iconStyle: "line"
             property bool reopen: false
             property string lastPath: ""
             property string terminal: "kitty --directory"
@@ -1467,7 +1531,7 @@ Item {
     }
 
     Shortcut { sequence: "Ctrl+K"; onActivated: app.openPalette() }
-    Shortcut { sequence: "Ctrl+F"; onActivated: rail.filter.grabFocus() }
+    Shortcut { sequence: "Ctrl+F"; onActivated: app.focusFilter() }
     Shortcut { sequence: "Ctrl+G"; onActivated: app.toggleGrid() }
     Shortcut { sequence: "Ctrl+1"; onActivated: app.setMode("list") }
     Shortcut { sequence: "Ctrl+2"; onActivated: app.setMode("grid") }
@@ -1563,7 +1627,7 @@ Item {
             else if (event.key === Qt.Key_N && ctrl && !shift)
                 app.newFile();
             else if (event.key === Qt.Key_Slash)
-                rail.filter.grabFocus();
+                app.focusFilter();
             else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter)
                 app.open(app.current);
             else if (event.key === Qt.Key_Backspace)
@@ -1596,9 +1660,9 @@ Item {
             }
             else if (!ctrl && !(event.modifiers & Qt.AltModifier) && event.text.length === 1 && /^[A-Za-z0-9À-ÿ._-]$/.test(event.text)) {
                 // Typing starts filtering the folder.
-                rail.filter.text = event.text;
+                (head.searchShown ? head.searchField : rail.filter).text = event.text;
                 app.query = event.text;
-                rail.filter.grabFocus();
+                app.focusFilter();
             } else
                 handled = false;
             event.accepted = handled;

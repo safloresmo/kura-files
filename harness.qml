@@ -52,6 +52,11 @@ ShellRoot {
                 bookmarks: app.bookmarks.length,
                 names: app.rows.slice(0, 40).map(e => e.name).join(" | "),
                 dual: app.dual,
+                sorter: app.showSorter,
+                icons: app.iconStyle,
+                pin: app.pinType,
+                only: app.onlyType,
+                types: app.typeCounts.map(t => t.ext + ":" + t.count).join(" "),
                 clip: app.clip ? app.clip.text : "",
                 changed: Object.keys(app.changed).length,
                 unreadable: app.unreadable,
@@ -71,9 +76,12 @@ ShellRoot {
             });
         }
         function go(path: string): void { app.go(path); }
+        function pin(ext: string): void { app.pin(ext); }
+        function only(on: bool): void { app.onlyType = on; }
         function search(text: string): void { app.search(text); }
         function reveal(): void { app.showInFolder(app.selected); }
         function pref(key: string, on: bool): void { app.setPref(key, on); }
+        function set(key: string, value: string): void { app.setPref(key, value); }
         function other(path: string): void { app.otherPath = path; }
         function shot(file: string): void { app.grabToImage(result => result.saveToFile(file)); }
         function focused(): string { return String(win.backingWindow ? win.backingWindow.active : "?"); }
