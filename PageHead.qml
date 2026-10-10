@@ -102,6 +102,7 @@ Item {
     Text {
         id: heading
         anchors { left: parent.left; right: parent.right; top: eyebrow.bottom; topMargin: app.short ? 0 : Tokens.s3 }
+        visible: !app.bare
         text: app.title
         color: Tokens.ink
         font.family: Tokens.ui
@@ -126,7 +127,7 @@ Item {
 
     Row {
         id: tools
-        anchors { left: parent.left; right: parent.right; top: app.short ? heading.bottom : blurb.bottom; topMargin: app.short ? Tokens.s2 : Tokens.s4 }
+        anchors { left: parent.left; right: parent.right; top: app.bare ? eyebrow.bottom : (app.short ? heading.bottom : blurb.bottom); topMargin: app.short ? Tokens.s2 : Tokens.s4 }
         spacing: Tokens.s2
 
         Btn { text: "←"; armed: app.back.length > 0; height: 36; width: 40; onAct: app.goBack() }

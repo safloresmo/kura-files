@@ -12,7 +12,9 @@ zone=$work/zone
 failed=0
 
 export QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software XDG_CONFIG_HOME=$work/config
-mkdir -p "$XDG_CONFIG_HOME"
+# The clicks below are placed for the full header.
+mkdir -p "$XDG_CONFIG_HOME/archivos"
+echo '{ "header": "full" }' >"$XDG_CONFIG_HOME/archivos/config.json"
 
 CTRL=67108864 SHIFT=33554432 ALT=134217728
 ENTER=16777220 ESC=16777216 BACKSPACE=16777219 DELETE=16777223 TAB=16777217

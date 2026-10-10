@@ -69,7 +69,10 @@ Item {
     property bool railForced: false
     readonly property bool showDetail: width >= 1180
     readonly property bool showRail: width >= 860 || railForced
-    readonly property bool short: height < 620
+    // full, compact or minimal: how much room the folder's name takes.
+    readonly property string header: settings.header
+    readonly property bool bare: header === "minimal"
+    readonly property bool short: height < 620 || header !== "full"
     property string otherPath: home
     readonly property bool dual: settings.dual
     readonly property var servers: settings.servers
@@ -1279,6 +1282,7 @@ Item {
             property bool hidden: false
             property bool sorter: false
             property string iconStyle: "line"
+            property string header: "minimal"
             property bool reopen: false
             property string lastPath: ""
             property string terminal: "kitty --directory"

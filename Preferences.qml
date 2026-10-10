@@ -207,6 +207,17 @@ Item {
                     }
                 }
                 Line {
+                    label: "Cabecera"
+                    note: "Cuánto sitio ocupa el nombre de la carpeta"
+                    Seg {
+                        anchors.right: parent.right
+                        anchors.verticalCenter: parent.verticalCenter
+                        options: ["COMPLETA", "COMPACTA", "MÍNIMA"]
+                        current: sheet.store.header === "minimal" ? "MÍNIMA" : (sheet.store.header === "compact" ? "COMPACTA" : "COMPLETA")
+                        onChose: key => sheet.app.setPref("header", key === "MÍNIMA" ? "minimal" : (key === "COMPACTA" ? "compact" : "full"))
+                    }
+                }
+                Line {
                     label: "Orden y tipos bajo la ruta"
                     Sw { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; on: sheet.store.sorter; onToggled: value => sheet.app.setPref("sorter", value) }
                 }
