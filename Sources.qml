@@ -162,8 +162,15 @@ Item {
                 app.countsReady = true;
             }
         }
-        // The engine fails only when it cannot read the folder at all.
-        onExited: code => app.unreadable = code !== 0
+        stderr: StdioCollector { id: counterErrors }
+        // The engine fails only when it cannot read the folder at all: either
+        // it is gone, and the view climbs to what is left, or it is off limits.
+        onExited: code => {
+            if (code !== 0 && /No such file/i.test(counterErrors.text))
+                app.climbOut();
+            else
+                app.unreadable = code !== 0;
+        }
     }
     Process {
         id: disk

@@ -148,6 +148,12 @@ open_at ""
 expect "reopening starts where it was left" here "folder"
 call pref reopen false
 
+echo "-- a folder that goes away"
+mkdir -p "$zone/soon/deeper"
+call go "$zone/soon/deeper"; sleep 0.6; expect "inside the folder" here "deeper"
+rm -rf "$zone/soon"
+call key 16777268 0; sleep 1.5;     expect "refreshing climbs out of a deleted folder" here "zone"
+
 echo "-- two panes"
 fresh
 mkdir -p "$zone/dest"

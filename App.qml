@@ -1076,6 +1076,14 @@ Item {
             current = keep === "" ? -1 : list.findIndex(e => e.path === keep);
         }
     }
+    // The folder on show no longer exists: step up, and say so.
+    function climbOut() {
+        if (path === "/")
+            return;
+        const gone = title;
+        path = path.slice(0, path.lastIndexOf("/")) || "/";
+        say("YA NO EXISTE · " + gone.toUpperCase(), true);
+    }
     // Leave a search or the recent list and land on the item, in its own folder.
     function showInFolder(e) {
         if (!e)
