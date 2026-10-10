@@ -365,6 +365,43 @@ pub fn unescape(text: &str) -> Option<String> {
     String::from_utf8(bytes).ok()
 }
 
+/// Finish a half typed path the way a shell does: print the longest path every
+/// matching folder shares, ending in a slash once only one is left.
+pub fn complete(text: &str) -> Result<(), String> {
+    let (dir, partial) = match text.rfind('/') {
+        Some(cut) => (&text[..=cut], &text[cut + 1..]),
+        None => return Ok(()),
+    };
+    let entries = fs::read_dir(dir).map_err(|e| format!("No se pudo leer: {e}"))?;
+    let mut names: Vec<String> = entries
+        .flatten()
+        .filter(|entry| entry.path().is_dir())
+        .map(|entry| entry.file_name().to_string_lossy().into_owned())
+        .filter(|name| partial.starts_with('.') || !name.starts_with('.'))
+        .collect();
+    let exact: Vec<String> = names.iter().filter(|name| name.starts_with(partial)).cloned().collect();
+    if exact.is_empty() {
+        let lower = partial.to_lowercase();
+        names.retain(|name| name.to_lowercase().starts_with(&lower));
+    } else {
+        names = exact;
+    }
+    let Some(first) = names.first() else { return Ok(()) };
+    if names.len() == 1 {
+        println!("{dir}{first}/");
+        return Ok(());
+    }
+    let mut shared = first.chars().count();
+    for name in &names[1..] {
+        shared = shared.min(first.chars().zip(name.chars()).take_while(|(a, b)| a.to_lowercase().eq(b.to_lowercase())).count());
+    }
+    let prefix: String = first.chars().take(shared).collect();
+    if prefix.chars().count() > partial.chars().count() {
+        println!("{dir}{prefix}");
+    }
+    Ok(())
+}
+
 fn attribute<'a>(tag: &'a str, name: &str) -> Option<&'a str> {
     let start = tag.find(&format!("{name}=\""))? + name.len() + 2;
     let end = tag[start..].find('"')? + start;

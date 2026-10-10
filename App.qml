@@ -75,6 +75,8 @@ Item {
 
     readonly property int total: rows.length
     readonly property int folderTotal: dir.count
+    readonly property string typedPath: head.pathField.text
+    readonly property bool looking: look.visible
     readonly property int markedCount: Object.keys(marked).length
     readonly property string trashDir: home + "/.local/share/Trash/files"
     readonly property bool inTrash: path === trashDir
@@ -297,6 +299,18 @@ Item {
             return;
         const i = path.lastIndexOf("/");
         go(i <= 0 ? "/" : path.slice(0, i));
+    }
+    // What was typed, as a real path, keeping a trailing slash.
+    function expand(text) {
+        const typed = String(text).trim();
+        const tail = typed.length > 1 && typed.charAt(typed.length - 1) === "/" ? "/" : "";
+        const real = clean(typed);
+        return real === "/" ? real : real + tail;
+    }
+    function completePath(text) {
+        completer.running = false;
+        completer.command = [engine, "complete", expand(text)];
+        completer.running = true;
     }
     function tryPath(p) {
         probe.target = clean(p);
@@ -1026,7 +1040,7 @@ Item {
         head.pathField.text = shorten(path);
         refresh();
     }
-    onQueryChanged: rebuild()
+    onQueryChanged: filterSoon.restart()
     onCurrentChanged: loadPreview()
     onRowsChanged: loadPreview()
     onSortKeyChanged: rebuild()
@@ -1211,6 +1225,24 @@ Item {
             }
         }
     }
+    // Typing in a huge folder would otherwise rebuild the list on every key.
+    Timer {
+        id: filterSoon
+        interval: 50
+        onTriggered: app.rebuild()
+    }
+    Process {
+        id: completer
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const found = text.trim();
+                if (found === "")
+                    return;
+                const slash = found.charAt(found.length - 1) === "/" ? "/" : "";
+                head.pathField.text = app.shorten(app.clean(found)) + (app.clean(found) === "/" ? "" : slash);
+            }
+        }
+    }
     Process {
         id: probe
         property string target: ""
@@ -1344,9 +1376,9 @@ Item {
                 app.select(app.current < 0 ? 0 : app.current + files.columns);
             else if (event.key === Qt.Key_Up)
                 app.select(app.current < 0 ? app.rows.length - 1 : app.current - files.columns);
-            else if (event.key === Qt.Key_Right && app.grid)
+            else if (event.key === Qt.Key_Right && (app.grid || app.looking))
                 app.select(app.current + 1);
-            else if (event.key === Qt.Key_Left && app.grid)
+            else if (event.key === Qt.Key_Left && (app.grid || app.looking))
                 app.select(app.current - 1);
             else if (event.key === Qt.Key_Home)
                 app.select(0);

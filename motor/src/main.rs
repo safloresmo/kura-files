@@ -37,6 +37,7 @@ archivos-motor apps PATH
 archivos-motor bookmarks list|add|remove [PATH]
 archivos-motor thumbs DIR
 archivos-motor recent
+archivos-motor complete TEXT
 archivos-motor remote URI...";
 
 extern "C" {
@@ -85,6 +86,7 @@ fn main() {
         ("delete", sources) if !sources.is_empty() => delete(sources),
         ("thumbs", [dir]) => describe::thumbs(Path::new(dir)),
         ("recent", []) => describe::recent(),
+        ("complete", [text]) => describe::complete(text),
         ("remote", uris) if !uris.is_empty() => describe::remote(uris),
         ("revert", triples) if !triples.is_empty() && triples.len() % 3 == 0 => revert(triples),
         ("extract", [archive]) => extract(Path::new(archive)),
@@ -584,5 +586,38 @@ mod tests {
         assert_eq!(fs::metadata(&file).unwrap().permissions().mode() & 0o777, 0o750);
         assert!(chmod("rwx", &file).is_err());
         assert!(chmod("77777", &file).is_err());
+    }
+
+    #[test]
+    fn completion_follows_the_folders() {
+        let dir = Scratch::new();
+        fs::create_dir_all(dir.0.join("Documentos")).unwrap();
+        fs::create_dir_all(dir.0.join("Descargas")).unwrap();
+        fs::create_dir_all(dir.0.join("Música")).unwrap();
+        dir.file("Datos.txt", "");
+        let base = format!("{}/", dir.0.display());
+        let run = |typed: &str| {
+            let out = std::process::Command::new(env::current_exe().unwrap())
+                .args(["--exact", "tests::completion_helper", "--nocapture"])
+                .env("COMPLETE", format!("{base}{typed}"))
+                .output()
+                .unwrap();
+            String::from_utf8_lossy(&out.stdout)
+                .lines()
+                .find(|line| line.starts_with(&base))
+                .map(|line| line[base.len()..].to_string())
+                .unwrap_or_default()
+        };
+        assert_eq!(run("Do"), "Documentos/");
+        assert_eq!(run("D"), "");
+        assert_eq!(run("mú"), "Música/");
+        assert_eq!(run("zz"), "");
+    }
+
+    #[test]
+    fn completion_helper() {
+        if let Ok(text) = env::var("COMPLETE") {
+            describe::complete(&text).unwrap();
+        }
     }
 }

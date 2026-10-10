@@ -9,7 +9,7 @@ Item {
     readonly property var groups: [
         { name: "MOVERSE", keys: [
             ["Enter", "Abrir"], ["Retroceso · Alt+↑", "Subir una carpeta"], ["Alt+← · Alt+→", "Atrás y adelante"],
-            ["Alt+Inicio", "Carpeta personal"], ["Ctrl+L", "Escribir una ruta"], ["Inicio · Fin", "Primero y último"], ["F5", "Actualizar"],
+            ["Alt+Inicio", "Carpeta personal"], ["Ctrl+L · Tab", "Escribir una ruta y completarla"], ["Inicio · Fin", "Primero y último"], ["F5", "Actualizar"],
             ["Ctrl+T · Ctrl+W", "Pestaña nueva y cerrar"], ["Ctrl+RePág · AvPág", "Cambiar de pestaña"], ["F6 · Tab", "Segundo panel y cambiar"]] },
         { name: "SELECCIONAR", keys: [
             ["Ctrl+clic", "Añadir o quitar"], ["Mayús+clic · Mayús+↑↓", "Marcar un tramo"], ["Ctrl+A", "Todo"],
@@ -20,7 +20,7 @@ Item {
             ["Ctrl+Mayús+C · Ctrl+Mayús+M", "Copiar o mover al otro panel"],
             ["Ctrl+I", "Propiedades"], ["Ctrl+D", "Marcador"]] },
         { name: "VER Y BUSCAR", keys: [
-            ["Espacio", "Vista rápida"], ["Ctrl+G", "Lista o cuadrícula"], ["Ctrl+1 a Ctrl+4", "Lista, cuadrícula, compacta, galería"], ["Ctrl+más · Ctrl+menos", "Zoom"], ["Ctrl+H", "Ocultos"],
+            ["Espacio · ← →", "Vista rápida y pasar de archivo"], ["Ctrl+G", "Lista o cuadrícula"], ["Ctrl+1 a Ctrl+4", "Lista, cuadrícula, compacta, galería"], ["Ctrl+más · Ctrl+menos", "Zoom"], ["Ctrl+H", "Ocultos"],
             ["Ctrl+F · / · escribir", "Filtrar la carpeta"], ["Ctrl+K", "Comandos"], ["Ctrl+,", "Ajustes"], ["F1", "Esta hoja"], ["Ctrl+Q", "Salir"]] }
     ]
 

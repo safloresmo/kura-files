@@ -116,6 +116,17 @@ call key 51 $CTRL;                 expect "ctrl+3 is compact" mode "compact"
 call key 52 $CTRL;                 expect "ctrl+4 is the gallery" mode "gallery"
 call key 49 $CTRL
 
+echo "-- path bar and quick look"
+call key 76 $CTRL; call key 65 $CTRL; call type "$zone/fo"; call key $TAB 0; sleep 0.8
+expect "tab completes a path" typed "~${zone#"$HOME"}/folder/"
+call key $ENTER 0; sleep 0.6;      expect "enter goes there" here "folder"
+call key $BACKSPACE 0
+call click 500 340 1 0; call key 32 0; sleep 0.8
+expect "space opens the quick look" looking true
+expect "text shows as text" preview "text"
+call key 16777236 0; sleep 0.8;    expect "right arrow moves to the next file" selected "b.txt"
+call key $ESC 0;                   expect "escape closes it" looking false
+
 echo "-- two panes"
 fresh
 mkdir -p "$zone/dest"

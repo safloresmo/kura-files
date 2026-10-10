@@ -136,6 +136,7 @@ Item {
             tabular: true
             placeholder: "Ir a una ruta…"
             onAccepted: app.tryPath(text)
+            Keys.onTabPressed: app.completePath(text)
         }
     }
 }
