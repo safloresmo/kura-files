@@ -221,7 +221,7 @@ Rectangle {
             Text {
                 x: row.width - Tokens.s4 - card.kindW - card.whenW
                 anchors.verticalCenter: parent.verticalCenter
-                text: card.app.inTrash ? card.app.trashedWhen(row.modelData.name) : Fmt.when(row.modelData.modified)
+                text: Fmt.when(row.modelData.modified)
                 color: Tokens.inkFaint
                 font.family: Tokens.mono
                 font.pixelSize: 11
@@ -231,7 +231,7 @@ Rectangle {
                 width: card.kindW
                 elide: Text.ElideLeft
                 anchors.verticalCenter: parent.verticalCenter
-                text: card.app.inTrash ? card.app.trashedFrom(row.modelData.name) : Fmt.kind(row.modelData.name, row.modelData.isDir)
+                text: card.app.inTrash && row.modelData.from ? card.app.folderOf(row.modelData.from) : Fmt.kind(row.modelData.name, row.modelData.isDir)
                 color: Tokens.inkFaint
                 font.family: Tokens.mono
                 font.pixelSize: 11

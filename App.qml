@@ -43,7 +43,7 @@ Item {
     property var activeJob: null
     property var bookmarks: []
     property var info: ({})
-    property var trashInfo: ({})
+    property var trashList: []
     property string infoPath: ""
     property var tabs: [{ path: home, back: [], forward: [] }]
     property int tab: 0
@@ -604,24 +604,17 @@ Item {
         run([engine, "chmod", mode, infoPath], "PERMISOS · " + mode);
         infoAgain.restart();
     }
-    function trashedWhen(name) {
-        const record = trashInfo[name];
-        return record ? Fmt.when(new Date(record.when)) : "";
-    }
-    function trashedFrom(name) {
-        const record = trashInfo[name];
-        if (!record)
-            return "";
-        const from = shorten(record.from);
-        const cut = from.lastIndexOf("/");
-        return cut > 0 ? from.slice(0, cut) : "/";
+    function folderOf(p) {
+        const shown = shorten(p);
+        const cut = shown.lastIndexOf("/");
+        return cut > 0 ? shown.slice(0, cut) : "/";
     }
     function restore() {
         const list = picked();
         if (list.length === 0 || !inTrash)
             return;
         marked = {};
-        op(["restore"].concat(list.map(e => e.name)), "RESTAURADO · " + label(list), null);
+        op(["restore"].concat(list.map(e => e.path)), "RESTAURADO · " + label(list), null);
     }
     function emptyTrash() {
         dialog.confirm("VACIAR PAPELERA", "Se eliminará todo lo que hay en la papelera. No se puede deshacer.",
@@ -695,7 +688,7 @@ Item {
         const items = [];
         if (inTrash) {
             items.push({ label: "Restaurar" + many, armed: n > 0, act: () => restore() });
-            items.push({ label: "Vaciar papelera", armed: dir.count > 0, act: () => emptyTrash() });
+            items.push({ label: "Vaciar papelera", armed: trashList.length > 0, act: () => emptyTrash() });
             menu.popup(x, y, items);
             return;
         }
@@ -937,6 +930,10 @@ Item {
         const source = [];
         if (deep) {
             for (const e of found)
+                source.push(e);
+        } else if (inTrash) {
+            // The trash view gathers every disk's trash, not just this folder.
+            for (const e of trashList)
                 source.push(e);
         } else {
             for (let i = 0; i < dir.count; i++) {
@@ -1228,13 +1225,22 @@ Item {
         command: [app.engine, "trashed"]
         stdout: StdioCollector {
             onStreamFinished: {
-                const map = {};
+                const list = [];
                 for (const line of text.split("\n")) {
                     const cols = line.split("\t");
-                    if (cols.length === 3)
-                        map[cols[0]] = { from: cols[1], when: cols[2] };
+                    if (cols.length !== 5)
+                        continue;
+                    list.push({
+                        name: cols[4].slice(cols[4].lastIndexOf("/") + 1),
+                        path: cols[4],
+                        size: Number(cols[1]),
+                        modified: new Date(cols[2]),
+                        isDir: cols[0] === "d",
+                        from: cols[3]
+                    });
                 }
-                app.trashInfo = map;
+                app.trashList = list;
+                app.rebuild();
             }
         }
     }
@@ -1732,7 +1738,8 @@ Item {
         Text {
             id: blurb
             anchors { left: parent.left; right: parent.right; top: heading.bottom; topMargin: Tokens.s1 }
-            text: app.recent ? "Lo último que abriste, esté donde esté."
+            text: app.inTrash && !app.deep ? Fmt.plural(app.rows.length, "elemento", "elementos") + " en la papelera, de todos los discos."
+                : app.recent ? "Lo último que abriste, esté donde esté."
                 : app.deep ? Fmt.plural(app.rows.length, "resultado", "resultados") + " para «" + app.deepQuery + "» en esta carpeta y sus subcarpetas."
                 : !app.ready ? "Leyendo…"
                 : (dir.count === 0 ? "Sin contenido."

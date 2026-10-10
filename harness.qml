@@ -53,7 +53,7 @@ ShellRoot {
                 names: app.rows.map(e => e.name).join(" | "),
                 dual: app.dual,
                 perms: app.info.mode ? app.info.mode.split("\t")[1] : "",
-                trashed: Object.keys(app.trashInfo).length,
+                trashed: app.trashList.length,
                 mode: app.mode,
                 redo: app.redo ? app.redo.text : "",
                 recent: app.recent,

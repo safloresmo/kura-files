@@ -23,7 +23,7 @@ archivos-motor mkdir|touch DIR NAME
 archivos-motor trash SRC...
 archivos-motor delete SRC...
 archivos-motor untrash ORIGINAL...
-archivos-motor restore NAME...
+archivos-motor restore HELD...
 archivos-motor trashed
 archivos-motor chmod MODE PATH
 archivos-motor revert (copy|move|new SRC DEST)...
@@ -280,22 +280,32 @@ fn restore_entry(item: &Trashed) -> Result<(), String> {
     Ok(())
 }
 
-/// What the home trash holds: `NAME<TAB>ORIGINAL<TAB>DELETED` per line.
+/// What every trash holds: `KIND SIZE DELETED ORIGINAL HELD` per line, tab
+/// separated, HELD being where the item sits inside the trash.
 fn trashed() -> Result<(), String> {
-    let home = home_trash();
-    for item in all_trashed().iter().filter(|item| item.can == home) {
-        println!("{}\t{}\t{}", item.name, item.original.display(), item.deleted);
+    for item in all_trashed() {
+        let held = item.can.join("files").join(&item.name);
+        let Ok(meta) = held.symlink_metadata() else { continue };
+        let kind = if meta.is_dir() { 'd' } else { 'f' };
+        println!("{kind}\t{}\t{}\t{}\t{}", meta.len(), item.deleted, item.original.display(), held.display());
     }
     Ok(())
 }
 
-/// Restore items of the home trash by the name they have inside it.
-fn restore(names: &[String]) -> Result<(), String> {
+/// Restore trashed items given where they sit inside a trash.
+fn restore(held: &[String]) -> Result<(), String> {
     let home = home_trash();
     let mut failed = false;
-    for name in names {
-        let outcome = trash_record(&home, None, name)
-            .ok_or_else(|| format!("No está en la papelera: {name}"))
+    for path in held {
+        let path = Path::new(path);
+        let outcome = path
+            .parent()
+            .and_then(Path::parent)
+            .and_then(|can| {
+                let top = if can == home { None } else { can.parent() };
+                trash_record(can, top, &file_name(path))
+            })
+            .ok_or_else(|| format!("No está en la papelera: {}", path.display()))
             .and_then(|item| restore_entry(&item));
         if let Err(message) = outcome {
             eprintln!("{message}");
