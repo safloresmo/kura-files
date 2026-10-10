@@ -44,6 +44,9 @@ archivos-motor sum PATH
 archivos-motor preview PATH [BYTES]
 archivos-motor apps PATH
 archivos-motor list DIR [hidden]
+archivos-motor clouds
+archivos-motor cloud-mount NAME
+archivos-motor cloud-unmount NAME
 archivos-motor themes DIR
 archivos-motor languages DIR
 archivos-motor stat PATH...
@@ -128,6 +131,9 @@ fn main() {
         ("preview", [path, bytes]) => describe::preview(Path::new(path), bytes.parse().unwrap_or(4000)),
         ("list", [dir]) => describe::list(Path::new(dir), false),
         ("list", [dir, _]) => describe::list(Path::new(dir), true),
+        ("clouds", []) => describe::clouds(),
+        ("cloud-mount", [name]) => describe::cloud_mount(name),
+        ("cloud-unmount", [name]) => describe::cloud_unmount(name),
         ("themes", [given]) => describe::catalogue("temas", Path::new(given)),
         ("languages", [given]) => describe::catalogue("idiomas", Path::new(given)),
         ("stat", paths) => describe::stat(paths),

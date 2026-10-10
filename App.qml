@@ -248,6 +248,35 @@ Item {
             go(home);
         run(["gio", "mount", "-u", server.uri], Lang.t("DESCONECTADO · ") + server.name.toUpperCase());
     }
+    // Accounts in the cloud, as rclone has them: { name, kind, dir, mounted }.
+    property var clouds: []
+    function loadClouds() {
+        cloudLister.running = true;
+    }
+    function openCloud(cloud) {
+        if (cloud.mounted) {
+            go(cloud.dir);
+            return;
+        }
+        say(Lang.t("CONECTANDO A ") + cloud.name.toUpperCase() + "…");
+        cloudJob.createObject(app, { cloud: cloud, command: [engine, "cloud-mount", cloud.name] }).running = true;
+    }
+    function closeCloud(cloud) {
+        if (path === cloud.dir || path.indexOf(cloud.dir + "/") === 0)
+            go(home);
+        cloudJob.createObject(app, { cloud: cloud, leaving: true, command: [engine, "cloud-unmount", cloud.name] }).running = true;
+    }
+    function cloudMenu(cloud, x, y) {
+        menu.popup(x, y, [
+            { label: cloud.mounted ? Lang.t("Abrir") : Lang.t("Conectar"), act: () => openCloud(cloud) },
+            { label: Lang.t("Desconectar"), armed: cloud.mounted, act: () => closeCloud(cloud) }
+        ]);
+    }
+    // Accounts are added in rclone's own guide, which opens the browser to sign in.
+    function addCloud() {
+        Quickshell.execDetached([settings.terminal.trim().split(/\s+/)[0], "-e", "rclone", "config"]);
+        say(Lang.t("AL TERMINAR, PULSA F5"));
+    }
     function serverMenu(server, x, y) {
         const mounted = remotes[server.uri] !== undefined && remotes[server.uri] !== "";
         menu.popup(x, y, [
@@ -373,6 +402,10 @@ Item {
         for (const dir in peeks) {
             if (p === dir || p.indexOf(dir + "/") === 0)
                 return peeks[dir] + ":" + (p.slice(dir.length) || "/");
+        }
+        for (const cloud of clouds) {
+            if (p === cloud.dir || p.indexOf(cloud.dir + "/") === 0)
+                return cloud.name + ":" + (p.slice(cloud.dir.length) || "/");
         }
         for (const server of servers) {
             const mounted = remotes[server.uri];
@@ -1562,6 +1595,7 @@ Item {
     function refresh() {
         countsReady = false;
         sources.reload();
+        loadClouds();
         // Opened folders are read again too.
         for (const p in expanded)
             branch.createObject(app, { dirPath: p }).running = true;
@@ -2116,6 +2150,47 @@ Item {
                         list.push({ key: cols[0], name: cols[1] });
                 }
                 app.themes = list;
+            }
+        }
+    }
+    Process {
+        id: cloudLister
+        command: [app.engine, "clouds"]
+        running: true
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const list = [];
+                for (const line of text.split("\n")) {
+                    const cols = line.split("\t");
+                    if (cols.length === 4)
+                        list.push({ name: cols[0], kind: cols[1], dir: cols[2], mounted: cols[3] === "1" });
+                }
+                app.clouds = list;
+            }
+        }
+    }
+    Component {
+        id: cloudJob
+
+        Process {
+            id: reach
+            property var cloud: null
+            property bool leaving: false
+            stdout: StdioCollector { id: reachOut }
+            stderr: StdioCollector { id: reachErr }
+            onExited: code => {
+                const name = cloud.name.toUpperCase();
+                const why = reachErr.text.trim().split("\n").pop();
+                if (code !== 0)
+                    app.say((leaving ? Lang.t("NO SE DESCONECTÓ ") : Lang.t("NO SE CONECTÓ A ")) + name + (why ? " · " + Lang.message(why).toUpperCase() : ""), true);
+                else if (leaving)
+                    app.say(Lang.t("DESCONECTADO · ") + name);
+                else {
+                    app.say(Lang.t("CONECTADO · ") + name);
+                    app.go(reachOut.text.trim());
+                }
+                app.loadClouds();
+                destroy();
             }
         }
     }

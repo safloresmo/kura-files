@@ -473,8 +473,82 @@ Item {
                 TapHandler { onTapped: rail.app.addServer() }
             }
 
+            Item { width: 1; height: Tokens.s2 }
+            GroupHead { number: devicesHead.number + 2; label: Lang.t("NUBE") }
+
+            Repeater {
+                model: rail.app.clouds
+
+                Item {
+                    id: cloud
+                    required property var modelData
+                    readonly property bool sel: modelData.mounted && (rail.app.path === modelData.dir || rail.app.path.indexOf(modelData.dir + "/") === 0)
+
+                    width: list.width
+                    height: 36
+
+                    Rectangle {
+                        anchors.fill: parent
+                        anchors.topMargin: 1
+                        anchors.bottomMargin: 1
+                        radius: Tokens.radius
+                        color: cloud.sel ? Tokens.bone : (cloudHover.hovered ? Tokens.tint10 : "transparent")
+                    }
+                    Icon {
+                        x: Tokens.s3
+                        name: "cloud"
+                        size: 16
+                        color: cloud.sel ? Tokens.inkOnBone : Tokens.inkFaint
+                        anchors.verticalCenter: parent.verticalCenter
+                    }
+                    Text {
+                        x: Tokens.s3 + 24
+                        anchors.verticalCenter: parent.verticalCenter
+                        width: list.width - 130
+                        elide: Text.ElideRight
+                        text: cloud.modelData.name
+                        color: cloud.sel ? Tokens.inkOnBone : (cloud.modelData.mounted ? Tokens.inkDim : Tokens.inkFaint)
+                        font.family: Tokens.ui
+                        font.pixelSize: 14
+                    }
+                    Text {
+                        anchors { right: parent.right; rightMargin: Tokens.s3; verticalCenter: parent.verticalCenter }
+                        text: cloud.modelData.mounted ? cloud.modelData.kind.toUpperCase() : Lang.t("CONECTAR")
+                        color: cloud.sel ? Tokens.inkOnBoneDim : Tokens.inkFaint
+                        font.family: Tokens.mono
+                        font.pixelSize: 9
+                        font.letterSpacing: 1.4
+                    }
+                    HoverHandler { id: cloudHover; cursorShape: Qt.PointingHandCursor }
+                    TapHandler { onTapped: rail.app.openCloud(cloud.modelData) }
+                    TapHandler {
+                        acceptedButtons: Qt.RightButton
+                        onTapped: point => {
+                            const scene = cloud.mapToItem(null, point.position.x, point.position.y);
+                            rail.app.cloudMenu(cloud.modelData, scene.x, scene.y);
+                        }
+                    }
+                }
+            }
+            Item {
+                width: list.width
+                height: 34
+
+                Text {
+                    x: Tokens.s3
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: Lang.t("+  AÑADIR CUENTA")
+                    color: cloudAddHover.hovered ? Tokens.ink : Tokens.inkFaint
+                    font.family: Tokens.mono
+                    font.pixelSize: 9
+                    font.letterSpacing: 1.4
+                }
+                HoverHandler { id: cloudAddHover; cursorShape: Qt.PointingHandCursor }
+                TapHandler { onTapped: rail.app.addCloud() }
+            }
+
             Item { visible: rail.app.labelCounts.length > 0; width: 1; height: visible ? Tokens.s2 : 0 }
-            GroupHead { visible: rail.app.labelCounts.length > 0; height: visible ? 34 : 0; number: devicesHead.number + 2; label: Lang.t("ETIQUETAS") }
+            GroupHead { visible: rail.app.labelCounts.length > 0; height: visible ? 34 : 0; number: devicesHead.number + 3; label: Lang.t("ETIQUETAS") }
 
             Repeater {
                 model: rail.app.labelCounts

@@ -279,6 +279,70 @@ pub fn list(dir: &Path, hidden: bool) -> Result<(), String> {
     Ok(())
 }
 
+/// Where an account in the cloud shows up as a folder while it is connected.
+fn cloud_dir(name: &str) -> PathBuf {
+    let runtime = env::var("XDG_RUNTIME_DIR").map(PathBuf::from).unwrap_or_else(|_| home().join(".cache"));
+    runtime.join("archivos/nube").join(name)
+}
+
+fn mounted_at(dir: &Path) -> bool {
+    let wanted = dir.to_string_lossy();
+    fs::read_to_string("/proc/self/mounts")
+        .map(|text| text.lines().any(|line| line.split(' ').nth(1) == Some(wanted.as_ref())))
+        .unwrap_or(false)
+}
+
+/// The accounts rclone knows: `NAME  KIND  FOLDER  CONNECTED` per line.
+pub fn clouds() -> Result<(), String> {
+    let listing = output_of("rclone", &["listremotes", "--long"], None);
+    for line in listing.lines() {
+        let Some((name, kind)) = line.split_once(':') else { continue };
+        let name = name.trim();
+        if name.is_empty() || !crate::valid_name(name) {
+            continue;
+        }
+        let dir = cloud_dir(name);
+        println!("{name}\t{}\t{}\t{}", kind.trim(), dir.display(), u8::from(mounted_at(&dir)));
+    }
+    Ok(())
+}
+
+/// Bring an account in as a folder. Prints the folder once it answers.
+pub fn cloud_mount(name: &str) -> Result<(), String> {
+    if !crate::valid_name(name) {
+        return Err(format!("Nombre no válido: {name}"));
+    }
+    let dir = cloud_dir(name);
+    if !mounted_at(&dir) {
+        fs::create_dir_all(&dir).map_err(|e| format!("No se pudo crear la carpeta: {e}"))?;
+        let out = Command::new("rclone")
+            .arg("mount")
+            .arg(format!("{name}:"))
+            .arg(&dir)
+            .args(["--daemon", "--vfs-cache-mode", "writes", "--dir-cache-time", "30s", "--daemon-wait", "20s"])
+            .output()
+            .map_err(|_| "Hace falta rclone".to_string())?;
+        if !out.status.success() {
+            let why = String::from_utf8_lossy(&out.stderr);
+            return Err(format!("No se pudo conectar: {}", why.lines().last().unwrap_or("").trim()));
+        }
+    }
+    println!("{}", dir.display());
+    Ok(())
+}
+
+/// Let an account go. Nothing is lost: what was being written is finished first.
+pub fn cloud_unmount(name: &str) -> Result<(), String> {
+    let dir = cloud_dir(name);
+    if !crate::valid_name(name) || !mounted_at(&dir) {
+        return Ok(());
+    }
+    let done = ["fusermount3", "fusermount"].iter().any(|tool| {
+        Command::new(tool).arg("-u").arg(&dir).status().map(|status| status.success()).unwrap_or(false)
+    });
+    if done { Ok(()) } else { Err("No se pudo desconectar: está en uso".to_string()) }
+}
+
 /// The themes or the languages on offer, the user's own first:
 /// `FILE-NAME  SHOWN-NAME` per line. `kind` is the folder they live in.
 pub fn catalogue(kind: &str, given: &Path) -> Result<(), String> {
