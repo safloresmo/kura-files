@@ -187,10 +187,12 @@ Item {
         refresh();
     }
     function addServer() {
-        dialog.ask("SERVIDOR · DIRECCIÓN", "sftp://usuario@equipo/", uri => {
-            Qt.callLater(() => dialog.ask("SERVIDOR · NOMBRE", uri.replace(/^[a-z]+:\/\/([^@\/]*@)?/, "").replace(/\/.*$/, ""),
-                name => saveServers(servers.concat([{ name: name, uri: uri }]))));
-        });
+        serverForm.open();
+    }
+    // Keep a server from the form and go in; a password given there is used once and forgotten.
+    function addServerEntry(server, secret) {
+        saveServers(servers.filter(x => x.uri !== server.uri).concat([server]));
+        connectServer(server, secret !== "" ? secret : undefined);
     }
     function removeServer(server) {
         saveServers(servers.filter(x => x.uri !== server.uri));
@@ -276,6 +278,7 @@ Item {
     }
 
     signal quit()
+    property alias serverForm: serverForm
     property alias jobsPanel: jobsPanel
     property alias pickBar: pickBar
 
@@ -1767,10 +1770,11 @@ Item {
     Shortcut { sequence: "Ctrl+Q"; onActivated: app.quit() }
     Shortcut {
         sequence: "Escape"
-        enabled: menu.visible || dialog.visible || look.visible || palette.visible || sheet.visible || keysSheet.visible || prefs.visible
+        enabled: menu.visible || dialog.visible || serverForm.visible || look.visible || palette.visible || sheet.visible || keysSheet.visible || prefs.visible
         onActivated: {
             menu.close();
             dialog.close();
+            serverForm.close();
             palette.close();
             sheet.close();
             keysSheet.close();
@@ -1989,6 +1993,11 @@ Item {
     }
     NameDialog {
         id: dialog
+        onClosed: app.focusList()
+    }
+    ServerForm {
+        id: serverForm
+        app: app
         onClosed: app.focusList()
     }
 }

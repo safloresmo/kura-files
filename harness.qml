@@ -48,6 +48,7 @@ ShellRoot {
                 query: app.query,
                 deep: app.deep,
                 hidden: app.showHidden,
+                servers: app.servers.map(x => x.name + " " + x.uri).join(" | "),
                 undos: app.undoStack.length,
                 redos: app.redoStack.length,
                 jobs: app.transfers.map(t => (t.paused ? "paused" : "running")).join(" "),
@@ -98,6 +99,7 @@ ShellRoot {
         function copyTo(dest: string, source: string): void { app.transferTo("copy", dest, [source], "COPIADO"); }
         function pauseAll(): void { for (const t of app.transfers) app.pauseJob(t.id); }
         function cancelAll(): void { app.cancelTransfer(); }
+        function serverForm(): void { app.addServer(); }
         function reveal(): void { app.showInFolder(app.selected); }
         function pref(key: string, on: bool): void { app.setPref(key, on); }
         function set(key: string, value: string): void { app.setPref(key, value); }

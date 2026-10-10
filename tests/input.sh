@@ -250,6 +250,13 @@ expect "and both can come again" redos 2
 call key 90 $((CTRL + SHIFT)); sleep 1; call key 90 $((CTRL + SHIFT)); sleep 1
 [ -d "$zone/Nueva carpetaone" ] && [ -d "$zone/Nueva carpetatwo" ] && echo "ok    redo brings both back" || { echo "FAIL  redo brings both back"; failed=1; }
 
+echo "-- adding a server"
+call serverForm
+call type files.example.org; call key $TAB 0; call type 2222; call key $TAB 0; call type guest
+call key $TAB 0; call key $TAB 0; call type srv/data; call key $TAB 0; call type Example
+call key $ENTER 0; sleep 1
+expect "the form builds the address and keeps the server" servers "Example sftp://guest@files.example.org:2222/srv/data"
+
 echo "-- the selection panel"
 open_at "$zone"
 expect "nothing picked, no panel" detail false
