@@ -15,13 +15,13 @@ Item {
             ["Ctrl+clic", "Añadir o quitar"], ["Mayús+clic · Mayús+↑↓", "Marcar un tramo"], ["Ctrl+A", "Todo"],
             ["Ctrl+Mayús+I", "Invertir"], ["Esc", "Soltar la selección"]] },
         { name: "ARCHIVOS", keys: [
-            ["Ctrl+C · Ctrl+X · Ctrl+V", "Copiar, cortar y pegar"], ["Ctrl+Z", "Deshacer"], ["F2", "Renombrar"],
+            ["Ctrl+C · Ctrl+X · Ctrl+V", "Copiar, cortar y pegar"], ["Ctrl+Z · Ctrl+Mayús+Z", "Deshacer y rehacer"], ["F2", "Renombrar"],
             ["Ctrl+Mayús+N · Ctrl+N", "Carpeta nueva y archivo nuevo"], ["Supr · Mayús+Supr", "A la papelera o para siempre"],
             ["Ctrl+Mayús+C · Ctrl+Mayús+M", "Copiar o mover al otro panel"],
             ["Ctrl+I", "Propiedades"], ["Ctrl+D", "Marcador"]] },
         { name: "VER Y BUSCAR", keys: [
             ["Espacio", "Vista rápida"], ["Ctrl+G", "Lista o cuadrícula"], ["Ctrl+más · Ctrl+menos", "Zoom"], ["Ctrl+H", "Ocultos"],
-            ["Ctrl+F · / · escribir", "Filtrar la carpeta"], ["Ctrl+K", "Comandos"], ["F1", "Esta hoja"], ["Ctrl+Q", "Salir"]] }
+            ["Ctrl+F · / · escribir", "Filtrar la carpeta"], ["Ctrl+K", "Comandos"], ["Ctrl+,", "Ajustes"], ["F1", "Esta hoja"], ["Ctrl+Q", "Salir"]] }
     ]
 
     signal closed()

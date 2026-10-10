@@ -343,7 +343,12 @@ fn encode(path: &str) -> String {
 }
 
 fn decode(uri: &str) -> Option<String> {
-    let raw = uri.strip_prefix("file://")?.as_bytes();
+    unescape(uri.strip_prefix("file://")?)
+}
+
+/// Turn %XX escapes back into the bytes they stand for.
+pub fn unescape(text: &str) -> Option<String> {
+    let raw = text.as_bytes();
     let mut bytes = Vec::with_capacity(raw.len());
     let mut i = 0;
     while i < raw.len() {
@@ -358,6 +363,39 @@ fn decode(uri: &str) -> Option<String> {
         i += 1;
     }
     String::from_utf8(bytes).ok()
+}
+
+fn attribute<'a>(tag: &'a str, name: &str) -> Option<&'a str> {
+    let start = tag.find(&format!("{name}=\""))? + name.len() + 2;
+    let end = tag[start..].find('"')? + start;
+    Some(&tag[start..end])
+}
+
+/// What was opened lately, newest first, from the list desktop apps keep:
+/// the same `KIND SIZE MODIFIED PATH` lines a search gives.
+pub fn recent() -> Result<(), String> {
+    let data = env::var("XDG_DATA_HOME").map(PathBuf::from).unwrap_or_else(|_| home().join(".local/share"));
+    let text = fs::read_to_string(data.join("recently-used.xbel")).unwrap_or_default();
+    let mut entries: Vec<(&str, String)> = text
+        .split("<bookmark ")
+        .skip(1)
+        .filter_map(|tag| {
+            let tag = &tag[..tag.find('>')?];
+            Some((attribute(tag, "modified")?, decode(attribute(tag, "href")?)?))
+        })
+        .collect();
+    entries.sort_by(|a, b| b.0.cmp(a.0));
+    let mut shown = 0;
+    for (_, path) in entries {
+        let Ok(meta) = fs::metadata(&path) else { continue };
+        let kind = if meta.is_dir() { 'd' } else { 'f' };
+        println!("{kind}\t{}\t{}\t{path}", meta.len(), seconds(meta.modified()));
+        shown += 1;
+        if shown >= 60 {
+            break;
+        }
+    }
+    Ok(())
 }
 
 /// The bookmark list GTK file managers share: `PATH<TAB>LABEL` per line.

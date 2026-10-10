@@ -77,7 +77,7 @@ Rectangle {
 
         Text {
             anchors { left: parent.left; leftMargin: Tokens.s4; verticalCenter: parent.verticalCenter }
-            text: card.app.inTrash ? "PAPELERA" : (card.app.deep ? "RESULTADOS · " + card.app.deepQuery.toUpperCase() : "CONTENIDO")
+            text: card.app.inTrash ? "PAPELERA" : (card.app.recent ? "RECIENTES" : card.app.deep ? "RESULTADOS · " + card.app.deepQuery.toUpperCase() : "CONTENIDO")
             color: Tokens.ink
             font.family: Tokens.mono
             font.pixelSize: 12
@@ -407,7 +407,8 @@ Rectangle {
     Empty {
         anchors.centerIn: view
         visible: card.app.ready && card.app.rows.length === 0
-        caption: card.app.deep ? "Nada coincide con «" + card.app.deepQuery + "» en las subcarpetas."
+        caption: card.app.recent ? "Todavía no hay nada reciente."
+            : card.app.deep ? "Nada coincide con «" + card.app.deepQuery + "» en las subcarpetas."
             : card.app.query !== "" ? "Nada coincide con «" + card.app.query + "»."
             : (card.app.inTrash ? "La papelera está vacía." : "Esta carpeta está vacía.")
     }

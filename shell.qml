@@ -48,6 +48,9 @@ ShellRoot {
         function trash(): void { app.trash(); }
         function restore(): void { app.restore(); }
         function undo(): void { app.undoLast(); }
+        function redo(): void { app.redoLast(); }
+        function recent(): void { app.showRecent(); }
+        function prefs(): void { app.openPrefs(); }
         function dual(): void { app.toggleDual(); }
         function swap(): void { app.swapPanes(); }
         function other(path: string): void { app.otherPath = path; }

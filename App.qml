@@ -35,6 +35,9 @@ Item {
     property string dragData: ""
     property bool deep: false
     property var undo: null
+    property var redo: null
+    property bool undoing: false
+    property bool recent: false
     property var transfer: null
     property var activeJob: null
     property var bookmarks: []
@@ -65,10 +68,10 @@ Item {
     readonly property int markedCount: Object.keys(marked).length
     readonly property string trashDir: home + "/.local/share/Trash/files"
     readonly property bool inTrash: path === trashDir
-    readonly property bool grid: settings.grid
+    readonly property bool grid: settings.views[path] !== undefined ? settings.views[path].grid === true : settings.grid
     readonly property bool ready: dir.status === FolderListModel.Ready
     readonly property var selected: entry(current)
-    readonly property string title: nameOf(path)
+    readonly property string title: recent ? "Recientes" : nameOf(path)
 
     function nameOf(p) {
         for (const place of places) {
@@ -294,7 +297,7 @@ Item {
             Spawn.run(["gio", "open", e.path]);
     }
     function terminal(p) {
-        Spawn.run(["kitty", "--directory", p]);
+        Spawn.run(settings.terminal.trim().split(/\s+/).concat([p]));
     }
     function copyPath(p) {
         Spawn.run(["wl-copy", "--", p]);
@@ -330,7 +333,18 @@ Item {
         }
         const last = undo;
         undo = null;
+        undoing = true;
+        redo = last.again ? { args: last.again, text: last.text } : null;
         op(last.args, "DESHECHO · " + last.text, null);
+    }
+    function redoLast() {
+        if (!redo) {
+            say("NADA QUE REHACER", true);
+            return;
+        }
+        const again = redo;
+        redo = null;
+        op(again.args, again.text, again.args[0] === "trash" ? ["untrash"].concat(again.args.slice(1)) : "auto");
     }
     function cancelTransfer() {
         if (activeJob)
@@ -391,9 +405,33 @@ Item {
             next[e.path] = true;
         marked = next;
     }
-    function toggleGrid() {
-        settings.grid = !settings.grid;
+    // A folder remembers how it was last looked at.
+    function rememberView(asGrid) {
+        const views = Object.assign({}, settings.views);
+        delete views[path];
+        const keys = Object.keys(views);
+        for (let i = 0; i < keys.length - 299; i++)
+            delete views[keys[i]];
+        views[path] = { grid: asGrid, sortKey: sortKey, sortReversed: sortReversed };
+        settings.views = views;
         settingsFile.writeAdapter();
+    }
+    function toggleGrid() {
+        rememberView(!grid);
+    }
+    function setPref(key, value) {
+        settings[key] = value;
+        settingsFile.writeAdapter();
+    }
+    function showRecent() {
+        deepQuery = "recientes";
+        found = [];
+        recent = true;
+        deep = true;
+        rail.filter.clear();
+        query = "";
+        recents.running = true;
+        focusList();
     }
 
     // A drag carries the marked rows when it starts on one of them, else its own row.
@@ -447,6 +485,7 @@ Item {
     function endSearch() {
         if (!deep)
             return;
+        recent = false;
         deep = false;
         found = [];
         rebuild();
@@ -544,7 +583,7 @@ Item {
         if (list.length === 0 || !inTrash)
             return;
         marked = {};
-        run(["gio", "trash", "--restore"].concat(list.map(e => "trash:///" + encodeURIComponent(e.name))), "RESTAURADO · " + label(list));
+        op(["restore"].concat(list.map(e => e.name)), "RESTAURADO · " + label(list), null);
     }
     function emptyTrash() {
         dialog.confirm("VACIAR PAPELERA", "Se eliminará todo lo que hay en la papelera. No se puede deshacer.",
@@ -765,6 +804,10 @@ Item {
         for (const server of servers)
             add((remotes[server.uri] ? "Ir a " : "Conectar a ") + server.name, "RED", () => connectServer(server));
         add("Ordenar por tipo", "ACCIÓN", () => sortBy(3));
+        if (redo)
+            add("Rehacer: " + redo.text.toLowerCase(), "CTRL+SHIFT+Z", () => redoLast());
+        add("Ver lo abierto recientemente", "LUGAR", () => showRecent());
+        add("Ajustes", "CTRL+,", () => prefs.open());
         add("Propiedades", "CTRL+I", () => properties());
         add("Ver los atajos de teclado", "F1", () => keysSheet.open());
         add("Cambiar la marca", "ACCIÓN", () => toggleBrand());
@@ -778,6 +821,9 @@ Item {
         return out;
     }
 
+    function openPrefs() {
+        prefs.open();
+    }
     function openKeys() {
         keysSheet.open();
     }
@@ -812,6 +858,8 @@ Item {
             sortKey = key;
             sortReversed = false;
         }
+        if (!deep)
+            rememberView(grid);
     }
     function iconFor(name, filePath, isDir) {
         if (isDir) {
@@ -823,7 +871,7 @@ Item {
         return Fmt.icon(name, isDir);
     }
     function countLabel(dirPath, long) {
-        if (!countsReady)
+        if (!countsReady || deep)
             return "";
         const n = counts[dirPath] || 0;
         return long ? Fmt.plural(n, "elemento", "elementos") : n + " elem.";
@@ -869,7 +917,11 @@ Item {
                 list.push(e);
         }
         const flip = sortReversed ? -1 : 1;
+        // Recent items arrive newest first; keep that until a column is chosen.
+        const asGiven = recent && sortKey === 0 && !sortReversed;
         list.sort((a, b) => {
+            if (asGiven)
+                return 0;
             if (a.isDir !== b.isDir)
                 return a.isDir ? -1 : 1;
             let d = 0;
@@ -910,6 +962,10 @@ Item {
     onGridChanged: refresh()
 
     onPathChanged: {
+        const view = settings.views[path];
+        sortKey = view ? view.sortKey || 0 : 0;
+        sortReversed = view ? view.sortReversed === true : false;
+        recent = false;
         deep = false;
         found = [];
         current = -1;
@@ -926,6 +982,7 @@ Item {
     onSortKeyChanged: rebuild()
     onSortReversedChanged: rebuild()
     Component.onCompleted: {
+        showHidden = settings.hidden;
         const start = Quickshell.env("ARCHIVOS_DIR");
         if (start)
             path = clean(start);
@@ -961,6 +1018,9 @@ Item {
             property bool grid: false
             property var servers: []
             property bool dual: false
+            property bool hidden: false
+            property string terminal: "kitty --directory"
+            property var views: ({})
             property string ownMark: "サ"
             property string ownName: "SFM FILES"
             property string ownTag: "SAFLORESMO // ARCHIVOS"
@@ -994,10 +1054,15 @@ Item {
                     app.activeJob = null;
                     app.transfer = null;
                 }
+                const again = command[0] === app.engine ? command.slice(1) : null;
                 if (undoArgs === "auto")
-                    app.undo = results.length > 0 ? { text: okText, args: ["revert"].concat(results) } : app.undo;
+                    app.undo = results.length > 0 ? { text: okText, args: ["revert"].concat(results), again: again } : app.undo;
                 else if (undoArgs !== null && code === 0)
-                    app.undo = { text: okText, args: undoArgs };
+                    app.undo = { text: okText, args: undoArgs, again: again };
+                if (app.undoing)
+                    app.undoing = false;
+                else if (undoArgs !== null)
+                    app.redo = null;
                 if (server && code !== 0 && !askedSecret) {
                     // Keys did not get us in: ask for the password and try once more.
                     const target = server;
@@ -1208,7 +1273,10 @@ Item {
                     PICTURES: ["Imágenes", "image", "画像"],
                     VIDEOS: ["Vídeos", "video", "動画"]
                 };
-                const list = [{ name: "Carpeta personal", path: app.home, icon: "home", seal: "自宅" }];
+                const list = [
+                    { name: "Carpeta personal", path: app.home, icon: "home", seal: "自宅" },
+                    { name: "Recientes", path: "", icon: "clock", seal: "最近", special: "recent" }
+                ];
                 for (const line of text.split("\n")) {
                     const cols = line.split("\t");
                     const meta = known[cols[0]];
@@ -1286,6 +1354,33 @@ Item {
         }
     }
     Process {
+        id: recents
+        command: [app.engine, "recent"]
+        stdout: StdioCollector {
+            onStreamFinished: {
+                if (!app.recent)
+                    return;
+                const list = [];
+                for (const line of text.split("\n")) {
+                    const cols = line.split("\t");
+                    if (cols.length < 4)
+                        continue;
+                    const full = cols.slice(3).join("\t");
+                    list.push({
+                        name: full.slice(full.lastIndexOf("/") + 1),
+                        shown: app.shorten(full),
+                        path: full,
+                        size: Number(cols[1]),
+                        modified: new Date(Number(cols[2]) * 1000),
+                        isDir: cols[0] === "d"
+                    });
+                }
+                app.found = list;
+                app.rebuild();
+            }
+        }
+    }
+    Process {
         id: appFinder
         stdout: StdioCollector {
             onStreamFinished: {
@@ -1332,6 +1427,7 @@ Item {
     Shortcut { sequence: "Alt+Home"; onActivated: app.go(app.home) }
     Shortcut { sequence: "Ctrl+T"; onActivated: app.newTab() }
     Shortcut { sequence: "F6"; onActivated: app.toggleDual() }
+    Shortcut { sequence: "Ctrl+,"; onActivated: prefs.open() }
     Shortcut { sequence: "Ctrl+W"; onActivated: app.closeTab(app.tab) }
     Shortcut { sequence: "Ctrl+PgDown"; onActivated: app.showTab((app.tab + 1) % app.tabs.length) }
     Shortcut { sequence: "Ctrl+PgUp"; onActivated: app.showTab((app.tab + app.tabs.length - 1) % app.tabs.length) }
@@ -1349,13 +1445,14 @@ Item {
     Shortcut { sequence: "Ctrl+Q"; onActivated: app.quit() }
     Shortcut {
         sequence: "Escape"
-        enabled: menu.visible || dialog.visible || look.visible || palette.visible || sheet.visible || keysSheet.visible
+        enabled: menu.visible || dialog.visible || look.visible || palette.visible || sheet.visible || keysSheet.visible || prefs.visible
         onActivated: {
             menu.close();
             dialog.close();
             palette.close();
             sheet.close();
             keysSheet.close();
+            prefs.close();
             look.close();
         }
     }
@@ -1401,6 +1498,8 @@ Item {
                 app.sendToOther(true);
             else if (event.key === Qt.Key_A && ctrl)
                 app.markAll();
+            else if (event.key === Qt.Key_Z && ctrl && shift)
+                app.redoLast();
             else if (event.key === Qt.Key_Z && ctrl)
                 app.undoLast();
             else if (event.key === Qt.Key_I && ctrl && shift)
@@ -1562,7 +1661,8 @@ Item {
         Text {
             id: blurb
             anchors { left: parent.left; right: parent.right; top: heading.bottom; topMargin: Tokens.s1 }
-            text: app.deep ? Fmt.plural(app.rows.length, "resultado", "resultados") + " para «" + app.deepQuery + "» en esta carpeta y sus subcarpetas."
+            text: app.recent ? "Lo último que abriste, esté donde esté."
+                : app.deep ? Fmt.plural(app.rows.length, "resultado", "resultados") + " para «" + app.deepQuery + "» en esta carpeta y sus subcarpetas."
                 : !app.ready ? "Leyendo…"
                 : (dir.count === 0 ? "Sin contenido."
                     : Fmt.plural(app.dirTotal, "carpeta", "carpetas") + " y " + Fmt.plural(app.fileTotal, "archivo", "archivos") + ".")
@@ -1755,6 +1855,12 @@ Item {
     Properties {
         id: sheet
         app: app
+        onClosed: app.focusList()
+    }
+    Preferences {
+        id: prefs
+        app: app
+        store: settings
         onClosed: app.focusList()
     }
     KeySheet {

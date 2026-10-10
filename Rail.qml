@@ -143,7 +143,8 @@ Item {
                 Item {
                     id: place
                     required property var modelData
-                    readonly property bool sel: rail.app.path === modelData.path
+                    readonly property bool special: modelData.special === "recent"
+                    readonly property bool sel: special ? rail.app.recent : (!rail.app.recent && rail.app.path === modelData.path)
 
                     width: list.width
                     height: 36
@@ -196,10 +197,11 @@ Item {
                         font.pixelSize: 12
                     }
                     HoverHandler { id: placeHover; cursorShape: Qt.PointingHandCursor }
-                    TapHandler { onTapped: rail.app.go(place.modelData.path) }
+                    TapHandler { onTapped: place.special ? rail.app.showRecent() : rail.app.go(place.modelData.path) }
                     DropArea {
                         id: placeDrop
                         anchors.fill: parent
+                        enabled: !place.special
                         onDropped: drop => {
                             rail.app.dropOn(place.modelData.path, drop.urls);
                             drop.accept(Qt.CopyAction);

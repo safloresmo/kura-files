@@ -23,6 +23,7 @@ archivos-motor mkdir|touch DIR NAME
 archivos-motor trash SRC...
 archivos-motor delete SRC...
 archivos-motor untrash ORIGINAL...
+archivos-motor restore NAME...
 archivos-motor revert (copy|move|new SRC DEST)...
 archivos-motor extract ARCHIVE
 archivos-motor compress zip|tar.gz|tar.xz|7z SRC...
@@ -33,6 +34,7 @@ archivos-motor preview PATH [BYTES]
 archivos-motor apps PATH
 archivos-motor bookmarks list|add|remove [PATH]
 archivos-motor thumbs DIR
+archivos-motor recent
 archivos-motor remote URI...";
 
 extern "C" {
@@ -75,8 +77,10 @@ fn main() {
         ("touch", [dir, name]) => create(Path::new(dir), name, false),
         ("trash", sources) if !sources.is_empty() => trash(sources),
         ("untrash", originals) if !originals.is_empty() => untrash(originals),
+        ("restore", names) if !names.is_empty() => restore(names),
         ("delete", sources) if !sources.is_empty() => delete(sources),
         ("thumbs", [dir]) => describe::thumbs(Path::new(dir)),
+        ("recent", []) => describe::recent(),
         ("remote", uris) if !uris.is_empty() => describe::remote(uris),
         ("revert", triples) if !triples.is_empty() && triples.len() % 3 == 0 => revert(triples),
         ("extract", [archive]) => extract(Path::new(archive)),
@@ -199,31 +203,72 @@ fn delete(sources: &[String]) -> Result<(), String> {
     if failed { Err(String::new()) } else { Ok(()) }
 }
 
+fn home_trash() -> PathBuf {
+    env::var("XDG_DATA_HOME")
+        .map(PathBuf::from)
+        .unwrap_or_else(|_| PathBuf::from(env::var("HOME").unwrap_or_default()).join(".local/share"))
+        .join("Trash")
+}
+
+/// Where a trashed item came from and when it was deleted, read from its record.
+fn trash_record(name: &str) -> Option<(String, String)> {
+    let text = fs::read_to_string(home_trash().join("info").join(format!("{name}.trashinfo"))).ok()?;
+    let field = |key: &str| text.lines().find_map(|line| line.strip_prefix(key)).map(str::to_string);
+    Some((describe::unescape(&field("Path=")?)?, field("DeletionDate=").unwrap_or_default()))
+}
+
+/// Put one item of the home trash back where it was, never over something else.
+fn restore_entry(name: &str) -> Result<(), String> {
+    let trash = home_trash();
+    let (original, _) = trash_record(name).ok_or_else(|| format!("No está en la papelera: {name}"))?;
+    let original = PathBuf::from(original);
+    if taken(&original) {
+        return Err(format!("Ya existe: {}", original.display()));
+    }
+    if let Some(parent) = original.parent() {
+        fs::create_dir_all(parent).map_err(|e| format!("No se pudo crear la carpeta: {e}"))?;
+    }
+    fs::rename(trash.join("files").join(name), &original).map_err(|e| format!("No se pudo restaurar: {e}"))?;
+    let _ = fs::remove_file(trash.join("info").join(format!("{name}.trashinfo")));
+    report("move", &trash.join("files").join(name), &original);
+    Ok(())
+}
+
+/// Restore items of the home trash by the name they have inside it.
+fn restore(names: &[String]) -> Result<(), String> {
+    let mut failed = false;
+    for name in names {
+        if let Err(message) = restore_entry(name) {
+            eprintln!("{message}");
+            failed = true;
+        }
+    }
+    if failed { Err(String::new()) } else { Ok(()) }
+}
+
 /// Bring back from the trash the newest entry that came from each original path.
 fn untrash(originals: &[String]) -> Result<(), String> {
-    let listing = Command::new("gio")
-        .args(["trash", "--list"])
-        .output()
-        .map_err(|e| format!("No se pudo leer la papelera: {e}"))?;
-    let listing = String::from_utf8_lossy(&listing.stdout);
+    let names: Vec<String> = fs::read_dir(home_trash().join("info"))
+        .map(|entries| {
+            entries
+                .flatten()
+                .filter_map(|e| e.file_name().to_string_lossy().strip_suffix(".trashinfo").map(str::to_string))
+                .collect()
+        })
+        .unwrap_or_default();
     let mut failed = false;
     for original in originals {
-        let uri = listing
-            .lines()
-            .filter_map(|line| line.split_once('\t'))
-            .filter(|(_, from)| from == original)
-            .map(|(uri, _)| uri)
-            .last();
-        let restored = match uri {
-            Some(uri) => Command::new("gio")
-                .args(["trash", "--restore", uri])
-                .status()
-                .map(|s| s.success())
-                .unwrap_or(false),
-            None => false,
+        let newest = names
+            .iter()
+            .filter_map(|name| trash_record(name).map(|(path, date)| (name, path, date)))
+            .filter(|(_, path, _)| path == original)
+            .max_by(|a, b| a.2.cmp(&b.2));
+        let outcome = match newest {
+            Some((name, _, _)) => restore_entry(name),
+            None => Err(format!("No está en la papelera: {original}")),
         };
-        if !restored {
-            eprintln!("No está en la papelera: {original}");
+        if let Err(message) = outcome {
+            eprintln!("{message}");
             failed = true;
         }
     }
