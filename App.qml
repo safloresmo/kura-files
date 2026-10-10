@@ -277,6 +277,46 @@ Item {
         Quickshell.execDetached([settings.terminal.trim().split(/\s+/)[0], "-e", "rclone", "config"]);
         say(Lang.t("AL TERMINAR, PULSA F5"));
     }
+    // The git repository the folder on show belongs to: { root, branch, url }, or null.
+    property var repo: null
+    function git(args, okText) {
+        // A repository that wants a name and a password fails at once instead of waiting.
+        run(["env", "GIT_ASKPASS=true", "git", "-C", repo.root].concat(args), okText);
+    }
+    function repoPage(filePath) {
+        if (!repo || repo.url === "")
+            return "";
+        if (!filePath || filePath === repo.root)
+            return repo.url;
+        const inside = filePath.slice(repo.root.length + 1).split("/").map(encodeURIComponent).join("/");
+        return repo.url + "/blob/" + encodeURIComponent(repo.branch) + "/" + inside;
+    }
+    function openRepoPage(filePath) {
+        const page = repoPage(filePath);
+        if (page !== "")
+            Quickshell.execDetached(["gio", "open", page]);
+    }
+    function cloneRepo() {
+        if (inTrash)
+            return;
+        dialog.ask(Lang.t("CLONAR UN REPOSITORIO · DIRECCIÓN"), "https://github.com/", address => {
+            const name = address.replace(/\/+$/, "").replace(/\.git$/, "").split(/[\/:]/).pop();
+            if (name === "")
+                return;
+            say(Lang.t("CLONANDO…"));
+            wanted = (path === "/" ? "" : path) + "/" + name;
+            forget.restart();
+            run(["env", "GIT_ASKPASS=true", "git", "clone", "--quiet", "--", address, wanted], Lang.t("CLONADO · ") + name.toUpperCase());
+        });
+    }
+    function commitRepo() {
+        if (!repo)
+            return;
+        dialog.ask(Lang.t("GUARDAR CAMBIOS · MENSAJE"), "", message => {
+            run(["sh", "-c", 'git -C "$1" add -A && git -C "$1" commit --quiet -m "$2"', "sh", repo.root, message], Lang.t("CAMBIOS GUARDADOS"));
+        });
+        dialog.preview(() => Lang.t("Se guardan todos los cambios del repositorio, también los archivos nuevos."));
+    }
     function serverMenu(server, x, y) {
         const mounted = remotes[server.uri] !== undefined && remotes[server.uri] !== "";
         menu.popup(x, y, [
@@ -1221,6 +1261,17 @@ Item {
             add(Lang.t("Actualizar las acciones de ") + p.name, Lang.t("ACCIONES"), () => packJob(["pack-add", p.url], Lang.t("ACTUALIZADAS · ") + p.name.toUpperCase()));
             add(Lang.t("Quitar las acciones de ") + p.name, Lang.t("ACCIONES"), () => removePack(p));
         }
+        add(Lang.t("Clonar un repositorio aquí"), "GIT", () => cloneRepo());
+        if (repo) {
+            add(Lang.t("Traer los cambios del repositorio"), "GIT PULL", () => git(["pull", "--quiet", "--ff-only"], Lang.t("CAMBIOS TRAÍDOS")));
+            add(Lang.t("Enviar los cambios del repositorio"), "GIT PUSH", () => git(["push", "--quiet"], Lang.t("CAMBIOS ENVIADOS")));
+            add(Lang.t("Guardar los cambios en el repositorio"), "GIT COMMIT", () => commitRepo());
+            if (repo.url !== "") {
+                add(Lang.t("Abrir el repositorio en el navegador"), "GIT", () => openRepoPage(""));
+                if (n === 1)
+                    add(Lang.t("Abrir en el navegador ") + list[0].name, "GIT", () => openRepoPage(list[0].path));
+            }
+        }
         add(Lang.t("Cambiar de tema"), Lang.t("ACCIÓN"), () => chooseTheme());
         add(Lang.t("Cambiar de idioma"), Lang.t("ACCIÓN"), () => chooseLanguage());
         add(Lang.t("Terminal aquí"), Lang.t("ACCIÓN"), () => terminal(path));
@@ -1604,6 +1655,7 @@ Item {
 
     onPathChanged: {
         expanded = ({});
+        repo = null;
         pinType = "";
         onlyType = false;
         if (settled && pick === "" && settings.reopen && settings.lastPath !== path)

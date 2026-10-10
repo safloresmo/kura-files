@@ -209,6 +209,38 @@ pub fn facts(path: &Path) -> Result<(), String> {
 
 /// Inside a git work tree, say which entries of `dir` hold changes:
 /// `git<TAB>LETTER<TAB>PATH`, the letter being `?` for new, `M` for the rest.
+/// The page of a repository, from the address git fetches it from: empty
+/// when there is none, or when it is not something a browser can open.
+pub fn web_address(origin: &str) -> String {
+    let origin = origin.trim_end_matches('/').trim_end_matches(".git");
+    let (host, path) = if let Some(rest) = origin.strip_prefix("https://").or_else(|| origin.strip_prefix("http://")) {
+        // A name and a password in the address stay out of the page's.
+        let rest = rest.rsplit_once('@').map_or(rest, |(_, after)| after);
+        match rest.split_once('/') {
+            Some(parts) => parts,
+            None => return String::new(),
+        }
+    } else if let Some(rest) = origin.strip_prefix("ssh://") {
+        let rest = rest.rsplit_once('@').map_or(rest, |(_, after)| after);
+        match rest.split_once('/') {
+            Some((host, path)) => (host.split(':').next().unwrap_or(host), path),
+            None => return String::new(),
+        }
+    } else if let Some((user_host, path)) = origin.split_once(':') {
+        // The short form: git@host:owner/name
+        match user_host.rsplit_once('@') {
+            Some((_, host)) if !path.starts_with('/') => (host, path),
+            _ => return String::new(),
+        }
+    } else {
+        return String::new();
+    };
+    if host.is_empty() || path.is_empty() || host.contains(char::is_whitespace) {
+        return String::new();
+    }
+    format!("https://{host}/{path}")
+}
+
 fn git_marks(dir: &Path) {
     let run = |args: &[&str]| {
         Command::new("git")
@@ -222,6 +254,9 @@ fn git_marks(dir: &Path) {
     };
     let Some(top) = run(&["rev-parse", "--show-toplevel"]) else { return };
     let top = PathBuf::from(top.trim());
+    let branch = run(&["rev-parse", "--abbrev-ref", "HEAD"]).unwrap_or_default();
+    let origin = run(&["config", "--get", "remote.origin.url"]).unwrap_or_default();
+    println!("repo\t{}\t{}\t{}", top.display(), branch.trim(), web_address(origin.trim()));
     let Some(status) = run(&["status", "--porcelain", "--", "."]) else { return };
     let Ok(here) = dir.canonicalize() else { return };
     let mut seen: Vec<(PathBuf, char)> = Vec::new();

@@ -143,13 +143,17 @@ Item {
                 const map = {};
                 const flags = {};
                 const changed = {};
+                let repo = null;
                 for (const line of text.split("\n")) {
                     const cut = line.indexOf("\t");
                     if (cut <= 0)
                         continue;
                     const what = line.slice(0, cut);
                     const where = line.slice(cut + 1);
-                    if (what === "git")
+                    if (what === "repo") {
+                        const cols = where.split("\t");
+                        repo = { root: cols[0], branch: cols[1] || "", url: cols[2] || "" };
+                    } else if (what === "git")
                         changed[where.slice(2)] = where.charAt(0);
                     else if (what === "link" || what === "exec")
                         flags[where] = what;
@@ -158,6 +162,7 @@ Item {
                 }
                 app.flags = flags;
                 app.changed = changed;
+                app.repo = repo;
                 app.counts = map;
                 app.countsReady = true;
             }

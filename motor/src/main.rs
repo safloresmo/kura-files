@@ -719,6 +719,15 @@ mod tests {
     }
 
     #[test]
+    fn a_repository_address_becomes_its_page() {
+        assert_eq!(describe::web_address("git@github.com:ana/caja.git"), "https://github.com/ana/caja");
+        assert_eq!(describe::web_address("https://ana:clave@gitlab.com/grupo/caja.git"), "https://gitlab.com/grupo/caja");
+        assert_eq!(describe::web_address("ssh://git@host.test:2222/ana/caja"), "https://host.test/ana/caja");
+        assert_eq!(describe::web_address("/srv/git/caja.git"), "");
+        assert_eq!(describe::web_address(""), "");
+    }
+
+    #[test]
     fn free_name_numbers_taken_names() {
         let dir = Scratch::new();
         assert_eq!(free_name(&dir.0, "nota.txt"), "nota.txt");

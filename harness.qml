@@ -54,6 +54,8 @@ ShellRoot {
                 query: app.query,
                 deep: app.deep,
                 hidden: app.showHidden,
+                repo: app.repo ? app.repo.branch + " " + app.repo.url : "",
+                page: app.selected ? app.repoPage(app.selected.path) : app.repoPage(""),
                 clouds: app.clouds.map(c => c.name + (c.mounted ? "*" : "")).join(" "),
                 languages: app.languages.map(l => l.key).join(" "),
                 word: Lang.t("Abrir"),
@@ -125,6 +127,7 @@ ShellRoot {
         function expand(): void { app.toggleExpand(app.selected); }
         function cloud(name: string): void { const c = app.clouds.find(x => x.name === name); if (c) app.openCloud(c); }
         function uncloud(name: string): void { const c = app.clouds.find(x => x.name === name); if (c) app.closeCloud(c); }
+        function git(what: string): void { app.git(what.split(" "), "GIT"); }
         function reveal(): void { app.showInFolder(app.selected); }
         function pref(key: string, on: bool): void { app.setPref(key, on); }
         function set(key: string, value: string): void { app.setPref(key, value); }

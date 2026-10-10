@@ -423,6 +423,18 @@ else
     echo "skip  rclone is not installed"
 fi
 
+echo "-- a folder that is a git repository"
+fresh
+(cd "$zone" && git init -q -b main && git -c user.name=t -c user.email=t@t add -A && git -c user.name=t -c user.email=t@t commit -qm first \
+    && git remote add origin git@example.org:ana/caja.git)
+open_at "$zone"; sleep 1
+expect "its branch and its page are known" repo "main https://example.org/ana/caja"
+call click 400 380 1 0
+expect "a file has a page of its own" page "https://example.org/ana/caja/blob/main/b.txt"
+echo more >>"$zone/b.txt"
+call git "commit --quiet -a -m second"; sleep 1.5
+[ "$(git -C "$zone" log --oneline | wc -l)" = 2 ] && echo "ok    and git runs on the repository" || { echo "FAIL  and git runs on the repository"; failed=1; }
+
 echo "-- the selection panel"
 open_at "$zone"
 expect "nothing picked, no panel" detail false

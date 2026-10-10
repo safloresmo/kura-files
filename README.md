@@ -22,6 +22,10 @@ Gestor de archivos de escritorio para Linux: interfaz en QML sobre Quickshell y 
 
 ![Nube y servidores](docs/videos/nube.gif)
 
+**Repositorios:** lo modificado va marcado, y la paleta clona, trae, envía y guarda cambios.
+
+![Repositorios](docs/videos/git.gif)
+
 ## Qué hace
 
 - Lista, lista compacta, cuadrícula y galería, con miniaturas y vista rápida.
@@ -32,6 +36,7 @@ Gestor de archivos de escritorio para Linux: interfaz en QML sobre Quickshell y 
 - Discos y servidores de red (SFTP y otros por GVFS).
 - Cuentas en la nube (Drive, Dropbox, OneDrive, iCloud y las demás que conoce `rclone`), como carpetas.
 - Envío de archivos por Tailscale y LocalSend.
+- Repositorios de git: marca lo modificado, y desde la paleta clona, trae, envía y guarda cambios, o abre la página del repositorio.
 - Paleta de comandos (Ctrl+K) y hoja de atajos (F1).
 - Atiende «mostrar en carpeta» de otros programas (`bin/archivos-servicio`).
 - Sirve de selector de archivos para otros programas a través del portal del escritorio (`bin/archivos-portal`).
