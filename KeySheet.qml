@@ -20,7 +20,7 @@ Item {
             ["Ctrl+Mayús+C · Ctrl+Mayús+M", "Copiar o mover al otro panel"],
             ["Ctrl+I", "Propiedades"], ["Ctrl+D", "Marcador"]] },
         { name: "VER Y BUSCAR", keys: [
-            ["Espacio", "Vista rápida"], ["Ctrl+G", "Lista o cuadrícula"], ["Ctrl+más · Ctrl+menos", "Zoom"], ["Ctrl+H", "Ocultos"],
+            ["Espacio", "Vista rápida"], ["Ctrl+G", "Lista o cuadrícula"], ["Ctrl+1 a Ctrl+4", "Lista, cuadrícula, compacta, galería"], ["Ctrl+más · Ctrl+menos", "Zoom"], ["Ctrl+H", "Ocultos"],
             ["Ctrl+F · / · escribir", "Filtrar la carpeta"], ["Ctrl+K", "Comandos"], ["Ctrl+,", "Ajustes"], ["F1", "Esta hoja"], ["Ctrl+Q", "Salir"]] }
     ]
 

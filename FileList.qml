@@ -13,11 +13,13 @@ Rectangle {
     readonly property int sizeW: 110
     readonly property int whenW: 160
     readonly property int kindW: 96
-    readonly property int cellW: Math.round(136 * app.zoom)
-    readonly property int cellH: Math.round(124 * app.zoom)
+    readonly property real factor: app.zoom * (app.gallery ? 2.1 : 1)
+    readonly property int rowH: app.compact ? 28 : 40
+    readonly property int cellW: Math.round(136 * factor)
+    readonly property int cellH: Math.round(124 * factor)
     readonly property int columns: app.grid ? Math.max(1, Math.floor(tiles.width / cellW)) : 1
     readonly property int pageStep: app.grid ? Math.max(1, Math.floor(tiles.height / cellH)) * columns
-        : Math.max(1, Math.floor(view.height / 40) - 1)
+        : Math.max(1, Math.floor(view.height / rowH) - 1)
 
     function reveal(i) {
         if (app.grid)
@@ -162,7 +164,7 @@ Rectangle {
             readonly property bool lit: sel || marked
 
             width: view.width
-            height: 40
+            height: card.rowH
 
             Rectangle {
                 anchors.fill: parent
@@ -191,6 +193,7 @@ Rectangle {
                 Icon {
                     visible: !row.lit
                     name: card.app.iconFor(row.modelData.name, row.modelData.path, row.modelData.isDir)
+                    size: card.app.compact ? 15 : 18
                     color: Tokens.inkFaint
                     anchors.verticalCenter: parent.verticalCenter
                 }
@@ -198,7 +201,7 @@ Rectangle {
                     text: row.modelData.shown || row.modelData.name
                     color: row.lit ? Tokens.ink : (row.modelData.name.charAt(0) === "." ? Tokens.inkFaint : Tokens.inkDim)
                     font.family: Tokens.ui
-                    font.pixelSize: Tokens.fRow
+                    font.pixelSize: card.app.compact ? 13 : Tokens.fRow
                     font.weight: row.lit ? Font.Medium : Font.Normal
                     elide: Text.ElideMiddle
                     width: row.width - card.sizeW - card.whenW - card.kindW - 80
@@ -315,8 +318,8 @@ Rectangle {
             Item {
                 id: art
                 anchors { top: parent.top; topMargin: 14; horizontalCenter: parent.horizontalCenter }
-                width: Math.round(96 * card.app.zoom)
-                height: Math.round(60 * card.app.zoom)
+                width: card.app.gallery ? tiles.cellWidth - 28 : Math.round(96 * card.factor)
+                height: card.app.gallery ? card.cellH - 62 : Math.round(60 * card.factor)
 
                 Image {
                     id: thumb
@@ -334,7 +337,7 @@ Rectangle {
                     anchors.centerIn: parent
                     visible: !thumb.visible
                     name: card.app.iconFor(tile.modelData.name, tile.modelData.path, tile.modelData.isDir)
-                    size: Math.round(34 * card.app.zoom)
+                    size: Math.round(34 * card.factor)
                     color: tile.lit ? Tokens.inkDim : Tokens.inkFaint
                 }
             }

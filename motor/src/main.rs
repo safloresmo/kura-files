@@ -380,3 +380,127 @@ fn compress(format: &str, sources: &[String]) -> Result<(), String> {
     report("new", &parent, &dest);
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::sync::atomic::{AtomicU32, Ordering};
+
+    static NEXT: AtomicU32 = AtomicU32::new(0);
+
+    /// A fresh folder under the system temp dir, removed when the test ends.
+    struct Scratch(PathBuf);
+
+    impl Scratch {
+        fn new() -> Self {
+            let dir = env::temp_dir().join(format!("archivos-motor-{}-{}", std::process::id(), NEXT.fetch_add(1, Ordering::Relaxed)));
+            fs::create_dir_all(&dir).unwrap();
+            Scratch(dir)
+        }
+        fn file(&self, name: &str, text: &str) -> PathBuf {
+            let path = self.0.join(name);
+            fs::create_dir_all(path.parent().unwrap()).unwrap();
+            fs::write(&path, text).unwrap();
+            path
+        }
+    }
+
+    impl Drop for Scratch {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.0);
+        }
+    }
+
+    fn text(path: &Path) -> String {
+        fs::read_to_string(path).unwrap()
+    }
+
+    #[test]
+    fn free_name_numbers_taken_names() {
+        let dir = Scratch::new();
+        assert_eq!(free_name(&dir.0, "nota.txt"), "nota.txt");
+        dir.file("nota.txt", "");
+        assert_eq!(free_name(&dir.0, "nota.txt"), "nota (2).txt");
+        dir.file("nota (2).txt", "");
+        assert_eq!(free_name(&dir.0, "nota.txt"), "nota (3).txt");
+        dir.file(".oculto", "");
+        assert_eq!(free_name(&dir.0, ".oculto"), ".oculto (2)");
+    }
+
+    #[test]
+    fn names_with_slashes_or_dots_are_refused() {
+        assert!(valid_name("informe final.pdf"));
+        for bad in ["", ".", "..", "a/b", "/raiz"] {
+            assert!(!valid_name(bad), "{bad}");
+        }
+    }
+
+    #[test]
+    fn archive_stem_drops_double_extensions() {
+        assert_eq!(archive_stem("copia.tar.gz"), "copia");
+        assert_eq!(archive_stem("fotos.zip"), "fotos");
+        assert_eq!(archive_stem("sin-extension"), "sin-extension");
+    }
+
+    #[test]
+    fn copy_keeps_what_was_there() {
+        let dir = Scratch::new();
+        let source = dir.file("origen/a.txt", "nuevo");
+        let kept = dir.file("destino/a.txt", "viejo");
+        let dest = dir.0.join("destino");
+        transfer::run("copy", &dest, &[source.to_string_lossy().into_owned()], "").unwrap();
+        assert_eq!(text(&kept), "viejo");
+        assert_eq!(text(&dest.join("a (2).txt")), "nuevo");
+        assert_eq!(text(&source), "nuevo");
+    }
+
+    #[test]
+    fn skip_leaves_the_destination_alone() {
+        let dir = Scratch::new();
+        let source = dir.file("origen/a.txt", "nuevo");
+        let kept = dir.file("destino/a.txt", "viejo");
+        let dest = dir.0.join("destino");
+        transfer::run("copy", &dest, &[source.to_string_lossy().into_owned()], "--skip").unwrap();
+        assert_eq!(text(&kept), "viejo");
+        assert!(!taken(&dest.join("a (2).txt")));
+    }
+
+    #[test]
+    fn move_carries_a_whole_folder() {
+        let dir = Scratch::new();
+        dir.file("origen/sub/hondo.txt", "x");
+        let dest = dir.0.join("destino");
+        fs::create_dir(&dest).unwrap();
+        let source = dir.0.join("origen/sub");
+        transfer::run("move", &dest, &[source.to_string_lossy().into_owned()], "").unwrap();
+        assert!(!taken(&source));
+        assert_eq!(text(&dest.join("sub/hondo.txt")), "x");
+    }
+
+    #[test]
+    fn a_folder_cannot_go_inside_itself() {
+        let dir = Scratch::new();
+        dir.file("a/b/c.txt", "x");
+        let outer = dir.0.join("a");
+        let inner = dir.0.join("a/b");
+        assert!(transfer::run("copy", &inner, &[outer.to_string_lossy().into_owned()], "").is_err());
+        assert!(!taken(&inner.join("a")));
+    }
+
+    #[test]
+    fn rename_refuses_a_taken_name() {
+        let dir = Scratch::new();
+        let one = dir.file("uno.txt", "1");
+        dir.file("dos.txt", "2");
+        assert!(rename(&one, "dos.txt").is_err());
+        assert_eq!(text(&dir.0.join("dos.txt")), "2");
+        rename(&one, "tres.txt").unwrap();
+        assert_eq!(text(&dir.0.join("tres.txt")), "1");
+    }
+
+    #[test]
+    fn escapes_survive_a_round_trip() {
+        assert_eq!(describe::unescape("/home/sfm/Mis%20cosas/%C3%B1").unwrap(), "/home/sfm/Mis cosas/ñ");
+        assert_eq!(describe::unescape("sin escapes").unwrap(), "sin escapes");
+    }
+}

@@ -68,7 +68,18 @@ Item {
     readonly property int markedCount: Object.keys(marked).length
     readonly property string trashDir: home + "/.local/share/Trash/files"
     readonly property bool inTrash: path === trashDir
-    readonly property bool grid: settings.views[path] !== undefined ? settings.views[path].grid === true : settings.grid
+    // list, compact, grid or gallery; a folder keeps its own once it is changed.
+    readonly property string mode: {
+        const view = settings.views[path];
+        if (view && view.mode)
+            return view.mode;
+        if (view && view.grid !== undefined)
+            return view.grid ? "grid" : "list";
+        return settings.grid ? "grid" : "list";
+    }
+    readonly property bool grid: mode === "grid" || mode === "gallery"
+    readonly property bool gallery: mode === "gallery"
+    readonly property bool compact: mode === "compact"
     readonly property bool ready: dir.status === FolderListModel.Ready
     readonly property var selected: entry(current)
     readonly property string title: recent ? "Recientes" : nameOf(path)
@@ -406,18 +417,23 @@ Item {
         marked = next;
     }
     // A folder remembers how it was last looked at.
-    function rememberView(asGrid) {
+    function rememberView(next) {
+        const asMode = next || mode;
+        const asGrid = asMode === "grid" || asMode === "gallery";
         const views = Object.assign({}, settings.views);
         delete views[path];
         const keys = Object.keys(views);
         for (let i = 0; i < keys.length - 299; i++)
             delete views[keys[i]];
-        views[path] = { grid: asGrid, sortKey: sortKey, sortReversed: sortReversed };
+        views[path] = { mode: asMode, grid: asGrid, sortKey: sortKey, sortReversed: sortReversed };
         settings.views = views;
         settingsFile.writeAdapter();
     }
     function toggleGrid() {
-        rememberView(!grid);
+        rememberView(grid ? "list" : "grid");
+    }
+    function setMode(next) {
+        rememberView(next);
     }
     function setPref(key, value) {
         settings[key] = value;
@@ -778,7 +794,10 @@ Item {
             add(isBookmarked(path) ? "Quitar esta carpeta de marcadores" : "Añadir esta carpeta a marcadores", "CTRL+D", () => toggleBookmark(path));
             add("Seleccionar todo", "CTRL+A", () => markAll());
         }
-        add(grid ? "Ver como lista" : "Ver como cuadrícula", "CTRL+G", () => toggleGrid());
+        add("Ver como lista", "CTRL+1", () => setMode("list"));
+        add("Ver como cuadrícula", "CTRL+2", () => setMode("grid"));
+        add("Ver como lista compacta", "CTRL+3", () => setMode("compact"));
+        add("Ver como galería", "CTRL+4", () => setMode("gallery"));
         add(showHidden ? "Esconder los ocultos" : "Mostrar los ocultos", "CTRL+H", () => showHidden = !showHidden);
         add("Filtrar esta carpeta", "CTRL+F", () => rail.filter.grabFocus());
         if (deep)
@@ -859,7 +878,7 @@ Item {
             sortReversed = false;
         }
         if (!deep)
-            rememberView(grid);
+            rememberView();
     }
     function iconFor(name, filePath, isDir) {
         if (isDir) {
@@ -1424,6 +1443,10 @@ Item {
     Shortcut { sequence: "Ctrl+K"; onActivated: app.openPalette() }
     Shortcut { sequence: "Ctrl+F"; onActivated: rail.filter.grabFocus() }
     Shortcut { sequence: "Ctrl+G"; onActivated: app.toggleGrid() }
+    Shortcut { sequence: "Ctrl+1"; onActivated: app.setMode("list") }
+    Shortcut { sequence: "Ctrl+2"; onActivated: app.setMode("grid") }
+    Shortcut { sequence: "Ctrl+3"; onActivated: app.setMode("compact") }
+    Shortcut { sequence: "Ctrl+4"; onActivated: app.setMode("gallery") }
     Shortcut { sequence: "Alt+Home"; onActivated: app.go(app.home) }
     Shortcut { sequence: "Ctrl+T"; onActivated: app.newTab() }
     Shortcut { sequence: "F6"; onActivated: app.toggleDual() }

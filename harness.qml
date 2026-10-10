@@ -52,6 +52,7 @@ ShellRoot {
                 bookmarks: app.bookmarks.length,
                 names: app.rows.map(e => e.name).join(" | "),
                 dual: app.dual,
+                mode: app.mode,
                 redo: app.redo ? app.redo.text : "",
                 recent: app.recent,
                 sort: app.sortKey,

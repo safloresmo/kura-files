@@ -29,6 +29,7 @@ archivos extraer ARCHIVO            extrae en una carpeta nueva
 archivos info RUTA                  lo que se sabe de un archivo o carpeta
 
 archivos compilar               compila el motor (hace falta la primera vez)
+archivos pruebas                corre las pruebas del motor
 TEXT
 }
 
@@ -92,5 +93,6 @@ case ${1:-} in
     extraer) shift; engine extract "$@" ;;
     info) shift; engine info "$@" ;;
     compilar) exec cargo build --release --manifest-path "$root/motor/Cargo.toml" ;;
+    pruebas) exec cargo test --manifest-path "$root/motor/Cargo.toml" ;;
     *) open_at "$1" ;;
 esac
