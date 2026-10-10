@@ -1,7 +1,5 @@
 import QtQuick
 import QtQuick.Controls
-import Ryoku.Ui
-import Ryoku.Ui.Singletons
 import "lib/format.js" as Fmt
 
 // The folder contents as a bordered card, as sortable rows or as a grid.

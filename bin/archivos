@@ -52,12 +52,21 @@ running() {
 
 # Bring the open window to the front, where the compositor lets us.
 raise() {
-    command -v hyprctl >/dev/null 2>&1 && command -v jq >/dev/null 2>&1 || return 0
+    command -v jq >/dev/null 2>&1 || return 0
     local pid address
     pid=$(pgrep -f "^qs -p $root\$" | head -1)
     [ -n "$pid" ] || return 0
+    if [ -n "${NIRI_SOCKET:-}" ] && command -v niri >/dev/null 2>&1; then
+        address=$(niri msg -j windows 2>/dev/null | jq -r --argjson pid "$pid" '.[] | select(.pid == $pid) | .id' | head -1)
+        [ -n "$address" ] && niri msg action focus-window --id "$address" >/dev/null 2>&1
+        return 0
+    fi
+    command -v hyprctl >/dev/null 2>&1 || return 0
     address=$(hyprctl clients -j 2>/dev/null | jq -r --argjson pid "$pid" '.[] | select(.pid == $pid) | .address' | head -1)
-    [ -n "$address" ] && hyprctl eval "hl.dispatch(hl.dsp.focus({ window = \"address:$address\" }))" >/dev/null 2>&1
+    [ -n "$address" ] || return 0
+    # A Hyprland set up in Lua takes the first form; an older one, the second.
+    hyprctl eval "hl.dispatch(hl.dsp.focus({ window = \"address:$address\" }))" >/dev/null 2>&1 \
+        || hyprctl dispatch focuswindow "address:$address" >/dev/null 2>&1
     return 0
 }
 

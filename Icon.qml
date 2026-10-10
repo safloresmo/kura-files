@@ -1,6 +1,5 @@
 import QtQuick
 import QtQuick.Shapes
-import Ryoku.Ui.Singletons
 
 // Line icon drawn on a 24 unit grid, stroked in a theme colour.
 Item {

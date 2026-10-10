@@ -1,6 +1,4 @@
 import QtQuick
-import Ryoku.Ui
-import Ryoku.Ui.Singletons
 
 // The keyboard shortcuts, on one sheet.
 Item {

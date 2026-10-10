@@ -1,5 +1,4 @@
 import QtQuick
-import Ryoku.Ui.Singletons
 
 // Context menu drawn inside the window. Each entry is
 // { label, hint, armed, act, sub } or { sep: true }; sub is a list of

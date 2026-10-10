@@ -2,7 +2,6 @@ import QtQuick
 import QtTest
 import Quickshell
 import Quickshell.Io
-import Ryoku.Ui.Singletons
 
 // Test harness: the same window, plus synthetic mouse and keyboard input
 // driven over IPC, so the interface can be exercised without a person.

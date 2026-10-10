@@ -1,6 +1,4 @@
 import QtQuick
-import Ryoku.Ui
-import Ryoku.Ui.Singletons
 import "lib/format.js" as Fmt
 
 // What is selected: a preview, its facts and the actions on it.

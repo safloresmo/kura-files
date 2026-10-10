@@ -1,6 +1,4 @@
 import QtQuick
-import Ryoku.Ui
-import Ryoku.Ui.Singletons
 import "lib/format.js" as Fmt
 
 // Everything known about one file or folder.

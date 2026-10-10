@@ -1,6 +1,5 @@
 import QtQuick
 import Quickshell
-import Ryoku.Ui.Singletons
 
 // The picture that stands for one entry, in the style chosen in the settings:
 // a line glyph, a sheet with the extension written on it, or the icon the

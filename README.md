@@ -1,6 +1,6 @@
 # Kura Files 庫
 
-Gestor de archivos de escritorio para Linux: interfaz en QML sobre Quickshell y un motor en Rust sin dependencias.
+Gestor de archivos de escritorio para Linux: interfaz en QML sobre Quickshell y un motor en Rust sin dependencias. Funciona en cualquier compositor Wayland.
 
 ![Kura Files](docs/captura.png)
 
@@ -40,7 +40,24 @@ Un repositorio de scripts se instala entero desde la paleta de comandos, con «I
 
 ## Requisitos
 
-Quickshell con los módulos de interfaz del escritorio, Rust para compilar el motor, y `gio`, `bsdtar` y `sha256sum` en el sistema. Los dos servicios usan Python con PyGObject.
+Linux con [Quickshell](https://quickshell.org) (probado con la 0.3.1) en cualquier compositor Wayland: Hyprland, Niri, Sway, KDE u otro. No depende de ningún escritorio concreto.
+
+- Para compilar el motor: Rust.
+- En el sistema: `gio` (GLib y GVFS), `bsdtar`, `sha256sum`, `wl-clipboard` y `jq`.
+- Opcionales: `plocate` para la búsqueda con índice, `git` para instalar acciones, `tailscale` y `localsend` para enviar archivos, y Python con PyGObject para los dos servicios.
+- Tipografías: Space Grotesk y SpaceMono Nerd Font; si faltan, se usan las del sistema.
+
+## Aspecto
+
+Los colores siguen la paleta que el escritorio saca del fondo de pantalla, si publica una: la de pywal (`~/.cache/wal/colors.json`) o la propia de algunos escritorios. Sin ninguna, usa un tema oscuro propio.
+
+Cualquier valor se puede fijar en `~/.config/archivos/tema.json`:
+
+```json
+{ "paper": "#0b1626", "ink": "#cfe0f5", "sun": "#6ea8ff", "ui": "Inter", "mono": "JetBrains Mono", "scale": 1.1 }
+```
+
+Las claves son `paper`, `paperLift`, `ink`, `inkDim`, `bone`, `inkOnBone`, `sun`, `ui`, `mono` y `scale`.
 
 ## Uso
 

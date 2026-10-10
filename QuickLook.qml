@@ -1,7 +1,5 @@
 import QtQuick
 import QtQuick.Controls
-import Ryoku.Ui
-import Ryoku.Ui.Singletons
 
 // Large preview of the selected file, over the window.
 Item {

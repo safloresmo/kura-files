@@ -1,8 +1,6 @@
 import QtQuick
 import QtQuick.Controls
 import Qt.labs.folderlistmodel
-import Ryoku.Ui
-import Ryoku.Ui.Singletons
 import "lib/format.js" as Fmt
 
 // The other folder of a two pane layout: somewhere to copy or move to.

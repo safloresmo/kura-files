@@ -1,6 +1,4 @@
 import QtQuick
-import Ryoku.Ui
-import Ryoku.Ui.Singletons
 
 // Left rail: masthead, filter field, places and mounted devices.
 Item {

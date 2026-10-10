@@ -1,6 +1,4 @@
 import QtQuick
-import Ryoku.Ui
-import Ryoku.Ui.Singletons
 
 // The transfers under way, each with its own pause and cancel.
 Rectangle {

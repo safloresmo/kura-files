@@ -1,6 +1,4 @@
 import QtQuick
-import Ryoku.Ui
-import Ryoku.Ui.Singletons
 
 // Shown when another program asked for a file: what is being chosen, and the answer.
 Item {

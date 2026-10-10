@@ -1,6 +1,5 @@
 import QtQuick
 import Quickshell
-import Ryoku.Ui.Singletons
 
 // The window other programs get when they ask for a file to open or save.
 // ARCHIVOS_PICK says what is wanted; the answer goes to ARCHIVOS_PICK_OUT.

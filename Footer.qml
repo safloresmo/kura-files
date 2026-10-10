@@ -1,6 +1,4 @@
 import QtQuick
-import Ryoku.Ui
-import Ryoku.Ui.Singletons
 import "lib/format.js" as Fmt
 
 // The strip at the bottom: what the folder holds, and what is going on.

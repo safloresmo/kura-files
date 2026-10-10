@@ -1,6 +1,4 @@
 import QtQuick
-import Ryoku.Ui
-import Ryoku.Ui.Singletons
 
 // A new server: what kind, where, and who to enter as.
 Item {

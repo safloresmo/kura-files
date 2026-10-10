@@ -1,6 +1,4 @@
 import QtQuick
-import Ryoku.Ui
-import Ryoku.Ui.Singletons
 
 // Command palette: type to find an action, a place or a path, Enter to run it.
 Item {

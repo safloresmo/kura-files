@@ -2,8 +2,6 @@ import QtQuick
 import Qt.labs.folderlistmodel
 import Quickshell
 import Quickshell.Io
-import Ryoku.Ui
-import Ryoku.Ui.Singletons
 import "lib/format.js" as Fmt
 
 Item {
@@ -454,13 +452,13 @@ Item {
         else if (pick === "save")
             pickBar.nameField.text = e.name;
         else if (pick === "")
-            Spawn.run(["gio", "open", e.path]);
+            Quickshell.execDetached(["gio", "open", e.path]);
     }
     function terminal(p) {
-        Spawn.run(settings.terminal.trim().split(/\s+/).concat([p]));
+        Quickshell.execDetached(settings.terminal.trim().split(/\s+/).concat([p]));
     }
     function copyPath(p) {
-        Spawn.run(["wl-copy", "--", p]);
+        Quickshell.execDetached(["wl-copy", "--", p]);
         say("RUTA COPIADA");
     }
 
@@ -752,7 +750,7 @@ Item {
         if (list.length === 0 || inTrash)
             return;
         clip = { paths: list.map(e => e.path), text: label(list), cut: cut };
-        Spawn.run(["sh", "-c", "printf '%s\\n' \"$@\" | wl-copy -t text/uri-list", "sh"].concat(list.map(e => url(e.path))));
+        Quickshell.execDetached(["sh", "-c", "printf '%s\\n' \"$@\" | wl-copy -t text/uri-list", "sh"].concat(list.map(e => url(e.path))));
         say((cut ? "CORTADO · " : "COPIADO · ") + clip.text);
     }
     function paste() {
@@ -935,11 +933,11 @@ Item {
         const list = picked().filter(e => !e.isDir);
         if (list.length === 0)
             return;
-        Spawn.run(["localsend"].concat(list.map(e => e.path)));
+        Quickshell.execDetached(["localsend"].concat(list.map(e => e.path)));
         say("ABIERTO EN LOCALSEND · " + label(list));
     }
     function openWith(e, app) {
-        Spawn.run(["gio", "launch", app.file, e.path]);
+        Quickshell.execDetached(["gio", "launch", app.file, e.path]);
     }
     // Make one application the default for this kind of file.
     function chooseDefault(e) {

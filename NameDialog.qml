@@ -1,6 +1,4 @@
 import QtQuick
-import Ryoku.Ui
-import Ryoku.Ui.Singletons
 
 // A question asked over the window: a line of text, or a yes or no.
 Item {
