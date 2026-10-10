@@ -84,8 +84,23 @@ Linux con [Quickshell](https://quickshell.org) (probado con la 0.3.1) en cualqui
 
 - Para compilar el motor: Rust.
 - En el sistema: `gio` (GLib y GVFS), `bsdtar`, `sha256sum`, `wl-clipboard` y `jq`.
-- Opcionales: `rclone` para la nube, `plocate` para la búsqueda con índice, `git` para instalar acciones, `tailscale` y `localsend` para enviar archivos, y Python con PyGObject para los dos servicios.
 - Tipografías: Space Grotesk y SpaceMono Nerd Font; si faltan, se usan las del sistema.
+
+Nada de lo siguiente es obligatorio; cada pieza añade una función y Kura funciona sin ella:
+
+| Programa | Qué añade |
+|---|---|
+| `poppler` (`pdftoppm`) | vista previa de PDF |
+| `ffmpegthumbnailer` | miniaturas de vídeo |
+| `f3d` | miniaturas de modelos 3D (STL, 3MF, OBJ…) |
+| `plocate` | búsqueda en toda la carpeta personal |
+| `rclone` y `fuse3` | cuentas en la nube |
+| `gvfs-smb`, `gvfs-mtp` | carpetas de Windows y teléfonos por cable |
+| `git` | repositorios y paquetes de acciones |
+| Python con PyGObject | «mostrar en carpeta» y selector de archivos |
+| `tailscale`, `localsend` | enviar archivos a otros equipos |
+
+El instalador no instala paquetes del sistema: comprueba lo obligatorio, y de lo opcional te dice qué falta y para qué sirve.
 
 ## Aspecto
 
@@ -127,13 +142,16 @@ Primero, lo que necesita. Las listas de paquetes son orientativas: los nombres c
 
 ```sh
 # Arch y derivadas
-sudo pacman -S quickshell rust glib2 gvfs libarchive jq wl-clipboard python-gobject plocate
+sudo pacman -S quickshell rust glib2 gvfs libarchive jq wl-clipboard
+sudo pacman -S python-gobject plocate poppler ffmpegthumbnailer f3d rclone fuse3 gvfs-smb gvfs-mtp   # opcional
 
 # Debian y Ubuntu (Quickshell no está empaquetado: se compila aparte)
-sudo apt install cargo libglib2.0-bin gvfs gvfs-backends libarchive-tools jq wl-clipboard python3-gi plocate
+sudo apt install cargo libglib2.0-bin gvfs gvfs-backends libarchive-tools jq wl-clipboard
+sudo apt install python3-gi plocate poppler-utils ffmpegthumbnailer f3d rclone fuse3   # opcional
 
 # Fedora (Quickshell está en COPR)
-sudo dnf install cargo glib2 gvfs bsdtar jq wl-clipboard python3-gobject plocate
+sudo dnf install cargo glib2 gvfs bsdtar jq wl-clipboard
+sudo dnf install python3-gobject plocate poppler-utils ffmpegthumbnailer f3d rclone fuse3 gvfs-smb gvfs-mtp   # opcional
 ```
 
 Después:
