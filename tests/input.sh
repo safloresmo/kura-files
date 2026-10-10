@@ -117,6 +117,19 @@ call key 78 $CTRL; call key $ENTER 0; sleep 1
 expect "ctrl+n makes a file" names "folder | a.txt | b.txt | c.txt | Sin título.txt"
 expect "and the cursor lands on it" selected "Sin título.txt"
 
+echo "-- cutting"
+cp "$zone/a.txt" "$zone/folder/a.txt"
+call click 500 340 1 0; call key 88 $CTRL;  expect "ctrl+x holds the file" clip "A.TXT"
+call click 500 300 1 0; call key $ENTER 0; call key 86 $CTRL; sleep 0.8
+call click 574 482 1 0; sleep 0.8
+expect "cancelling the question keeps the cut" clip "A.TXT"
+call key 86 $CTRL; sleep 0.8; call click 909 482 1 0; sleep 1.2
+expect "pasting moves it beside its namesake" names "a (2).txt | a.txt"
+expect "and the cut is spent" clip ""
+call key 90 $CTRL; sleep 1.2; call key $BACKSPACE 0
+rm -f "$zone/folder/a.txt"; sleep 0.5
+expect "undo brings it home" names "folder | a.txt | b.txt | c.txt | Sin título.txt"
+
 echo "-- filter and palette"
 call key 70 $CTRL; call type b.t;  expect "ctrl+f filters" names "b.txt"
 call key $ESC 0; call key $ENTER 0; expect "escape clears the filter" rows 5

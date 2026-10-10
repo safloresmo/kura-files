@@ -554,9 +554,13 @@ Item {
             pasteboard.running = true;
             return;
         }
-        transferTo(clip.cut ? "move" : "copy", path, clip.paths, (clip.cut ? "MOVIDO · " : "PEGADO · ") + clip.text);
-        if (clip.cut)
-            clip = null;
+        // A cut is spent once the move really starts, not if the question is cancelled.
+        const held = clip;
+        transferTo(clip.cut ? "move" : "copy", path, clip.paths, (clip.cut ? "MOVIDO · " : "PEGADO · ") + clip.text,
+            () => {
+                if (held.cut && clip === held)
+                    clip = null;
+            });
     }
     function trash() {
         const list = picked();
@@ -705,10 +709,10 @@ Item {
         })));
     }
     // Copy or move into a folder, asking first when names are already taken there.
-    function transferTo(mode, dest, paths, okText) {
+    function transferTo(mode, dest, paths, okText, started) {
         if (paths.length === 0)
             return;
-        clash.pending = { mode: mode, dest: dest, paths: paths, okText: okText };
+        clash.pending = { mode: mode, dest: dest, paths: paths, okText: okText, started: started };
         clash.running = false;
         clash.command = [engine, "conflicts", dest].concat(paths);
         clash.running = true;
@@ -1285,7 +1289,11 @@ Item {
                 if (!job)
                     return;
                 const names = text.split("\n").filter(line => line !== "");
-                const go = policy => app.op([job.mode].concat(policy ? [policy] : []).concat([job.dest]).concat(job.paths), job.okText);
+                const go = policy => {
+                    if (job.started)
+                        job.started();
+                    app.op([job.mode].concat(policy ? [policy] : []).concat([job.dest]).concat(job.paths), job.okText);
+                };
                 if (names.length === 0) {
                     go("");
                     return;
