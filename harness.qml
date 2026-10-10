@@ -11,8 +11,8 @@ ShellRoot {
     FloatingWindow {
         id: win
         title: "archivos-test"
-        implicitWidth: 1400
-        implicitHeight: 900
+        implicitWidth: Number(Quickshell.env("HARNESS_W")) || 1400
+        implicitHeight: Number(Quickshell.env("HARNESS_H")) || 900
         color: Tokens.paper
 
         App {

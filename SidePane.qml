@@ -18,7 +18,7 @@ Rectangle {
         const list = [];
         for (let i = 0; i < other.count; i++)
             list.push({ name: other.get(i, "fileName"), path: other.get(i, "filePath"), size: other.get(i, "fileSize"), isDir: other.isFolder(i) });
-        list.sort((a, b) => (a.isDir !== b.isDir ? (a.isDir ? -1 : 1) : a.name.localeCompare(b.name)));
+        list.sort((a, b) => (a.isDir !== b.isDir ? (a.isDir ? -1 : 1) : Fmt.compare(a.name, b.name)));
         rows = list;
     }
 
