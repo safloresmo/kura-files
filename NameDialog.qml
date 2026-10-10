@@ -13,6 +13,8 @@ Item {
     property string yesText: "ACEPTAR"
     property var choices: []
     property bool masked: false
+    // Runs when the question is put away without an answer.
+    property var refused: null
 
     signal closed()
 
@@ -42,6 +44,7 @@ Item {
         visible = true;
     }
     function pick(option) {
+        refused = null;
         close();
         if (option.act)
             option.act();
@@ -57,9 +60,14 @@ Item {
         visible = true;
         yes.forceActiveFocus();
     }
+    // Say what to do if the question just asked goes unanswered.
+    function orElse(callback) {
+        refused = callback;
+    }
     function accept() {
         const value = plain ? "yes" : field.text.trim();
         const callback = done;
+        refused = null;
         close();
         if (callback && value !== "")
             callback(value);
@@ -69,6 +77,10 @@ Item {
             return;
         visible = false;
         done = null;
+        const gaveUp = refused;
+        refused = null;
+        if (gaveUp)
+            gaveUp();
         closed();
     }
 

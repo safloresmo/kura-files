@@ -257,6 +257,32 @@ call key $TAB 0; call key $TAB 0; call type srv/data; call key $TAB 0; call type
 call key $ENTER 0; sleep 1
 expect "the form builds the address and keeps the server" servers "Example sftp://guest@files.example.org:2222/srv/data"
 
+echo "-- a server that asks questions"
+cat >"$work/fake-gio" <<'FAKE'
+#!/bin/bash
+# Stands in for `gio mount`: a new machine that wants trust, then a password.
+log=$(dirname "$0")/fake-gio.log
+printf 'Can not verify the identity of "host".\nThe identity sent is "SHA256:abc123".\n[1] Log In Anyway\n[2] Cancel Login\nChoice: '
+read -r choice; echo "choice=$choice" >>"$log"
+[ "$choice" = 1 ] || { echo "Login dialog cancelled" >&2; exit 2; }
+printf 'Password required for share\nPassword: '
+read -r word; echo "word=$word" >>"$log"
+[ "$word" = sesame ] || { echo "Permission denied" >&2; exit 2; }
+FAKE
+chmod +x "$work/fake-gio"
+pkill -f "qs -p $harness" 2>/dev/null; sleep 0.3
+ARCHIVOS_GIO=$work/fake-gio ARCHIVOS_DIR=$zone qs -p "$harness" >"$work/window.log" 2>&1 &
+sleep 4
+call serverForm; call type host.test; call key $ENTER 0; sleep 1
+call key $ENTER 0; sleep 1
+call type sesame; call key $ENTER 0; sleep 1
+[ "$(tr '\n' ' ' <"$work/fake-gio.log")" = "choice=1 word=sesame " ] && echo "ok    trust and the password are both answered" || { echo "FAIL  trust and the password are both answered: $(cat "$work/fake-gio.log" 2>/dev/null)"; failed=1; }
+expect "and it says so" notice "CONECTADO · HOST.TEST"
+rm -f "$work/fake-gio.log"
+call serverForm; call type other.test; call key $ENTER 0; sleep 1
+call key $ESC 0; sleep 1
+expect "refusing to trust cancels the login" notice "NO SE CONECTÓ A OTHER.TEST · LOGIN DIALOG CANCELLED"
+
 echo "-- the selection panel"
 open_at "$zone"
 expect "nothing picked, no panel" detail false

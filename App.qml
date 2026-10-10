@@ -204,14 +204,7 @@ Item {
             return;
         }
         say("CONECTANDO A " + server.name.toUpperCase() + "…");
-        job.createObject(app, {
-            command: ["gio", "mount", server.uri],
-            secret: secret === undefined ? "" : secret,
-            okText: "CONECTADO · " + server.name.toUpperCase(),
-            failText: "NO SE CONECTÓ A " + server.name.toUpperCase(),
-            server: server,
-            askedSecret: secret !== undefined
-        }).running = true;
+        mounter.createObject(app, { server: server, secret: secret === undefined ? "" : secret }).running = true;
     }
     function disconnectServer(server) {
         const mounted = remotes[server.uri];
@@ -1449,6 +1442,78 @@ Item {
         interval: 7000
         onTriggered: app.notice = ""
     }
+    // Mounting a server is a conversation: it may ask whether to trust a new
+    // machine, and for a name or a password, before it lets us in.
+    Component {
+        id: mounter
+
+        Process {
+            id: mount
+            property var server: null
+            property string secret: ""
+            property string heard: ""
+            property bool gaveUp: false
+
+            function answer(text) {
+                write(text + "\n");
+            }
+            function giveUp() {
+                gaveUp = true;
+                signal(15);
+            }
+            function listen(data) {
+                heard += data;
+                const tail = heard.replace(/\s+$/, "");
+                const name = server.name.toUpperCase();
+                if (/Choice:$/.test(tail)) {
+                    const print = /SHA256:[A-Za-z0-9+\/=]+/.exec(heard);
+                    heard = "";
+                    dialog.confirm("SERVIDOR NUEVO · " + name,
+                        "Es la primera vez que entras en este equipo, así que no se puede comprobar que sea quien dice ser."
+                        + (print ? " Su huella es " + print[0] + "." : "") + " ¿Confiar en él y seguir?",
+                        () => mount.answer("1"), "CONFIAR");
+                    dialog.orElse(() => mount.answer("2"));
+                } else if (/Password:$/.test(tail)) {
+                    heard = "";
+                    if (secret !== "") {
+                        const once = secret;
+                        secret = "";
+                        answer(once);
+                    } else {
+                        dialog.askSecret("CONTRASEÑA · " + name, text => mount.answer(text));
+                        dialog.orElse(() => mount.giveUp());
+                    }
+                } else if (/(User|Domain):$/.test(tail)) {
+                    const domain = /Domain:$/.test(tail);
+                    heard = "";
+                    dialog.ask((domain ? "DOMINIO · " : "USUARIO · ") + name, domain ? "WORKGROUP" : "", text => mount.answer(text));
+                    dialog.orElse(() => mount.giveUp());
+                }
+            }
+
+            command: [Quickshell.env("ARCHIVOS_GIO") || "gio", "mount", server ? server.uri : ""]
+            // The questions are matched by their English wording.
+            environment: ({ "LC_ALL": "C" })
+            stdinEnabled: true
+            stdout: SplitParser {
+                splitMarker: ""
+                onRead: data => mount.listen(data)
+            }
+            stderr: StdioCollector { id: mountErrors }
+            onExited: exitCode => {
+                const name = server.name.toUpperCase();
+                const why = mountErrors.text.trim().split("\n").pop();
+                if (exitCode === 0)
+                    app.say("CONECTADO · " + name);
+                else if (gaveUp)
+                    app.say("CONEXIÓN CANCELADA · " + name, true);
+                else
+                    app.say("NO SE CONECTÓ A " + name + (why ? " · " + why.toUpperCase() : ""), true);
+                app.refresh();
+                destroy();
+            }
+        }
+    }
     Component {
         id: job
 
@@ -1457,11 +1522,6 @@ Item {
             property string okText: ""
             property string failText: ""
             property var undoArgs: null
-            property var server: null
-            property bool askedSecret: false
-            // Typed by the user and handed over on standard input, so it never
-            // shows in the process list.
-            property string secret: ""
             property int code: -1
             property var results: []
             property int tid: 0
@@ -1490,11 +1550,7 @@ Item {
                     app.redoing = false;
                 else if (undoArgs !== null)
                     app.redoStack = [];
-                if (server && code !== 0 && !askedSecret) {
-                    // Keys did not get us in: ask for the password and try once more.
-                    const target = server;
-                    dialog.askSecret("CONTRASEÑA · " + target.name.toUpperCase(), secret => app.connectServer(target, secret));
-                } else if (code === 0)
+                if (code === 0)
                     app.say(okText);
                 else if (/access denied/i.test(why) && command[0] === "tailscale")
                     app.say(failText + " · FALTA EL PERMISO: SUDO TAILSCALE SET --OPERATOR=$USER", true);
@@ -1504,11 +1560,6 @@ Item {
                 destroy();
             }
 
-            stdinEnabled: secret !== ""
-            onStarted: {
-                if (secret !== "")
-                    write(secret + "\n");
-            }
             stdout: SplitParser {
                 onRead: line => {
                     const cols = line.split("\t");
