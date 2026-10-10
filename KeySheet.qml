@@ -15,7 +15,7 @@ Item {
             ["Ctrl+clic", "Añadir o quitar"], ["Mayús+clic · Mayús+↑↓", "Marcar un tramo"], ["Ctrl+A", "Todo"],
             ["Ctrl+Mayús+I", "Invertir"], ["Esc", "Soltar la selección"]] },
         { name: "ARCHIVOS", keys: [
-            ["Ctrl+C · Ctrl+X · Ctrl+V", "Copiar, cortar y pegar"], ["Ctrl+Z · Ctrl+Mayús+Z", "Deshacer y rehacer"], ["F2", "Renombrar"],
+            ["Ctrl+C · Ctrl+X · Ctrl+V", "Copiar, cortar y pegar"], ["Ctrl+Z · Ctrl+Mayús+Z", "Deshacer y rehacer"], ["F2 · Ctrl+Mayús+D", "Renombrar y duplicar"],
             ["Ctrl+Mayús+N · Ctrl+N", "Carpeta nueva y archivo nuevo"], ["Supr · Mayús+Supr", "A la papelera o para siempre"],
             ["Ctrl+Mayús+C · Ctrl+Mayús+M", "Copiar o mover al otro panel"],
             ["Ctrl+I", "Propiedades"], ["Ctrl+D", "Marcador"]] },
@@ -53,8 +53,9 @@ Item {
 
     Rectangle {
         anchors.centerIn: parent
-        width: Math.min(900, parent.width - Tokens.s7)
-        height: head.height + grid.height + Tokens.s5
+        width: Math.min(900, parent.width - Tokens.s5)
+        height: Math.min(parent.height - Tokens.s5, head.height + grid.height + Tokens.s4 * 2)
+        clip: true
         color: Tokens.paper
         radius: Tokens.radius
         border.width: Tokens.border
@@ -91,11 +92,17 @@ Item {
             }
         }
 
+        Flickable {
+            anchors { top: head.bottom; left: parent.left; right: parent.right; bottom: parent.bottom }
+            anchors.margins: Tokens.s4
+            contentHeight: grid.height
+            clip: true
+            boundsBehavior: Flickable.StopAtBounds
+
         Grid {
             id: grid
-            anchors { top: head.bottom; left: parent.left; right: parent.right }
-            anchors.margins: Tokens.s4
-            columns: 2
+            width: parent.width
+            columns: sheet.width < 760 ? 1 : 2
             columnSpacing: Tokens.s5
             rowSpacing: Tokens.s4
 
@@ -106,7 +113,7 @@ Item {
                     id: group
                     required property var modelData
                     required property int index
-                    width: (grid.width - Tokens.s5) / 2
+                    width: grid.columns === 1 ? grid.width : (grid.width - Tokens.s5) / 2
 
                     Row {
                         spacing: Tokens.s2
@@ -160,6 +167,7 @@ Item {
                     }
                 }
             }
+        }
         }
     }
 }

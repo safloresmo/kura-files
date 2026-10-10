@@ -20,6 +20,8 @@ Item {
         Row {
             id: crumbs
             anchors.verticalCenter: parent.verticalCenter
+            width: Math.min(implicitWidth, Math.max(0, eyebrow.width - actions.width - Tokens.s4))
+            clip: true
             spacing: Tokens.s2
 
             Text {
@@ -89,23 +91,24 @@ Item {
             spacing: Tokens.s2
 
             Btn { text: "COMANDOS"; onAct: app.openPalette() }
-            Btn { text: app.grid ? "LISTA" : "CUADRÍCULA"; onAct: app.toggleGrid() }
-            Btn { text: "OCULTOS"; primary: app.showHidden; onAct: app.showHidden = !app.showHidden }
-            Btn { text: "TERMINAL AQUÍ"; onAct: app.terminal(app.path) }
+            Btn { visible: head.width >= 420; text: app.grid ? "LISTA" : "CUADRÍCULA"; onAct: app.toggleGrid() }
+            Btn { visible: head.width >= 560; text: "OCULTOS"; primary: app.showHidden; onAct: app.showHidden = !app.showHidden }
+            Btn { visible: head.width >= 700; text: "TERMINAL AQUÍ"; onAct: app.terminal(app.path) }
         }
     }
 
     Text {
         id: heading
-        anchors { left: parent.left; right: parent.right; top: eyebrow.bottom; topMargin: Tokens.s3 }
+        anchors { left: parent.left; right: parent.right; top: eyebrow.bottom; topMargin: app.short ? 0 : Tokens.s3 }
         text: app.title
         color: Tokens.ink
         font.family: Tokens.ui
-        font.pixelSize: Tokens.fTitle
+        font.pixelSize: app.short ? 22 : Tokens.fTitle
         elide: Text.ElideMiddle
     }
     Text {
         id: blurb
+        visible: !app.short
         anchors { left: parent.left; right: parent.right; top: heading.bottom; topMargin: Tokens.s1 }
         text: app.inTrash && !app.deep ? Fmt.plural(app.rows.length, "elemento", "elementos") + " en la papelera, de todos los discos."
             : app.recent ? "Lo último que abriste, esté donde esté."
@@ -120,7 +123,7 @@ Item {
 
     Row {
         id: tools
-        anchors { left: parent.left; right: parent.right; top: blurb.bottom; topMargin: Tokens.s4 }
+        anchors { left: parent.left; right: parent.right; top: app.short ? heading.bottom : blurb.bottom; topMargin: app.short ? Tokens.s2 : Tokens.s4 }
         spacing: Tokens.s2
 
         Btn { text: "←"; armed: app.back.length > 0; height: 36; width: 40; onAct: app.goBack() }

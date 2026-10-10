@@ -42,7 +42,7 @@ Item {
 
     Rectangle {
         anchors.fill: parent
-        anchors.margins: Tokens.s7
+        anchors.margins: look.width < 700 ? Tokens.s3 : Tokens.s7
         color: Tokens.paper
         radius: Tokens.radius
         border.width: Tokens.border

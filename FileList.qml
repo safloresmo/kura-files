@@ -10,9 +10,13 @@ Rectangle {
 
     required property var app
 
-    readonly property int sizeW: 110
-    readonly property int whenW: 160
-    readonly property int kindW: 96
+    // Columns drop out, last one first, as the card gets narrower.
+    readonly property bool showKind: width >= 620
+    readonly property bool showWhen: width >= 470
+    readonly property bool showSize: width >= 340
+    readonly property int sizeW: showSize ? 110 : 0
+    readonly property int whenW: showWhen ? 160 : 0
+    readonly property int kindW: showKind ? 96 : 0
     readonly property real factor: app.zoom * (app.gallery ? 2.1 : 1)
     readonly property int rowH: app.compact ? 28 : 40
     readonly property int cellW: Math.round(136 * factor)
@@ -115,21 +119,24 @@ Rectangle {
             key: 0
         }
         HeadCell {
+            visible: card.app.grid ? parent.width >= 240 : card.showSize
             x: card.app.grid ? 140 : parent.width - card.kindW - card.whenW - card.sizeW
-            width: card.sizeW - Tokens.s5
+            width: 110 - Tokens.s5
             label: "TAMAÑO"
             key: 1
             alignRight: !card.app.grid
         }
         HeadCell {
+            visible: card.app.grid ? parent.width >= 400 : card.showWhen
             x: card.app.grid ? 260 : parent.width - card.kindW - card.whenW
-            width: card.whenW
+            width: 160
             label: card.app.inTrash ? "BORRADO" : "MODIFICADO"
             key: 2
         }
         HeadCell {
+            visible: card.app.grid ? parent.width >= 500 : card.showKind
             x: card.app.grid ? 420 : parent.width - card.kindW
-            width: card.kindW
+            width: 96
             label: card.app.inTrash ? "ESTABA EN" : "TIPO"
             key: 3
         }
@@ -209,8 +216,9 @@ Rectangle {
                 }
             }
             Text {
+                visible: card.showSize
                 x: row.width - Tokens.s4 - card.kindW - card.whenW - card.sizeW
-                width: card.sizeW - Tokens.s5
+                width: 110 - Tokens.s5
                 horizontalAlignment: Text.AlignRight
                 anchors.verticalCenter: parent.verticalCenter
                 text: row.modelData.isDir ? card.app.countLabel(row.modelData.path) : Fmt.size(row.modelData.size)
@@ -219,6 +227,7 @@ Rectangle {
                 font.pixelSize: 11
             }
             Text {
+                visible: card.showWhen
                 x: row.width - Tokens.s4 - card.kindW - card.whenW
                 anchors.verticalCenter: parent.verticalCenter
                 text: Fmt.when(row.modelData.modified)
@@ -227,8 +236,9 @@ Rectangle {
                 font.pixelSize: 11
             }
             Text {
+                visible: card.showKind
                 x: row.width - Tokens.s4 - card.kindW
-                width: card.kindW
+                width: 96
                 elide: Text.ElideLeft
                 anchors.verticalCenter: parent.verticalCenter
                 text: card.app.inTrash && row.modelData.from ? card.app.folderOf(row.modelData.from) : Fmt.kind(row.modelData.name, row.modelData.isDir)

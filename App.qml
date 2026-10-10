@@ -50,6 +50,12 @@ Item {
     property var remotes: ({})
     property var thumbs: ({})
     property real zoom: 1.0
+    // The layout sheds pieces as the window shrinks: the selection card first,
+    // then the rail, then the roomy page header.
+    property bool railForced: false
+    readonly property bool showDetail: width >= 1180
+    readonly property bool showRail: width >= 860 || railForced
+    readonly property bool short: height < 620
     property string otherPath: home
     readonly property bool dual: settings.dual
     readonly property var servers: settings.servers
@@ -610,6 +616,23 @@ Item {
         const cut = shown.lastIndexOf("/");
         return cut > 0 ? shown.slice(0, cut) : "/";
     }
+    function duplicate() {
+        const list = picked();
+        if (list.length === 0 || inTrash)
+            return;
+        op(["copy", path].concat(list.map(e => e.path)), "DUPLICADO · " + label(list));
+    }
+    // How much the marked files weigh, for the footer.
+    readonly property string markedWeight: {
+        if (markedCount === 0)
+            return "";
+        let bytes = 0;
+        for (const e of rows) {
+            if (marked[e.path] === true && !e.isDir)
+                bytes += Number(e.size) || 0;
+        }
+        return Fmt.size(bytes).toUpperCase();
+    }
     function restore() {
         const list = picked();
         if (list.length === 0 || !inTrash)
@@ -712,6 +735,8 @@ Item {
         items.push({ label: "Pegar aquí", hint: "CTRL+V", act: () => paste() });
         if (one)
             items.push({ label: "Renombrar", hint: "F2", act: () => rename() });
+        if (n > 0)
+            items.push({ label: "Duplicar" + many, hint: "CTRL+SHIFT+D", act: () => duplicate() });
         items.push({ label: "Nueva carpeta", hint: "CTRL+SHIFT+N", act: () => newFolder() });
         items.push({ label: "Nuevo archivo", hint: "CTRL+N", act: () => newFile() });
         if (undo)
@@ -783,6 +808,7 @@ Item {
                     add("Vista rápida", "ESPACIO", () => look.open());
             }
             if (n > 0) {
+                add("Duplicar " + label(list).toLowerCase(), "CTRL+SHIFT+D", () => duplicate());
                 add("Copiar " + label(list).toLowerCase(), "CTRL+C", () => hold(false));
                 add("Cortar " + label(list).toLowerCase(), "CTRL+X", () => hold(true));
                 add("Mandar a la papelera " + label(list).toLowerCase(), "SUPR", () => trash());
@@ -832,6 +858,8 @@ Item {
                 add("Mover al otro panel", "CTRL+SHIFT+M", () => sendToOther(true));
             }
         }
+        if (width < 860)
+            add(railForced ? "Esconder el panel lateral" : "Mostrar el panel lateral", "F9", () => railForced = !railForced);
         add("Pestaña nueva", "CTRL+T", () => newTab());
         if (tabs.length > 1)
             add("Cerrar la pestaña", "CTRL+W", () => closeTab(tab));
@@ -970,7 +998,7 @@ Item {
                 d = b.modified - a.modified;
             else if (sortKey === 3)
                 d = Fmt.kind(a.name, a.isDir).localeCompare(Fmt.kind(b.name, b.isDir));
-            return flip * (d || (a.shown || a.name).localeCompare(b.shown || b.name));
+            return flip * (d || Fmt.compare(a.shown || a.name, b.shown || b.name));
         });
         dirTotal = dirs;
         fileTotal = regular;
@@ -1264,6 +1292,7 @@ Item {
     Shortcut { sequence: "Alt+Home"; onActivated: app.go(app.home) }
     Shortcut { sequence: "Ctrl+T"; onActivated: app.newTab() }
     Shortcut { sequence: "F6"; onActivated: app.toggleDual() }
+    Shortcut { sequence: "F9"; onActivated: app.railForced = !app.railForced }
     Shortcut { sequence: "Ctrl+,"; onActivated: prefs.open() }
     Shortcut { sequence: "Ctrl+W"; onActivated: app.closeTab(app.tab) }
     Shortcut { sequence: "Ctrl+PgDown"; onActivated: app.showTab((app.tab + 1) % app.tabs.length) }
@@ -1343,6 +1372,8 @@ Item {
                 app.invertMarks();
             else if (event.key === Qt.Key_I && ctrl)
                 app.properties();
+            else if (event.key === Qt.Key_D && ctrl && shift)
+                app.duplicate();
             else if (event.key === Qt.Key_D && ctrl)
                 app.toggleBookmark(app.selected && app.selected.isDir ? app.selected.path : app.path);
             else if (event.key === Qt.Key_N && ctrl && !shift)
@@ -1398,15 +1429,17 @@ Item {
     Rail {
         id: rail
         app: app
+        visible: app.showRail
+        width: visible ? Tokens.railW : 0
         anchors { left: parent.left; top: parent.top; bottom: foot.top }
     }
 
     Item {
         id: page
         anchors { left: rail.right; right: parent.right; top: parent.top; bottom: foot.top }
-        anchors.leftMargin: Tokens.s6
-        anchors.rightMargin: Tokens.s6
-        anchors.topMargin: Tokens.s5
+        anchors.leftMargin: app.width < 700 ? Tokens.s4 : Tokens.s6
+        anchors.rightMargin: app.width < 700 ? Tokens.s4 : Tokens.s6
+        anchors.topMargin: app.short ? Tokens.s3 : Tokens.s5
 
         PageHead {
             id: head
@@ -1418,7 +1451,7 @@ Item {
         TabStrip {
             id: tabBar
             app: app
-            anchors { left: parent.left; right: detail.left; top: head.bottom; topMargin: Tokens.s3; rightMargin: Tokens.s5 }
+            anchors { left: parent.left; right: detail.left; top: head.bottom; topMargin: Tokens.s3; rightMargin: detail.shown ? Tokens.s5 : 0 }
         }
 
         FileList {
@@ -1426,15 +1459,18 @@ Item {
             app: app
             anchors { left: parent.left; right: detail.left; top: tabBar.bottom; bottom: parent.bottom }
             anchors.topMargin: tabBar.visible ? Tokens.s3 : Tokens.s4
-            anchors.rightMargin: Tokens.s5
-            anchors.bottomMargin: Tokens.s5
+            anchors.rightMargin: detail.shown ? Tokens.s5 : 0
+            anchors.bottomMargin: app.short ? Tokens.s3 : Tokens.s5
         }
         Detail {
             id: detail
             app: app
             anchors { right: parent.right; top: head.bottom; topMargin: Tokens.s4 }
-            width: app.dual ? Math.round((page.width - Tokens.s5) / 2) : 340
-            visible: !app.dual
+            readonly property bool shown: app.dual || app.showDetail
+            width: !shown ? 0 : (app.dual ? Math.round((page.width - Tokens.s5) / 2) : 340)
+            height: Math.min(implicitHeight, page.height - y - Tokens.s5)
+            clip: true
+            visible: !app.dual && app.showDetail
         }
         SidePane {
             app: app

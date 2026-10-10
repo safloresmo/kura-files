@@ -9,7 +9,7 @@ ShellRoot {
         title: app.brand.title
         implicitWidth: 1320
         implicitHeight: 860
-        minimumSize: Qt.size(980, 620)
+        minimumSize: Qt.size(480, 380)
         color: Tokens.paper
 
         Binding {

@@ -75,7 +75,7 @@ Item {
 
     Rectangle {
         anchors.centerIn: parent
-        width: 520
+        width: Math.min(520, sheet.width - Tokens.s5)
         height: body.height
         color: Tokens.paper
         radius: Tokens.radius

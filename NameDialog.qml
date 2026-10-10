@@ -82,7 +82,7 @@ Item {
 
     Rectangle {
         anchors.centerIn: parent
-        width: dialog.choices.length > 0 ? 620 : 440
+        width: Math.min(dialog.choices.length > 0 ? 620 : 440, dialog.width - Tokens.s5)
         height: body.height + Tokens.s5 * 2
         color: Tokens.paper
         radius: Tokens.radius

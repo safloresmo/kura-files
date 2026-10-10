@@ -17,6 +17,8 @@ Item {
         color: Tokens.line
     }
     Row {
+        id: tally
+        visible: foot.width >= 620 || (app.notice === "" && app.transfer === null)
         anchors { left: parent.left; leftMargin: Tokens.s5; verticalCenter: parent.verticalCenter }
         spacing: Tokens.s3
 
@@ -34,8 +36,10 @@ Item {
             anchors.verticalCenter: parent.verticalCenter
         }
         Text {
-            text: (app.query !== "" ? app.rows.length + " DE " + app.folderTotal + " · " : "")
-                + Fmt.plural(app.dirTotal, "CARPETA", "CARPETAS") + " · " + Fmt.plural(app.fileTotal, "ARCHIVO", "ARCHIVOS")
+            text: app.markedCount > 0
+                ? app.markedCount + (app.markedCount === 1 ? " MARCADO" : " MARCADOS") + " · " + app.markedWeight
+                : (app.query !== "" ? app.rows.length + " DE " + app.folderTotal + " · " : "")
+                    + Fmt.plural(app.dirTotal, "CARPETA", "CARPETAS") + " · " + Fmt.plural(app.fileTotal, "ARCHIVO", "ARCHIVOS")
             color: Tokens.ink
             font.family: Tokens.mono
             font.pixelSize: 10
@@ -63,7 +67,8 @@ Item {
             ? "COPIANDO · " + app.transfer.name.toUpperCase() + " · " + (app.transfer.total > 0 ? Math.floor(100 * app.transfer.done / app.transfer.total) : 0) + "%"
             : app.notice !== "" ? app.notice : (app.clip ? "PORTAPAPELES · " + app.clip.text + "   " : "") + app.space
         color: app.transfer !== null ? Tokens.ink : (app.notice !== "" && app.noticeBad ? Tokens.alert : (app.notice !== "" ? Tokens.ink : Tokens.inkMuted))
-        width: parent.width * 0.55
+        // The message gets what the count leaves free; a notice may take the count's place.
+        width: Math.max(0, foot.width - (tally.visible ? tally.width + Tokens.s5 * 2 : Tokens.s5) - Tokens.s6 - (cancel.visible ? cancel.width + Tokens.s3 : 0))
         horizontalAlignment: Text.AlignRight
         elide: Text.ElideMiddle
         font.family: Tokens.mono
