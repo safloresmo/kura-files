@@ -657,7 +657,12 @@ fn render_with(path: &Path, exec: &str) -> Option<PathBuf> {
                 _ => {}
             }
         }
-        let _ = Command::new("sh").arg("-c").arg(command).output();
+        let _ = Command::new("sh").arg("-c").arg(&command).output();
+        // Some draw through the display server and fail where its graphics
+        // differ from what they expect; without one they draw off screen.
+        if !made(&thumb) {
+            let _ = Command::new("sh").arg("-c").arg(&command).env_remove("DISPLAY").output();
+        }
     }
     made(&thumb).then_some(thumb)
 }
