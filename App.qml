@@ -49,12 +49,29 @@ Item {
     property bool dragging: false
     property string dragData: ""
     property bool deep: false
-    property var undo: null
-    property var redo: null
+    // What can be taken back, oldest first, and what was taken back and can be done again.
+    property var undoStack: []
+    property var redoStack: []
+    readonly property var undo: undoStack.length > 0 ? undoStack[undoStack.length - 1] : null
+    readonly property var redo: redoStack.length > 0 ? redoStack[redoStack.length - 1] : null
     property bool undoing: false
+    property bool redoing: false
     property bool recent: false
-    property var transfer: null
-    property var activeJob: null
+    // The transfers under way: { id, label, name, done, total, paused }.
+    property var transfers: []
+    property var jobTasks: ({})
+    property int jobCount: 0
+    // All of them as one, for the strip at the bottom.
+    readonly property var transfer: {
+        if (transfers.length === 0)
+            return null;
+        let done = 0, total = 0;
+        for (const t of transfers) {
+            done += t.done;
+            total += t.total;
+        }
+        return { done: done, total: total, name: transfers.length > 1 ? transfers.length + " TRABAJOS" : transfers[0].name };
+    }
     property var bookmarks: []
     property var info: ({})
     property var trashList: []
@@ -259,6 +276,7 @@ Item {
     }
 
     signal quit()
+    property alias jobsPanel: jobsPanel
     property alias pickBar: pickBar
 
     // Set when another program is waiting for a file: open, save or folder.
@@ -413,12 +431,15 @@ Item {
         noticeClear.restart();
     }
     function run(command, okText, failText, undoArgs) {
-        job.createObject(app, {
+        const task = job.createObject(app, {
             command: command,
             okText: okText,
             failText: failText || "NO SE PUDO",
-            undoArgs: undoArgs === undefined ? null : undoArgs
-        }).running = true;
+            undoArgs: undoArgs === undefined ? null : undoArgs,
+            tid: ++jobCount
+        });
+        jobTasks[task.tid] = task;
+        task.running = true;
     }
     // An engine operation. `undoArgs` is how to take it back: "auto" builds it
     // from what the engine reports, a list is used as given, null means none.
@@ -431,9 +452,12 @@ Item {
             return;
         }
         const last = undo;
-        undo = null;
+        undoStack = undoStack.slice(0, -1);
         undoing = true;
-        redo = last.again ? { args: last.again, text: last.text } : null;
+        if (last.again)
+            redoStack = redoStack.concat([{ args: last.again, text: last.text }]);
+        else
+            redoStack = [];
         op(last.args, "DESHECHO · " + last.text, null);
     }
     function redoLast() {
@@ -442,12 +466,43 @@ Item {
             return;
         }
         const again = redo;
-        redo = null;
+        redoStack = redoStack.slice(0, -1);
+        redoing = true;
         op(again.args, again.text, again.args[0] === "trash" ? ["untrash"].concat(again.args.slice(1)) : "auto");
     }
+    function pushUndo(step) {
+        undoStack = undoStack.concat([step]).slice(-40);
+    }
+    function trackJob(task, done, total, name) {
+        const now = { id: task.tid, label: task.okText.split(" · ")[0], name: name, done: done, total: total, paused: task.paused };
+        const at = transfers.findIndex(t => t.id === task.tid);
+        transfers = at < 0 ? transfers.concat([now]) : transfers.map(t => t.id === task.tid ? now : t);
+    }
+    function dropJob(task) {
+        delete jobTasks[task.tid];
+        if (transfers.some(t => t.id === task.tid))
+            transfers = transfers.filter(t => t.id !== task.tid);
+    }
+    function cancelJob(id) {
+        const task = jobTasks[id];
+        if (!task)
+            return;
+        // A stopped process cannot hear the request to end, so wake it first.
+        if (task.paused)
+            task.signal(18);
+        task.signal(15);
+    }
+    function pauseJob(id) {
+        const task = jobTasks[id];
+        if (!task)
+            return;
+        task.paused = !task.paused;
+        task.signal(task.paused ? 19 : 18);
+        transfers = transfers.map(t => t.id === id ? Object.assign({}, t, { paused: task.paused }) : t);
+    }
     function cancelTransfer() {
-        if (activeJob)
-            activeJob.signal(15);
+        for (const t of transfers)
+            cancelJob(t.id);
     }
     // What an action applies to: the marked rows, or the one under the cursor.
     function picked() {
@@ -722,6 +777,12 @@ Item {
             return;
         run([engine, "chmod", mode, infoPath], "PERMISOS · " + mode);
         infoAgain.restart();
+    }
+    function chmodTree() {
+        if (infoPath === "")
+            return;
+        dialog.confirm("PERMISOS", "Todo lo que hay dentro tomará los permisos de esta carpeta. No se puede deshacer.",
+            () => run([engine, "chmod-tree", infoPath], "PERMISOS APLICADOS A TODO"), "APLICAR");
     }
     function folderOf(p) {
         const shown = shorten(p);
@@ -1400,13 +1461,12 @@ Item {
             property string secret: ""
             property int code: -1
             property var results: []
+            property int tid: 0
+            property bool paused: false
 
             function finish() {
                 const why = errors.text.trim().split("\n")[0];
-                if (app.activeJob === task) {
-                    app.activeJob = null;
-                    app.transfer = null;
-                }
+                app.dropJob(task);
                 const again = command[0] === app.engine ? command.slice(1) : null;
                 // Land on what the operation just made, when it is in this folder.
                 if (code === 0 && results.length >= 3 && undoArgs !== null) {
@@ -1418,13 +1478,15 @@ Item {
                     }
                 }
                 if (undoArgs === "auto")
-                    app.undo = results.length > 0 ? { text: okText, args: ["revert"].concat(results), again: again } : app.undo;
+                    results.length > 0 && app.pushUndo({ text: okText, args: ["revert"].concat(results), again: again });
                 else if (undoArgs !== null && code === 0)
-                    app.undo = { text: okText, args: undoArgs, again: again };
+                    app.pushUndo({ text: okText, args: undoArgs, again: again });
                 if (app.undoing)
                     app.undoing = false;
+                else if (app.redoing)
+                    app.redoing = false;
                 else if (undoArgs !== null)
-                    app.redo = null;
+                    app.redoStack = [];
                 if (server && code !== 0 && !askedSecret) {
                     // Keys did not get us in: ask for the password and try once more.
                     const target = server;
@@ -1448,8 +1510,7 @@ Item {
                 onRead: line => {
                     const cols = line.split("\t");
                     if (cols[0] === "progress" && cols.length >= 4) {
-                        app.activeJob = task;
-                        app.transfer = { done: Number(cols[1]), total: Number(cols[2]), name: cols.slice(3).join("\t") };
+                        app.trackJob(task, Number(cols[1]), Number(cols[2]), cols.slice(3).join("\t"));
                     } else if (cols[0] === "done" && cols.length === 4) {
                         task.results = task.results.concat([cols[1], cols[2], cols[3]]);
                     }
@@ -1884,6 +1945,11 @@ Item {
         id: foot
         app: app
         anchors { left: parent.left; right: parent.right; bottom: parent.bottom }
+    }
+    Jobs {
+        id: jobsPanel
+        app: app
+        anchors { right: parent.right; rightMargin: Tokens.s5; bottom: foot.top; bottomMargin: Tokens.s2 }
     }
     ChooserBar {
         id: pickBar

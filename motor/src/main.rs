@@ -28,6 +28,7 @@ archivos-motor untrash ORIGINAL...
 archivos-motor restore HELD...
 archivos-motor trashed
 archivos-motor chmod MODE PATH
+archivos-motor chmod-tree DIR
 archivos-motor revert (copy|move|new SRC DEST)...
 archivos-motor extract ARCHIVE
 archivos-motor compress zip|tar.gz|tar.xz|7z SRC...
@@ -92,6 +93,7 @@ fn main() {
         ("untrash", originals) if !originals.is_empty() => untrash(originals),
         ("restore", names) if !names.is_empty() => restore(names),
         ("trashed", []) => trashed(),
+        ("chmod-tree", [path]) => chmod_tree(Path::new(path)),
         ("chmod", [mode, path]) => chmod(mode, Path::new(path)),
         ("delete", sources) if !sources.is_empty() => delete(sources),
         ("thumbs", [dir]) => describe::thumbs(Path::new(dir)),
@@ -426,6 +428,43 @@ fn chmod(mode: &str, path: &Path) -> Result<(), String> {
 }
 
 /// Undo earlier results: a copy or a new item goes to the trash, a move goes back.
+/// Give everything inside a folder the folder's own permissions. Files only
+/// keep the execute bits when they could already be run.
+fn chmod_tree(root: &Path) -> Result<(), String> {
+    use std::os::unix::fs::PermissionsExt;
+    let meta = root.symlink_metadata().map_err(|e| format!("No se pudo leer: {e}"))?;
+    if !meta.is_dir() {
+        return Err(format!("No es una carpeta: {}", root.display()));
+    }
+    let bits = meta.permissions().mode() & 0o777;
+    let mut failed = 0;
+    let mut pending = vec![root.to_path_buf()];
+    while let Some(dir) = pending.pop() {
+        let Ok(entries) = fs::read_dir(&dir) else {
+            failed += 1;
+            continue;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            let Ok(meta) = path.symlink_metadata() else { continue };
+            if meta.file_type().is_symlink() {
+                continue;
+            }
+            let wanted = if meta.is_dir() || meta.permissions().mode() & 0o111 != 0 { bits } else { bits & 0o666 };
+            if fs::set_permissions(&path, fs::Permissions::from_mode(wanted)).is_err() {
+                failed += 1;
+            }
+            if meta.is_dir() {
+                pending.push(path);
+            }
+        }
+    }
+    if failed > 0 {
+        return Err(format!("No se pudieron cambiar {failed}"));
+    }
+    Ok(())
+}
+
 fn revert(triples: &[String]) -> Result<(), String> {
     let mut failed = false;
     for triple in triples.chunks(3) {
@@ -586,6 +625,23 @@ mod tests {
         assert_eq!(describe::filled("convert %f out.jpg", &paths), "convert '/tmp/a b.png' out.jpg");
         assert_eq!(describe::filled("pack %F", &paths), "pack '/tmp/a b.png' '/tmp/it'\\''s.png'");
         assert_eq!(describe::filled("cd %d && echo 100%% %n", &paths), "cd '/tmp' && echo 100% 'a b.png'");
+    }
+
+    #[test]
+    fn a_folder_hands_its_permissions_down() {
+        use std::os::unix::fs::PermissionsExt;
+        let scratch = Scratch::new();
+        let note = scratch.file("top/deep/note.txt", "x");
+        let tool = scratch.file("top/tool.sh", "x");
+        fs::set_permissions(&tool, fs::Permissions::from_mode(0o700)).unwrap();
+        let top = scratch.0.join("top");
+        fs::set_permissions(&top, fs::Permissions::from_mode(0o750)).unwrap();
+        chmod_tree(&top).unwrap();
+        let mode = |path: &Path| fs::metadata(path).unwrap().permissions().mode() & 0o777;
+        assert_eq!(mode(&top.join("deep")), 0o750);
+        assert_eq!(mode(&note), 0o640);
+        assert_eq!(mode(&tool), 0o750);
+        assert!(chmod_tree(&note).is_err());
     }
 
     #[test]

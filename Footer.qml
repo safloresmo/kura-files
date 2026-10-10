@@ -58,13 +58,13 @@ Item {
         visible: app.transfer !== null
         anchors { right: parent.right; rightMargin: Tokens.s6; verticalCenter: parent.verticalCenter }
         compact: true
-        text: "CANCELAR"
-        onAct: app.cancelTransfer()
+        text: app.transfers.length > 1 || app.jobsPanel.visible ? "TRABAJOS" : "CANCELAR"
+        onAct: app.transfers.length > 1 || app.jobsPanel.visible ? app.jobsPanel.visible = !app.jobsPanel.visible : app.cancelTransfer()
     }
     Text {
         anchors { right: cancel.visible ? cancel.left : parent.right; rightMargin: cancel.visible ? Tokens.s3 : Tokens.s6; verticalCenter: parent.verticalCenter }
         text: app.transfer !== null
-            ? "COPIANDO · " + app.transfer.name.toUpperCase() + " · " + (app.transfer.total > 0 ? Math.floor(100 * app.transfer.done / app.transfer.total) : 0) + "%"
+            ? (app.transfers.length > 1 ? "" : "COPIANDO · ") + app.transfer.name.toUpperCase() + " · " + (app.transfer.total > 0 ? Math.floor(100 * app.transfer.done / app.transfer.total) : 0) + "%"
             : app.notice !== "" ? app.notice : (app.clip ? "PORTAPAPELES · " + app.clip.text + "   " : "") + app.space
         color: app.transfer !== null ? Tokens.ink : (app.notice !== "" && app.noticeBad ? Tokens.alert : (app.notice !== "" ? Tokens.ink : Tokens.inkMuted))
         // The message gets what the count leaves free; a notice may take the count's place.

@@ -48,6 +48,9 @@ ShellRoot {
                 query: app.query,
                 deep: app.deep,
                 hidden: app.showHidden,
+                undos: app.undoStack.length,
+                redos: app.redoStack.length,
+                jobs: app.transfers.map(t => (t.paused ? "paused" : "running")).join(" "),
                 pick: app.pickPaths.join(" | "),
                 actions: app.actions.map(a => (a.group !== "" ? a.group + " · " : "") + a.name).join(" | "),
                 detail: app.showDetail,
@@ -92,6 +95,9 @@ ShellRoot {
         function act(index: int): void { app.actionEntries(app.picked().map(e => e.path))[index].act(); }
         function pickName(text: string): void { app.pickBar.nameField.text = text; }
         function pickDone(): void { app.pickDone(); }
+        function copyTo(dest: string, source: string): void { app.transferTo("copy", dest, [source], "COPIADO"); }
+        function pauseAll(): void { for (const t of app.transfers) app.pauseJob(t.id); }
+        function cancelAll(): void { app.cancelTransfer(); }
         function reveal(): void { app.showInFolder(app.selected); }
         function pref(key: string, on: bool): void { app.setPref(key, on); }
         function set(key: string, value: string): void { app.setPref(key, value); }

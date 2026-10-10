@@ -237,6 +237,19 @@ sleep 4
 call pickDone; sleep 1
 [ "$(cat "$work/answer" 2>/dev/null)" = "$zone/draft.txt" ] && echo "ok    saving answers with the name in this folder" || { echo "FAIL  saving answers with the name in this folder"; failed=1; }
 
+echo "-- undo keeps a history"
+fresh
+open_at "$zone"
+call key 78 $((CTRL + SHIFT)); call type one; call key $ENTER 0; sleep 0.8
+call key 78 $((CTRL + SHIFT)); call type two; call key $ENTER 0; sleep 0.8
+expect "two steps are remembered" undos 2
+[ -d "$zone/Nueva carpetaone" ] && [ -d "$zone/Nueva carpetatwo" ] && echo "ok    both folders were made" || { echo "FAIL  both folders were made"; failed=1; }
+call key 90 $CTRL; sleep 1; call key 90 $CTRL; sleep 1
+[ ! -e "$zone/Nueva carpetaone" ] && [ ! -e "$zone/Nueva carpetatwo" ] && echo "ok    both can be taken back" || { echo "FAIL  both can be taken back"; failed=1; }
+expect "and both can come again" redos 2
+call key 90 $((CTRL + SHIFT)); sleep 1; call key 90 $((CTRL + SHIFT)); sleep 1
+[ -d "$zone/Nueva carpetaone" ] && [ -d "$zone/Nueva carpetatwo" ] && echo "ok    redo brings both back" || { echo "FAIL  redo brings both back"; failed=1; }
+
 echo "-- the selection panel"
 open_at "$zone"
 expect "nothing picked, no panel" detail false

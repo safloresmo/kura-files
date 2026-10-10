@@ -228,6 +228,11 @@ Item {
                     spacing: Tokens.s2
 
                     Btn {
+                        visible: sheet.info.kind === "inode/directory" && sheet.info.mode !== undefined
+                        text: "PERMISOS A TODO LO DE DENTRO"
+                        onAct: sheet.app.chmodTree()
+                    }
+                    Btn {
                         visible: sheet.info.kind !== undefined && sheet.info.kind !== "inode/directory" && sheet.app.digest === ""
                         text: "SHA-256"
                         onAct: sheet.app.checksum()
