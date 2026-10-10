@@ -48,6 +48,7 @@ ShellRoot {
         function trash(): void { app.trash(); }
         function restore(): void { app.restore(); }
         function undo(): void { app.undoLast(); }
+        function reveal(): void { app.showInFolder(app.selected); }
         function chmod(mode: string): void { app.chmod(mode); }
         function view(mode: string): void { app.setMode(mode); }
         function redo(): void { app.redoLast(); }

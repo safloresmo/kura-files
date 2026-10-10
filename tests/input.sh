@@ -44,7 +44,11 @@ print(str(value).lower() if isinstance(value, bool) else value)' "$2" 2>/dev/nul
 open_at() {
     pkill -f "qs -p $harness" 2>/dev/null
     sleep 0.3
-    ARCHIVOS_DIR=$1 qs -p "$harness" >"$work/window.log" 2>&1 &
+    if [ -n "$1" ]; then
+        ARCHIVOS_DIR=$1 qs -p "$harness" >"$work/window.log" 2>&1 &
+    else
+        qs -p "$harness" >"$work/window.log" 2>&1 &
+    fi
     sleep 4
 }
 
@@ -111,6 +115,7 @@ expect "f2 on several renames by pattern" names "folder | c.txt | nota 1.txt | n
 call key 90 $CTRL; sleep 1.2;      expect "and ctrl+z puts the names back" names "folder | a.txt | b.txt | c.txt"
 call key 78 $CTRL; call key $ENTER 0; sleep 1
 expect "ctrl+n makes a file" names "folder | a.txt | b.txt | c.txt | Sin título.txt"
+expect "and the cursor lands on it" selected "Sin título.txt"
 
 echo "-- filter and palette"
 call key 70 $CTRL; call type b.t;  expect "ctrl+f filters" names "b.txt"
@@ -131,6 +136,17 @@ expect "space opens the quick look" looking true
 expect "text shows as text" preview "text"
 call key 16777236 0; sleep 0.8;    expect "right arrow moves to the next file" selected "b.txt"
 call key $ESC 0;                   expect "escape closes it" looking false
+
+echo "-- search and reopening"
+echo deep >"$zone/folder/hidden-gem.txt"
+call search gem; sleep 1;          expect "search finds it below" rows 1
+call click 500 300 1 0; call reveal; sleep 1
+expect "show in folder goes there" here "folder"
+expect "with the cursor on it" selected "hidden-gem.txt"
+call pref reopen true
+open_at ""
+expect "reopening starts where it was left" here "folder"
+call pref reopen false
 
 echo "-- two panes"
 fresh

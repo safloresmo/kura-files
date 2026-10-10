@@ -192,6 +192,11 @@ Item {
                     }
                 }
                 Line {
+                    label: "Abrir donde lo dejé"
+                    note: "En vez de la carpeta personal"
+                    Sw { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; on: sheet.store.reopen; onToggled: value => sheet.app.setPref("reopen", value) }
+                }
+                Line {
                     label: "Mostrar los ocultos al abrir"
                     Sw { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; on: sheet.store.hidden; onToggled: value => sheet.app.setPref("hidden", value) }
                 }

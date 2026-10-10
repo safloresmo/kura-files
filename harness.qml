@@ -70,6 +70,9 @@ ShellRoot {
             });
         }
         function go(path: string): void { app.go(path); }
+        function search(text: string): void { app.search(text); }
+        function reveal(): void { app.showInFolder(app.selected); }
+        function pref(key: string, on: bool): void { app.setPref(key, on); }
         function other(path: string): void { app.otherPath = path; }
         function shot(file: string): void { app.grabToImage(result => result.saveToFile(file)); }
         function focused(): string { return String(win.backingWindow ? win.backingWindow.active : "?"); }

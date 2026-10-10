@@ -26,6 +26,9 @@ Item {
     property var flags: ({})
     property var changed: ({})
     property bool unreadable: false
+    // A path to put the cursor on as soon as it shows up in the list.
+    property string wanted: ""
+    property bool settled: false
     property var facts: []
     property bool countsReady: false
     property string space: ""
@@ -464,6 +467,8 @@ Item {
         rememberView(next);
     }
     function setPref(key, value) {
+        if (key === "reopen" && value === true)
+            settings.lastPath = path;
         settings[key] = value;
         settingsFile.writeAdapter();
     }
@@ -742,6 +747,8 @@ Item {
             return;
         }
         sources.loadTargets();
+        if (one && deep)
+            items.push({ label: "Mostrar en su carpeta", act: () => showInFolder(one) });
         if (one) {
             items.push({ label: "Abrir", hint: "ENTER", act: () => open(current) });
             if (one.isDir)
@@ -826,6 +833,8 @@ Item {
                 add("Restaurar " + label(list).toLowerCase(), "PAPELERA", () => restore());
             add("Vaciar papelera", "PAPELERA", () => emptyTrash());
         } else {
+            if (n === 1 && deep)
+                add("Mostrar " + list[0].name + " en su carpeta", "ACCIÓN", () => showInFolder(list[0]));
             if (n === 1) {
                 add("Abrir " + list[0].name, "ENTER", () => open(current));
                 add("Renombrar " + list[0].name, "F2", () => rename());
@@ -1058,7 +1067,26 @@ Item {
         dirTotal = dirs;
         fileTotal = regular;
         rows = list;
-        current = keep === "" ? -1 : list.findIndex(e => e.path === keep);
+        const target = wanted !== "" ? list.findIndex(e => e.path === wanted) : -1;
+        if (target >= 0) {
+            wanted = "";
+            current = target;
+            Qt.callLater(() => files.reveal(target));
+        } else {
+            current = keep === "" ? -1 : list.findIndex(e => e.path === keep);
+        }
+    }
+    // Leave a search or the recent list and land on the item, in its own folder.
+    function showInFolder(e) {
+        if (!e)
+            return;
+        const parent = e.path.slice(0, e.path.lastIndexOf("/")) || "/";
+        wanted = e.path;
+        forget.restart();
+        if (parent === path)
+            endSearch();
+        else
+            go(parent);
     }
     function refresh() {
         countsReady = false;
@@ -1067,6 +1095,8 @@ Item {
     onGridChanged: refresh()
 
     onPathChanged: {
+        if (settled && settings.reopen && settings.lastPath !== path)
+            setPref("lastPath", path);
         unreadable = false;
         changed = {};
         Qt.callLater(loadPreview);
@@ -1094,6 +1124,10 @@ Item {
         const start = Quickshell.env("ARCHIVOS_DIR");
         if (start)
             path = clean(start);
+        else if (settings.reopen && settings.lastPath !== "") {
+            settled = true;
+            path = settings.lastPath;
+        }
         head.pathField.text = shorten(path);
         refresh();
         focusList();
@@ -1117,8 +1151,20 @@ Item {
         id: settingsFile
         path: (Quickshell.env("XDG_CONFIG_HOME") || (app.home + "/.config")) + "/archivos/config.json"
         watchChanges: true
+        blockLoading: true
         printErrors: false
         onFileChanged: reload()
+        onLoadFailed: app.settled = true
+        // The settings can arrive after the window is up: apply the ones that
+        // only matter at the start, once.
+        onLoaded: {
+            if (app.settled)
+                return;
+            app.settled = true;
+            app.showHidden = settings.hidden;
+            if (!Quickshell.env("ARCHIVOS_DIR") && settings.reopen && settings.lastPath !== "")
+                app.path = settings.lastPath;
+        }
 
         JsonAdapter {
             id: settings
@@ -1127,6 +1173,8 @@ Item {
             property var servers: []
             property bool dual: false
             property bool hidden: false
+            property bool reopen: false
+            property string lastPath: ""
             property string terminal: "kitty --directory"
             property var views: ({})
             property string ownMark: "庫"
@@ -1163,6 +1211,15 @@ Item {
                     app.transfer = null;
                 }
                 const again = command[0] === app.engine ? command.slice(1) : null;
+                // Land on what the operation just made, when it is in this folder.
+                if (code === 0 && results.length >= 3 && undoArgs !== null) {
+                    const made = results[results.length - 1];
+                    if (made.slice(0, made.lastIndexOf("/")) === app.path) {
+                        app.wanted = made;
+                        forget.restart();
+                        Qt.callLater(app.rebuild);
+                    }
+                }
                 if (undoArgs === "auto")
                     app.undo = results.length > 0 ? { text: okText, args: ["revert"].concat(results), again: again } : app.undo;
                 else if (undoArgs !== null && code === 0)
@@ -1270,6 +1327,11 @@ Item {
         }
     }
     // Typing in a huge folder would otherwise rebuild the list on every key.
+    Timer {
+        id: forget
+        interval: 2500
+        onTriggered: app.wanted = ""
+    }
     Timer {
         id: filterSoon
         interval: 50
