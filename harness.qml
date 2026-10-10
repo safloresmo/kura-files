@@ -110,6 +110,7 @@ ShellRoot {
         function unpack(name: string): void { app.packJob(["pack-remove", name], "ACCIONES QUITADAS"); }
         function label(key: string): void { app.setLabel(key); }
         function showLabel(key: string): void { app.showLabel(key); }
+        function expand(): void { app.toggleExpand(app.selected); }
         function reveal(): void { app.showInFolder(app.selected); }
         function pref(key: string, on: bool): void { app.setPref(key, on); }
         function set(key: string, value: string): void { app.setPref(key, value); }

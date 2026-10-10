@@ -366,6 +366,20 @@ else
     echo "skip  plocate is not installed"
 fi
 
+echo "-- folders that open in place"
+fresh
+mkdir -p "$zone/folder/inner"; echo x >"$zone/folder/leaf.txt"; echo x >"$zone/folder/inner/deep.txt"
+open_at "$zone"
+call click 400 312 1 0; call key 16777236 0; sleep 0.8
+expect "right opens a folder under itself" names "folder | inner | leaf.txt | a.txt | b.txt | c.txt"
+call key $DOWN 0; call key 16777236 0; sleep 0.8
+expect "and a folder inside it" names "folder | inner | deep.txt | leaf.txt | a.txt | b.txt | c.txt"
+call key $DOWN 0; call key 16777234 0; expect "left steps out to the folder" selected "inner"
+call key 16777234 0;               expect "then closes it" names "folder | inner | leaf.txt | a.txt | b.txt | c.txt"
+call click 400 392 1 0; call key $F2 0; call key 65 $CTRL; call type twig.txt; call key $ENTER 0; sleep 1.2
+[ -f "$zone/folder/twig.txt" ] && echo "ok    a file is renamed where it sits" || { echo "FAIL  a file is renamed where it sits"; failed=1; }
+expect "and the opened folder shows it" names "folder | inner | twig.txt | a.txt | b.txt | c.txt"
+
 echo "-- the selection panel"
 open_at "$zone"
 expect "nothing picked, no panel" detail false

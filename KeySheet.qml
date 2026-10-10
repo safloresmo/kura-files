@@ -15,7 +15,7 @@ Item {
             ["Ctrl+clic", "Añadir o quitar"], ["Mayús+clic · Mayús+↑↓", "Marcar un tramo"], ["Ctrl+A", "Todo"],
             ["Ctrl+Mayús+I", "Invertir"], ["Esc", "Soltar la selección"]] },
         { name: "ARCHIVOS", keys: [
-            ["Ctrl+C · Ctrl+X · Ctrl+V", "Copiar, cortar y pegar"], ["Ctrl+Z · Ctrl+Mayús+Z", "Deshacer y rehacer"], ["F2 · Ctrl+Mayús+D", "Renombrar y duplicar"], ["Ctrl+Mayús+L", "Crear un enlace"],
+            ["Ctrl+C · Ctrl+X · Ctrl+V", "Copiar, cortar y pegar"], ["Ctrl+Z · Ctrl+Mayús+Z", "Deshacer y rehacer"], ["F2 · Ctrl+Mayús+D", "Renombrar y duplicar"], ["Ctrl+Mayús+L", "Crear un enlace"], ["→ · ←", "Abrir y cerrar una carpeta en la lista"],
             ["Ctrl+Mayús+N · Ctrl+N", "Carpeta nueva y archivo nuevo"], ["Supr · Mayús+Supr", "A la papelera o para siempre"],
             ["Ctrl+Mayús+C · Ctrl+Mayús+M", "Copiar o mover al otro panel"],
             ["Ctrl+I", "Propiedades"], ["Ctrl+D", "Marcador"]] },

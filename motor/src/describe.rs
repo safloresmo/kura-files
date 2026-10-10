@@ -264,6 +264,21 @@ pub fn counts(dir: &Path) -> Result<(), String> {
     Ok(())
 }
 
+/// What a folder holds, one line each as a search gives them, names only.
+pub fn list(dir: &Path, hidden: bool) -> Result<(), String> {
+    let entries = fs::read_dir(dir).map_err(|e| format!("No se pudo leer: {e}"))?;
+    for entry in entries.flatten() {
+        let name = entry.file_name().to_string_lossy().into_owned();
+        if !hidden && name.starts_with('.') {
+            continue;
+        }
+        let Ok(meta) = entry.path().metadata().or_else(|_| entry.path().symlink_metadata()) else { continue };
+        let kind = if meta.is_dir() { 'd' } else { 'f' };
+        println!("{kind}\t{}\t{}\t{name}", meta.len(), seconds(meta.modified()));
+    }
+    Ok(())
+}
+
 /// The same line a search gives, for each of the paths that still exists.
 pub fn stat(paths: &[String]) -> Result<(), String> {
     for path in paths {

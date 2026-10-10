@@ -188,6 +188,11 @@ Rectangle {
                 anchors.verticalCenter: parent.verticalCenter
                 spacing: Tokens.s3
 
+                Item {
+                    visible: (row.modelData.depth || 0) > 0
+                    width: (row.modelData.depth || 0) * 18 - Tokens.s3
+                    height: 1
+                }
                 Text {
                     visible: row.lit
                     text: "//"
@@ -207,12 +212,16 @@ Rectangle {
                     anchors.verticalCenter: parent.verticalCenter
                 }
                 Text {
+                    // A folder's tag is the arrow that opens it in place.
+                    readonly property bool opener: row.modelData.isDir && card.app.canExpand
                     width: 34
-                    text: card.app.tagFor(row.modelData.name, row.modelData.isDir)
-                    color: card.app.toneFor(row.modelData.name, row.modelData.path, row.modelData.isDir)
+                    text: opener ? (card.app.isExpanded(row.modelData.path) ? "▾" : "▸") : card.app.tagFor(row.modelData.name, row.modelData.isDir)
+                    color: opener ? (openerHover.hovered ? Tokens.ink : Tokens.inkFaint) : card.app.toneFor(row.modelData.name, row.modelData.path, row.modelData.isDir)
                     font.family: Tokens.mono
-                    font.pixelSize: 8
+                    font.pixelSize: opener ? 16 : 8
                     font.letterSpacing: 0.6
+                    HoverHandler { id: openerHover; enabled: parent.opener; cursorShape: Qt.PointingHandCursor }
+                    TapHandler { enabled: parent.opener; onTapped: card.app.toggleExpand(row.modelData) }
                     elide: Text.ElideRight
                     anchors.verticalCenter: parent.verticalCenter
                 }
@@ -234,7 +243,7 @@ Rectangle {
                     font.pixelSize: card.app.compact ? 13 : Tokens.fRow
                     font.weight: row.lit ? Font.Medium : Font.Normal
                     elide: Text.ElideMiddle
-                    width: row.width - card.sizeW - card.whenW - card.kindW - 126
+                    width: row.width - card.sizeW - card.whenW - card.kindW - 126 - (row.modelData.depth || 0) * 18
                     anchors.verticalCenter: parent.verticalCenter
                 }
             }
@@ -244,7 +253,8 @@ Rectangle {
                 width: 110 - Tokens.s5
                 horizontalAlignment: Text.AlignRight
                 anchors.verticalCenter: parent.verticalCenter
-                text: row.modelData.isDir ? card.app.countLabel(row.modelData.path) : Fmt.size(row.modelData.size)
+                // Only the folders of the folder on show have been counted.
+                text: !row.modelData.isDir ? Fmt.size(row.modelData.size) : ((row.modelData.depth || 0) > 0 ? "" : card.app.countLabel(row.modelData.path))
                 color: Tokens.inkFaint
                 font.family: Tokens.mono
                 font.pixelSize: 11

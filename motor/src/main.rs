@@ -43,6 +43,7 @@ archivos-motor inside DIR TEXT [hidden]
 archivos-motor sum PATH
 archivos-motor preview PATH [BYTES]
 archivos-motor apps PATH
+archivos-motor list DIR [hidden]
 archivos-motor stat PATH...
 archivos-motor index
 archivos-motor everywhere TEXT [hidden]
@@ -123,6 +124,8 @@ fn main() {
         ("sum", [path]) => describe::sum(Path::new(path)),
         ("preview", [path]) => describe::preview(Path::new(path), 4000),
         ("preview", [path, bytes]) => describe::preview(Path::new(path), bytes.parse().unwrap_or(4000)),
+        ("list", [dir]) => describe::list(Path::new(dir), false),
+        ("list", [dir, _]) => describe::list(Path::new(dir), true),
         ("stat", paths) => describe::stat(paths),
         ("index", []) => describe::index(),
         ("everywhere", [text]) => describe::everywhere(text, false),

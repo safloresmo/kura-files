@@ -97,6 +97,40 @@ Item {
     readonly property var servers: settings.servers
     property string deepQuery: ""
     property bool deepInside: false
+    // Folders opened in place in the list: each one's path and what it holds.
+    property var expanded: ({})
+    readonly property bool canExpand: !grid && !deep && !inTrash && query === ""
+    function isExpanded(p) {
+        return expanded[p] !== undefined;
+    }
+    function unfold(e) {
+        if (!e || !e.isDir || !canExpand || isExpanded(e.path))
+            return;
+        branch.createObject(app, { dirPath: e.path }).running = true;
+    }
+    function fold(e) {
+        if (!e || !isExpanded(e.path))
+            return;
+        // What was open below it closes with it.
+        const next = {};
+        for (const p in expanded) {
+            if (p !== e.path && p.indexOf(e.path + "/") !== 0)
+                next[p] = expanded[p];
+        }
+        expanded = next;
+        rebuild();
+    }
+    function toggleExpand(e) {
+        if (e && isExpanded(e.path))
+            fold(e);
+        else
+            unfold(e);
+    }
+    // The row of the folder that holds this one, when it is open in the list.
+    function parentRow(e) {
+        const parent = e.path.slice(0, e.path.lastIndexOf("/"));
+        return rows.findIndex(r => r.path === parent);
+    }
     // The results come from everywhere under the home folder, not from below this one.
     property bool deepWide: false
     property string digest: ""
@@ -1398,7 +1432,7 @@ Item {
         if (!deep && !inTrash && dir.status === FolderListModel.Loading && dir.count > 5000)
             return;
         const keep = selected ? selected.path : "";
-        const list = [];
+        let list = [];
         let dirs = 0;
         let regular = 0;
         const source = [];
@@ -1450,7 +1484,7 @@ Item {
         const flip = sortReversed ? -1 : 1;
         // Recent items arrive newest first; keep that until a column is chosen.
         const asGiven = recent && sortKey === 0 && !sortReversed;
-        list.sort((a, b) => {
+        const order = (a, b) => {
             if (asGiven)
                 return 0;
             if (pinned(a) !== pinned(b))
@@ -1465,7 +1499,27 @@ Item {
             else if (sortKey === 3)
                 d = Fmt.kind(a.name, a.isDir).localeCompare(Fmt.kind(b.name, b.isDir));
             return flip * (d || Fmt.compareKeys(a.key, b.key));
-        });
+        };
+        list.sort(order);
+        // Opened folders show what they hold right under them, a step in.
+        let shown = list;
+        if (canExpand && Object.keys(expanded).length > 0) {
+            shown = [];
+            const place = (entries, depth) => {
+                for (const e of entries) {
+                    e.depth = depth;
+                    shown.push(e);
+                    const inside = expanded[e.path];
+                    if (e.isDir && inside !== undefined) {
+                        const kids = inside.map(k => Object.assign({ key: Fmt.sortKey(k.name) }, k));
+                        kids.sort(order);
+                        place(kids, depth + 1);
+                    }
+                }
+            };
+            place(list, 0);
+        }
+        list = shown;
         dirTotal = dirs;
         fileTotal = regular;
         rows = list;
@@ -1505,10 +1559,14 @@ Item {
     function refresh() {
         countsReady = false;
         sources.reload();
+        // Opened folders are read again too.
+        for (const p in expanded)
+            branch.createObject(app, { dirPath: p }).running = true;
     }
     onGridChanged: refresh()
 
     onPathChanged: {
+        expanded = ({});
         pinType = "";
         onlyType = false;
         if (settled && pick === "" && settings.reopen && settings.lastPath !== path)
@@ -1942,6 +2000,41 @@ Item {
             app.go(dir);
         }
     }
+    Component {
+        id: branch
+
+        Process {
+            id: reader
+            property string dirPath: ""
+            command: [app.engine, "list", dirPath].concat(app.showHidden ? ["hidden"] : [])
+            stdout: StdioCollector {
+                onStreamFinished: {
+                    const list = [];
+                    for (const line of text.split("\n")) {
+                        const cols = line.split("\t");
+                        if (cols.length < 4)
+                            continue;
+                        const name = cols.slice(3).join("\t");
+                        list.push({
+                            name: name,
+                            path: reader.dirPath + "/" + name,
+                            size: Number(cols[1]),
+                            modified: new Date(Number(cols[2]) * 1000),
+                            isDir: cols[0] === "d"
+                        });
+                    }
+                    // The folder may have been closed, or left, while it was being read.
+                    if (reader.dirPath.indexOf(app.path === "/" ? "/" : app.path + "/") === 0) {
+                        const next = Object.assign({}, app.expanded);
+                        next[reader.dirPath] = list;
+                        app.expanded = next;
+                        app.rebuild();
+                    }
+                    reader.destroy();
+                }
+            }
+        }
+    }
     Process {
         id: labelLister
         stdout: StdioCollector {
@@ -2121,6 +2214,15 @@ Item {
                 app.select(app.current + 1);
             else if (event.key === Qt.Key_Left && (app.grid || app.looking))
                 app.select(app.current - 1);
+            else if (event.key === Qt.Key_Right && app.selected && app.selected.isDir)
+                app.unfold(app.selected);
+            else if (event.key === Qt.Key_Left && app.selected) {
+                // Close an open folder; from inside one, step out to it.
+                if (app.isExpanded(app.selected.path))
+                    app.fold(app.selected);
+                else if (app.parentRow(app.selected) >= 0)
+                    app.select(app.parentRow(app.selected));
+            }
             else if (event.key === Qt.Key_Home)
                 app.select(0);
             else if (event.key === Qt.Key_End)
