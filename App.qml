@@ -712,6 +712,11 @@ Item {
     function transferTo(mode, dest, paths, okText, started) {
         if (paths.length === 0)
             return;
+        // One question at a time: a second transfer would take the first one's answer.
+        if (clash.pending !== null || dialog.visible) {
+            say("RESPONDE PRIMERO A LA PREGUNTA ANTERIOR", true);
+            return;
+        }
         clash.pending = { mode: mode, dest: dest, paths: paths, okText: okText, started: started };
         clash.running = false;
         clash.command = [engine, "conflicts", dest].concat(paths);
