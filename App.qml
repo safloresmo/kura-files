@@ -171,10 +171,9 @@ Item {
             return;
         }
         say("CONECTANDO A " + server.name.toUpperCase() + "…");
-        const command = secret === undefined ? ["gio", "mount", server.uri]
-            : ["sh", "-c", "printf '%s\\n' \"$1\" | gio mount \"$2\"", "sh", secret, server.uri];
         job.createObject(app, {
-            command: command,
+            command: ["gio", "mount", server.uri],
+            secret: secret === undefined ? "" : secret,
             okText: "CONECTADO · " + server.name.toUpperCase(),
             failText: "NO SE CONECTÓ A " + server.name.toUpperCase(),
             server: server,
@@ -1209,6 +1208,9 @@ Item {
             property var undoArgs: null
             property var server: null
             property bool askedSecret: false
+            // Typed by the user and handed over on standard input, so it never
+            // shows in the process list.
+            property string secret: ""
             property int code: -1
             property var results: []
 
@@ -1239,7 +1241,7 @@ Item {
                 if (server && code !== 0 && !askedSecret) {
                     // Keys did not get us in: ask for the password and try once more.
                     const target = server;
-                    dialog.ask("CONTRASEÑA · " + target.name.toUpperCase(), "", secret => app.connectServer(target, secret));
+                    dialog.askSecret("CONTRASEÑA · " + target.name.toUpperCase(), secret => app.connectServer(target, secret));
                 } else if (code === 0)
                     app.say(okText);
                 else if (/access denied/i.test(why) && command[0] === "tailscale")
@@ -1250,6 +1252,11 @@ Item {
                 destroy();
             }
 
+            stdinEnabled: secret !== ""
+            onStarted: {
+                if (secret !== "")
+                    write(secret + "\n");
+            }
             stdout: SplitParser {
                 onRead: line => {
                     const cols = line.split("\t");

@@ -12,10 +12,17 @@ Item {
     property bool plain: false
     property string yesText: "ACEPTAR"
     property var choices: []
+    property bool masked: false
 
     signal closed()
 
+    // The same, for something that should not be read over a shoulder.
+    function askSecret(title, callback) {
+        ask(title, "", callback);
+        masked = true;
+    }
     function ask(title, value, callback) {
+        masked = false;
         heading = title;
         done = callback;
         plain = false;
@@ -117,6 +124,7 @@ Item {
             Field {
                 id: field
                 visible: !dialog.plain
+                secret: dialog.masked
                 width: parent.width
                 toolbar: true
                 onAccepted: dialog.accept()
