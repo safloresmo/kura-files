@@ -30,6 +30,7 @@ archivos comprimir FORMATO ORIGEN...   zip, tar.gz, tar.xz o 7z
 archivos extraer ARCHIVO            extrae en una carpeta nueva
 archivos info RUTA                  lo que se sabe de un archivo o carpeta
 
+archivos idioma [CÓDIGO]        plantilla para traducir, o lo que le falta a un idioma
 archivos compilar               compila el motor (hace falta la primera vez)
 archivos pruebas                corre las pruebas del motor y las de la ventana
 TEXT
@@ -135,6 +136,17 @@ case ${1:-} in
     comprimir) shift; engine compress "$@" ;;
     extraer) shift; engine extract "$@" ;;
     info) shift; engine info "$@" ;;
+    idioma)
+        # Every text there is, taken from the English file, which has them all.
+        if [ -z "${2:-}" ]; then
+            jq 'with_entries(select(.key != "_")) | with_entries(.value = (if .key == "name" then "Nombre del idioma" else "" end))' "$root/idiomas/en.json"
+        else
+            mine=${XDG_CONFIG_HOME:-$HOME/.config}/archivos/idiomas/$2.json
+            [ -f "$root/idiomas/$2.json" ] && mine=$root/idiomas/$2.json
+            [ -f "$mine" ] || { echo "No hay idioma $2." >&2; exit 1; }
+            jq -r --slurpfile have "$mine" 'keys[] | select(. != "_" and (($have[0][.] // "") == ""))' "$root/idiomas/en.json"
+        fi
+        ;;
     compilar) exec cargo build --release --manifest-path "$root/motor/Cargo.toml" ;;
     pruebas) cargo test --manifest-path "$root/motor/Cargo.toml" && exec "$root/tests/input.sh" ;;
     *) open_at "$1" ;;

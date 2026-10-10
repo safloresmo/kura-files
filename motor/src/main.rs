@@ -45,6 +45,7 @@ archivos-motor preview PATH [BYTES]
 archivos-motor apps PATH
 archivos-motor list DIR [hidden]
 archivos-motor themes DIR
+archivos-motor languages DIR
 archivos-motor stat PATH...
 archivos-motor index
 archivos-motor everywhere TEXT [hidden]
@@ -127,7 +128,8 @@ fn main() {
         ("preview", [path, bytes]) => describe::preview(Path::new(path), bytes.parse().unwrap_or(4000)),
         ("list", [dir]) => describe::list(Path::new(dir), false),
         ("list", [dir, _]) => describe::list(Path::new(dir), true),
-        ("themes", [given]) => describe::themes(Path::new(given)),
+        ("themes", [given]) => describe::catalogue("temas", Path::new(given)),
+        ("languages", [given]) => describe::catalogue("idiomas", Path::new(given)),
         ("stat", paths) => describe::stat(paths),
         ("index", []) => describe::index(),
         ("everywhere", [text]) => describe::everywhere(text, false),

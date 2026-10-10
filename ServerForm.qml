@@ -37,11 +37,11 @@ Item {
     function accept() {
         const where = host.text.trim();
         if (where === "" || /[\s\/]/.test(where)) {
-            app.say("ESCRIBE EL SERVIDOR", true);
+            app.say(Lang.t("ESCRIBE EL SERVIDOR"), true);
             return;
         }
         if (port.text.trim() !== "" && !/^[0-9]{1,5}$/.test(port.text.trim())) {
-            app.say("EL PUERTO ES UN NÚMERO", true);
+            app.say(Lang.t("EL PUERTO ES UN NÚMERO"), true);
             return;
         }
         const server = { name: nick.text.trim() || where, uri: uri() };
@@ -105,14 +105,14 @@ Item {
 
             Text {
                 bottomPadding: Tokens.s2
-                text: "// NUEVO SERVIDOR"
+                text: Lang.t("// NUEVO SERVIDOR")
                 color: Tokens.ink
                 font.family: Tokens.mono
                 font.pixelSize: 12
                 font.letterSpacing: Tokens.trackLabel
             }
             Line {
-                label: "Tipo"
+                label: Lang.t("Tipo")
                 Seg {
                     anchors.right: parent.right
                     anchors.verticalCenter: parent.verticalCenter
@@ -122,28 +122,28 @@ Item {
                 }
             }
             Line {
-                label: "Servidor"
-                Field { id: host; Keys.onTabPressed: port.grabFocus(); Keys.onBacktabPressed: nick.grabFocus(); anchors.fill: parent; toolbar: true; tabular: true; placeholder: "equipo.ejemplo.com o 192.168.1.20"; onAccepted: form.accept() }
+                label: Lang.t("Servidor")
+                Field { id: host; Keys.onTabPressed: port.grabFocus(); Keys.onBacktabPressed: nick.grabFocus(); anchors.fill: parent; toolbar: true; tabular: true; placeholder: Lang.t("equipo.ejemplo.com o 192.168.1.20"); onAccepted: form.accept() }
             }
             Line {
-                label: "Puerto"
+                label: Lang.t("Puerto")
                 Field { id: port; Keys.onTabPressed: user.grabFocus(); Keys.onBacktabPressed: host.grabFocus(); anchors { left: parent.left; verticalCenter: parent.verticalCenter } width: 110; toolbar: true; tabular: true; placeholder: form.ports[form.kind]; onAccepted: form.accept() }
             }
             Line {
-                label: "Usuario"
-                Field { id: user; Keys.onTabPressed: pass.grabFocus(); Keys.onBacktabPressed: port.grabFocus(); anchors.fill: parent; toolbar: true; tabular: true; placeholder: "opcional"; onAccepted: form.accept() }
+                label: Lang.t("Usuario")
+                Field { id: user; Keys.onTabPressed: pass.grabFocus(); Keys.onBacktabPressed: port.grabFocus(); anchors.fill: parent; toolbar: true; tabular: true; placeholder: Lang.t("opcional"); onAccepted: form.accept() }
             }
             Line {
-                label: "Contraseña"
-                Field { id: pass; Keys.onTabPressed: folder.grabFocus(); Keys.onBacktabPressed: user.grabFocus(); anchors.fill: parent; toolbar: true; secret: true; placeholder: "no se guarda; vacía si entras con llave"; onAccepted: form.accept() }
+                label: Lang.t("Contraseña")
+                Field { id: pass; Keys.onTabPressed: folder.grabFocus(); Keys.onBacktabPressed: user.grabFocus(); anchors.fill: parent; toolbar: true; secret: true; placeholder: Lang.t("no se guarda; vacía si entras con llave"); onAccepted: form.accept() }
             }
             Line {
-                label: form.kind === "SMB" ? "Recurso" : "Carpeta"
-                Field { id: folder; Keys.onTabPressed: nick.grabFocus(); Keys.onBacktabPressed: pass.grabFocus(); anchors.fill: parent; toolbar: true; tabular: true; placeholder: form.kind === "SMB" ? "nombre de la carpeta compartida" : "opcional, por ejemplo /srv/datos"; onAccepted: form.accept() }
+                label: form.kind === "SMB" ? Lang.t("Recurso") : Lang.t("Carpeta")
+                Field { id: folder; Keys.onTabPressed: nick.grabFocus(); Keys.onBacktabPressed: pass.grabFocus(); anchors.fill: parent; toolbar: true; tabular: true; placeholder: form.kind === "SMB" ? Lang.t("nombre de la carpeta compartida") : Lang.t("opcional, por ejemplo /srv/datos"); onAccepted: form.accept() }
             }
             Line {
-                label: "Nombre"
-                Field { id: nick; Keys.onTabPressed: host.grabFocus(); Keys.onBacktabPressed: folder.grabFocus(); anchors.fill: parent; toolbar: true; placeholder: "cómo aparece en la lista"; onAccepted: form.accept() }
+                label: Lang.t("Nombre")
+                Field { id: nick; Keys.onTabPressed: host.grabFocus(); Keys.onBacktabPressed: folder.grabFocus(); anchors.fill: parent; toolbar: true; placeholder: Lang.t("cómo aparece en la lista"); onAccepted: form.accept() }
             }
             Text {
                 width: parent.width
@@ -159,8 +159,8 @@ Item {
                 topPadding: Tokens.s2
                 spacing: Tokens.s2
 
-                Btn { text: "CANCELAR"; onAct: form.close() }
-                Btn { text: "GUARDAR Y CONECTAR"; primary: true; onAct: form.accept() }
+                Btn { text: Lang.t("CANCELAR"); onAct: form.close() }
+                Btn { text: Lang.t("GUARDAR Y CONECTAR"); primary: true; onAct: form.accept() }
             }
         }
     }

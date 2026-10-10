@@ -279,11 +279,12 @@ pub fn list(dir: &Path, hidden: bool) -> Result<(), String> {
     Ok(())
 }
 
-/// The themes on offer, the user's own first: `FILE-NAME  SHOWN-NAME` per line.
-pub fn themes(given: &Path) -> Result<(), String> {
+/// The themes or the languages on offer, the user's own first:
+/// `FILE-NAME  SHOWN-NAME` per line. `kind` is the folder they live in.
+pub fn catalogue(kind: &str, given: &Path) -> Result<(), String> {
     let config = env::var("XDG_CONFIG_HOME").map(PathBuf::from).unwrap_or_else(|_| home().join(".config"));
     let mut seen: Vec<String> = Vec::new();
-    for dir in [config.join("archivos/temas"), given.to_path_buf()] {
+    for dir in [config.join("archivos").join(kind), given.to_path_buf()] {
         let mut files: Vec<PathBuf> = fs::read_dir(&dir).into_iter().flatten().flatten().map(|entry| entry.path()).collect();
         files.sort();
         for file in files {
@@ -291,7 +292,7 @@ pub fn themes(given: &Path) -> Result<(), String> {
             if key.is_empty() || key.starts_with('.') || seen.contains(&key) {
                 continue;
             }
-            // The name a theme gives itself, read without taking the file apart.
+            // The name the file gives itself, read without taking the file apart.
             let text = fs::read_to_string(&file).unwrap_or_default();
             let shown = text
                 .split("\"name\"")

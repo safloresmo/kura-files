@@ -18,7 +18,7 @@ Item {
     property bool sortReversed: false
     property int current: -1
 
-    property var places: [{ name: "Carpeta personal", path: home, icon: "home", seal: "自宅" }]
+    property var places: [{ name: Lang.t("Carpeta personal"), path: home, icon: "home", seal: "自宅" }]
     property var devices: []
     property var counts: ({})
     property var flags: ({})
@@ -68,7 +68,7 @@ Item {
             done += t.done;
             total += t.total;
         }
-        return { done: done, total: total, name: transfers.length > 1 ? transfers.length + " TRABAJOS" : transfers[0].name };
+        return { done: done, total: total, name: transfers.length > 1 ? transfers.length + Lang.t(" TRABAJOS") : transfers[0].name };
     }
     property var bookmarks: []
     property var info: ({})
@@ -168,7 +168,7 @@ Item {
     readonly property bool compact: mode === "compact"
     readonly property bool ready: dir.status === FolderListModel.Ready
     readonly property var selected: entry(current)
-    readonly property string title: recent ? "Recientes" : nameOf(path)
+    readonly property string title: recent ? Lang.t("Recientes") : nameOf(path)
 
     function nameOf(p) {
         for (const place of places) {
@@ -179,7 +179,7 @@ Item {
             if (remotes[server.uri] === p)
                 return server.name;
         }
-        return p === "/" ? "Raíz" : p.slice(p.lastIndexOf("/") + 1);
+        return p === "/" ? Lang.t("Raíz") : p.slice(p.lastIndexOf("/") + 1);
     }
 
     // Tabs keep a path and its history; the rest of the view follows the open one.
@@ -239,22 +239,22 @@ Item {
             go(mounted);
             return;
         }
-        say("CONECTANDO A " + server.name.toUpperCase() + "…");
+        say(Lang.t("CONECTANDO A ") + server.name.toUpperCase() + "…");
         mounter.createObject(app, { server: server, secret: secret === undefined ? "" : secret }).running = true;
     }
     function disconnectServer(server) {
         const mounted = remotes[server.uri];
         if (mounted && (path === mounted || path.indexOf(mounted + "/") === 0))
             go(home);
-        run(["gio", "mount", "-u", server.uri], "DESCONECTADO · " + server.name.toUpperCase());
+        run(["gio", "mount", "-u", server.uri], Lang.t("DESCONECTADO · ") + server.name.toUpperCase());
     }
     function serverMenu(server, x, y) {
         const mounted = remotes[server.uri] !== undefined && remotes[server.uri] !== "";
         menu.popup(x, y, [
-            { label: mounted ? "Abrir" : "Conectar", act: () => connectServer(server) },
-            { label: "Desconectar", armed: mounted, act: () => disconnectServer(server) },
+            { label: mounted ? Lang.t("Abrir") : Lang.t("Conectar"), act: () => connectServer(server) },
+            { label: Lang.t("Desconectar"), armed: mounted, act: () => disconnectServer(server) },
             { sep: true },
-            { label: "Quitar de la lista", act: () => removeServer(server) }
+            { label: Lang.t("Quitar de la lista"), act: () => removeServer(server) }
         ]);
     }
     // Two panes: the second one is where things get copied or moved to.
@@ -285,12 +285,12 @@ Item {
         if (!dual || list.length === 0 || inTrash)
             return;
         if (otherPath === path) {
-            say("LOS DOS PANELES MUESTRAN LA MISMA CARPETA", true);
+            say(Lang.t("LOS DOS PANELES MUESTRAN LA MISMA CARPETA"), true);
             return;
         }
         marked = {};
         transferTo(moving ? "move" : "copy", otherPath, list.map(e => e.path),
-            (moving ? "MOVIDO AL OTRO PANEL · " : "COPIADO AL OTRO PANEL · ") + label(list));
+            (moving ? Lang.t("MOVIDO AL OTRO PANEL · ") : Lang.t("COPIADO AL OTRO PANEL · ")) + label(list));
     }
     function setZoom(value) {
         zoom = Math.max(0.6, Math.min(2.4, Math.round(value * 10) / 10));
@@ -299,11 +299,11 @@ Item {
         const list = picked();
         if (list.length === 0 || inTrash)
             return;
-        dialog.confirm("ELIMINAR PARA SIEMPRE", "Se eliminará " + label(list).toLowerCase() + " sin pasar por la papelera. No se puede deshacer.",
+        dialog.confirm(Lang.t("ELIMINAR PARA SIEMPRE"), Lang.t("Se eliminará ") + label(list).toLowerCase() + Lang.t(" sin pasar por la papelera. No se puede deshacer."),
             () => {
                 marked = {};
-                op(["delete"].concat(list.map(e => e.path)), "ELIMINADO · " + label(list), null);
-            }, "SÍ, ELIMINAR");
+                op(["delete"].concat(list.map(e => e.path)), Lang.t("ELIMINADO · ") + label(list), null);
+            }, Lang.t("SÍ, ELIMINAR"));
     }
 
     signal quit()
@@ -317,7 +317,7 @@ Item {
     readonly property bool pickMulti: Quickshell.env("ARCHIVOS_PICK_MULTI") === "1"
     readonly property string pickName: Quickshell.env("ARCHIVOS_PICK_NAME") || ""
     readonly property string pickTitle: Quickshell.env("ARCHIVOS_PICK_TITLE")
-        || (pick === "save" ? "Guardar como" : pick === "folder" ? "Elegir carpeta" : pick === "open" ? "Abrir archivo" : "")
+        || (pick === "save" ? Lang.t("Guardar como") : pick === "folder" ? Lang.t("Elegir carpeta") : pick === "open" ? Lang.t("Abrir archivo") : "")
     // What would be handed over if the button were pressed now.
     readonly property var pickPaths: {
         if (pick === "folder") {
@@ -331,8 +331,8 @@ Item {
         return [];
     }
     readonly property bool pickReady: pick === "save" ? !inTrash : pickPaths.length > 0
-    readonly property string pickSummary: pickPaths.length === 0 ? "Elige un archivo."
-        : pickPaths.length === 1 ? shorten(pickPaths[0]) : Fmt.plural(pickPaths.length, "archivo", "archivos")
+    readonly property string pickSummary: pickPaths.length === 0 ? Lang.t("Elige un archivo.")
+        : pickPaths.length === 1 ? shorten(pickPaths[0]) : Fmt.plural(pickPaths.length, Lang.t("archivo"), Lang.t("archivos"))
     function pickAnswer(paths) {
         answer.command = ["sh", "-c", 'out=$1; shift; printf "%s\\n" "$@" > "$out"', "sh", Quickshell.env("ARCHIVOS_PICK_OUT") || "/dev/null"].concat(paths);
         answer.running = true;
@@ -345,12 +345,12 @@ Item {
         }
         const name = pickBar.nameField.text.trim();
         if (name === "" || name.indexOf("/") >= 0 || inTrash) {
-            say("ESCRIBE UN NOMBRE", true);
+            say(Lang.t("ESCRIBE UN NOMBRE"), true);
             return;
         }
         const target = (path === "/" ? "" : path) + "/" + name;
         if (rows.some(e => e.name === name))
-            dialog.confirm("YA EXISTE", "«" + name + "» ya está en esta carpeta. ¿Reemplazarlo?", () => pickAnswer([target]), "REEMPLAZAR");
+            dialog.confirm(Lang.t("YA EXISTE"), "«" + name + Lang.t("» ya está en esta carpeta. ¿Reemplazarlo?"), () => pickAnswer([target]), Lang.t("REEMPLAZAR"));
         else
             pickAnswer([target]);
     }
@@ -459,7 +459,7 @@ Item {
     }
     function copyPath(p) {
         Quickshell.execDetached(["wl-copy", "--", p]);
-        say("RUTA COPIADA");
+        say(Lang.t("RUTA COPIADA"));
     }
 
     function say(text, bad) {
@@ -471,7 +471,7 @@ Item {
         const task = job.createObject(app, {
             command: command,
             okText: okText,
-            failText: failText || "NO SE PUDO",
+            failText: failText || Lang.t("NO SE PUDO"),
             undoArgs: undoArgs === undefined ? null : undoArgs,
             tid: ++jobCount
         });
@@ -485,7 +485,7 @@ Item {
     }
     function undoLast() {
         if (!undo) {
-            say("NADA QUE DESHACER", true);
+            say(Lang.t("NADA QUE DESHACER"), true);
             return;
         }
         const last = undo;
@@ -495,11 +495,11 @@ Item {
             redoStack = redoStack.concat([{ args: last.again, text: last.text }]);
         else
             redoStack = [];
-        op(last.args, "DESHECHO · " + last.text, null);
+        op(last.args, Lang.t("DESHECHO · ") + last.text, null);
     }
     function redoLast() {
         if (!redo) {
-            say("NADA QUE REHACER", true);
+            say(Lang.t("NADA QUE REHACER"), true);
             return;
         }
         const again = redo;
@@ -520,8 +520,8 @@ Item {
         const asRoot = [elevator];
         for (let i = 0; i < command.length; i++)
             asRoot.push(String(command[i]));
-        dialog.confirm("PERMISO DENEGADO", "Tu usuario no puede hacer esto aquí. ¿Repetirlo como administrador? Te pedirá la contraseña y no se podrá deshacer.",
-            () => run(asRoot, okText, failText, null), "COMO ADMINISTRADOR");
+        dialog.confirm(Lang.t("PERMISO DENEGADO"), Lang.t("Tu usuario no puede hacer esto aquí. ¿Repetirlo como administrador? Te pedirá la contraseña y no se podrá deshacer."),
+            () => run(asRoot, okText, failText, null), Lang.t("COMO ADMINISTRADOR"));
     }
     function pushUndo(step) {
         undoStack = undoStack.concat([step]).slice(-40);
@@ -564,7 +564,7 @@ Item {
         return selected ? [selected] : [];
     }
     function label(list) {
-        return list.length === 1 ? list[0].name.toUpperCase() : list.length + " ELEMENTOS";
+        return list.length === 1 ? list[0].name.toUpperCase() : list.length + Lang.t(" ELEMENTOS");
     }
     function click(i, modifiers) {
         const e = entry(i);
@@ -674,13 +674,13 @@ Item {
         }
         if (paths.length === 0 || inTrash)
             return;
-        const what = paths.length === 1 ? paths[0].slice(paths[0].lastIndexOf("/") + 1).toUpperCase() : paths.length + " ELEMENTOS";
+        const what = paths.length === 1 ? paths[0].slice(paths[0].lastIndexOf("/") + 1).toUpperCase() : paths.length + Lang.t(" ELEMENTOS");
         const where = dest.slice(dest.lastIndexOf("/") + 1).toUpperCase() || "/";
         marked = {};
         if (dest === trashDir)
-            op(["trash"].concat(paths), "A LA PAPELERA · " + what, ["untrash"].concat(paths));
+            op(["trash"].concat(paths), Lang.t("A LA PAPELERA · ") + what, ["untrash"].concat(paths));
         else
-            transferTo(inside ? "drop" : "copy", dest, paths, (inside ? "SOLTADO EN " : "COPIADO A ") + where + " · " + what);
+            transferTo(inside ? "drop" : "copy", dest, paths, (inside ? Lang.t("SOLTADO EN ") : Lang.t("COPIADO A ")) + where + " · " + what);
     }
     function search(text, inside) {
         const q = String(text).trim();
@@ -702,7 +702,7 @@ Item {
     function searchEverywhere(text) {
         const q = String(text === undefined ? "" : text).trim();
         if (q === "") {
-            dialog.ask("BUSCAR EN TODA TU CARPETA PERSONAL", "", value => searchEverywhere(value));
+            dialog.ask(Lang.t("BUSCAR EN TODA TU CARPETA PERSONAL"), "", value => searchEverywhere(value));
             return;
         }
         deepQuery = q;
@@ -721,13 +721,13 @@ Item {
     function searchInside() {
         if (inTrash)
             return;
-        dialog.ask("BUSCAR DENTRO DE LOS ARCHIVOS", "", value => search(value, true));
+        dialog.ask(Lang.t("BUSCAR DENTRO DE LOS ARCHIVOS"), "", value => search(value, true));
     }
     function makeLink() {
         const list = picked();
         if (list.length === 0 || inTrash)
             return;
-        op(["link", dual && otherPath !== "" ? otherPath : path].concat(list.map(e => e.path)), "ENLAZADO · " + label(list));
+        op(["link", dual && otherPath !== "" ? otherPath : path].concat(list.map(e => e.path)), Lang.t("ENLAZADO · ") + label(list));
     }
     function checksum() {
         if (infoPath === "" || summer.running)
@@ -751,7 +751,7 @@ Item {
             return;
         clip = { paths: list.map(e => e.path), text: label(list), cut: cut };
         Quickshell.execDetached(["sh", "-c", "printf '%s\\n' \"$@\" | wl-copy -t text/uri-list", "sh"].concat(list.map(e => url(e.path))));
-        say((cut ? "CORTADO · " : "COPIADO · ") + clip.text);
+        say((cut ? Lang.t("CORTADO · ") : Lang.t("COPIADO · ")) + clip.text);
     }
     function paste() {
         if (inTrash)
@@ -762,7 +762,7 @@ Item {
         }
         // A cut is spent once the move really starts, not if the question is cancelled.
         const held = clip;
-        transferTo(clip.cut ? "move" : "copy", path, clip.paths, (clip.cut ? "MOVIDO · " : "PEGADO · ") + clip.text,
+        transferTo(clip.cut ? "move" : "copy", path, clip.paths, (clip.cut ? Lang.t("MOVIDO · ") : Lang.t("PEGADO · ")) + clip.text,
             () => {
                 if (held.cut && clip === held)
                     clip = null;
@@ -773,7 +773,7 @@ Item {
         if (list.length === 0 || inTrash)
             return;
         marked = {};
-        op(["trash"].concat(list.map(e => e.path)), "A LA PAPELERA · " + label(list), ["untrash"].concat(list.map(e => e.path)));
+        op(["trash"].concat(list.map(e => e.path)), Lang.t("A LA PAPELERA · ") + label(list), ["untrash"].concat(list.map(e => e.path)));
     }
     // The name a pattern gives the nth of a set, as the engine works it out.
     function patterned(pattern, index, total, original) {
@@ -789,9 +789,9 @@ Item {
         if (list.length === 0 || inTrash)
             return;
         if (list.length > 1) {
-            dialog.ask("RENOMBRAR " + list.length + " · {n} ES EL NÚMERO", "nombre {n}", pattern => {
+            dialog.ask(Lang.t("RENOMBRAR ") + list.length + Lang.t(" · {n} ES EL NÚMERO"), Lang.t("nombre {n}"), pattern => {
                 marked = {};
-                op(["rename-many", pattern].concat(list.map(x => x.path)), "RENOMBRADOS · " + list.length + " ELEMENTOS");
+                op(["rename-many", pattern].concat(list.map(x => x.path)), Lang.t("RENOMBRADOS · ") + list.length + Lang.t(" ELEMENTOS"));
             });
             dialog.preview(text => {
                 const pattern = text.trim();
@@ -799,44 +799,44 @@ Item {
                     return "";
                 const lines = list.slice(0, 4).map((e, i) => e.name + "  →  " + patterned(pattern, i, list.length, e.name));
                 if (list.length > 4)
-                    lines.push("… y " + (list.length - 4) + " más");
+                    lines.push("… y " + (list.length - 4) + Lang.t(" más"));
                 return lines.join("\n");
             });
             return;
         }
         const e = list[0];
-        dialog.ask("RENOMBRAR", e.name, value => op(["rename", e.path, value], "RENOMBRADO · " + value.toUpperCase()));
+        dialog.ask(Lang.t("RENOMBRAR"), e.name, value => op(["rename", e.path, value], Lang.t("RENOMBRADO · ") + value.toUpperCase()));
     }
     function newFolder() {
         if (inTrash)
             return;
-        dialog.ask("NUEVA CARPETA", "Nueva carpeta", value => op(["mkdir", path, value], "CARPETA CREADA · " + value.toUpperCase()));
+        dialog.ask(Lang.t("NUEVA CARPETA"), Lang.t("Nueva carpeta"), value => op(["mkdir", path, value], Lang.t("CARPETA CREADA · ") + value.toUpperCase()));
     }
     function newFile() {
         if (inTrash)
             return;
-        dialog.ask("NUEVO ARCHIVO", "Sin título.txt", value => op(["touch", path, value], "ARCHIVO CREADO · " + value.toUpperCase()));
+        dialog.ask(Lang.t("NUEVO ARCHIVO"), Lang.t("Sin título.txt"), value => op(["touch", path, value], Lang.t("ARCHIVO CREADO · ") + value.toUpperCase()));
     }
     function compress(format) {
         const list = picked();
         if (list.length === 0 || inTrash)
             return;
-        say("COMPRIMIENDO…");
-        op(["compress", format].concat(list.map(e => e.path)), "COMPRIMIDO · " + label(list));
+        say(Lang.t("COMPRIMIENDO…"));
+        op(["compress", format].concat(list.map(e => e.path)), Lang.t("COMPRIMIDO · ") + label(list));
     }
     function extract() {
         const list = picked().filter(e => !e.isDir && Fmt.icon(e.name, false) === "archive");
         if (list.length !== 1)
             return;
-        say("EXTRAYENDO…");
-        op(["extract", list[0].path], "EXTRAÍDO · " + list[0].name.toUpperCase());
+        say(Lang.t("EXTRAYENDO…"));
+        op(["extract", list[0].path], Lang.t("EXTRAÍDO · ") + list[0].name.toUpperCase());
     }
     // Look inside an archive without unpacking it next to the original.
     function peek() {
         const list = picked().filter(e => !e.isDir && Fmt.icon(e.name, false) === "archive");
         if (list.length !== 1)
             return;
-        say("ABRIENDO " + list[0].name.toUpperCase() + "…");
+        say(Lang.t("ABRIENDO ") + list[0].name.toUpperCase() + "…");
         peeker.name = list[0].name;
         peeker.command = [engine, "peek", list[0].path];
         peeker.running = true;
@@ -855,12 +855,12 @@ Item {
     }
     function toggleBookmark(p) {
         const had = isBookmarked(p);
-        run([engine, "bookmarks", had ? "remove" : "add", p], had ? "MARCADOR QUITADO" : "MARCADOR AÑADIDO");
+        run([engine, "bookmarks", had ? "remove" : "add", p], had ? Lang.t("MARCADOR QUITADO") : Lang.t("MARCADOR AÑADIDO"));
     }
     function bookmarkMenu(b, x, y) {
         menu.popup(x, y, [
-            { label: "Abrir", act: () => go(b.path) },
-            { label: "Quitar marcador", act: () => toggleBookmark(b.path) }
+            { label: Lang.t("Abrir"), act: () => go(b.path) },
+            { label: Lang.t("Quitar marcador"), act: () => toggleBookmark(b.path) }
         ]);
     }
     function properties() {
@@ -877,14 +877,14 @@ Item {
     function chmod(mode) {
         if (infoPath === "")
             return;
-        run([engine, "chmod", mode, infoPath], "PERMISOS · " + mode);
+        run([engine, "chmod", mode, infoPath], Lang.t("PERMISOS · ") + mode);
         infoAgain.restart();
     }
     function chmodTree() {
         if (infoPath === "")
             return;
-        dialog.confirm("PERMISOS", "Todo lo que hay dentro tomará los permisos de esta carpeta. No se puede deshacer.",
-            () => run([engine, "chmod-tree", infoPath], "PERMISOS APLICADOS A TODO"), "APLICAR");
+        dialog.confirm(Lang.t("PERMISOS"), Lang.t("Todo lo que hay dentro tomará los permisos de esta carpeta. No se puede deshacer."),
+            () => run([engine, "chmod-tree", infoPath], Lang.t("PERMISOS APLICADOS A TODO")), Lang.t("APLICAR"));
     }
     function folderOf(p) {
         const shown = shorten(p);
@@ -895,7 +895,7 @@ Item {
         const list = picked();
         if (list.length === 0 || inTrash)
             return;
-        op(["copy", path].concat(list.map(e => e.path)), "DUPLICADO · " + label(list));
+        op(["copy", path].concat(list.map(e => e.path)), Lang.t("DUPLICADO · ") + label(list));
     }
     // How much the marked files weigh, for the footer.
     readonly property string markedWeight: {
@@ -913,20 +913,20 @@ Item {
         if (list.length === 0 || !inTrash)
             return;
         marked = {};
-        op(["restore"].concat(list.map(e => e.path)), "RESTAURADO · " + label(list), null);
+        op(["restore"].concat(list.map(e => e.path)), Lang.t("RESTAURADO · ") + label(list), null);
     }
     function emptyTrash() {
-        dialog.confirm("VACIAR PAPELERA", "Se eliminará todo lo que hay en la papelera. No se puede deshacer.",
-            () => run(["gio", "trash", "--empty"], "PAPELERA VACÍA"), "SÍ, VACIAR");
+        dialog.confirm(Lang.t("VACIAR PAPELERA"), Lang.t("Se eliminará todo lo que hay en la papelera. No se puede deshacer."),
+            () => run(["gio", "trash", "--empty"], Lang.t("PAPELERA VACÍA")), Lang.t("SÍ, VACIAR"));
     }
     function sendTo(target) {
         const list = picked().filter(e => !e.isDir);
         if (list.length === 0)
             return;
-        say("ENVIANDO A " + target.name.toUpperCase() + "…");
+        say(Lang.t("ENVIANDO A ") + target.name.toUpperCase() + "…");
         run(["tailscale", "file", "cp", "--"].concat(list.map(e => e.path)).concat([target.name + ":"]),
-            "ENVIADO A " + target.name.toUpperCase() + " · " + label(list),
-            "NO SE ENVIÓ A " + target.name.toUpperCase());
+            Lang.t("ENVIADO A ") + target.name.toUpperCase() + " · " + label(list),
+            Lang.t("NO SE ENVIÓ A ") + target.name.toUpperCase());
     }
     // LocalSend picks the receiver in its own window.
     function localSend() {
@@ -934,7 +934,7 @@ Item {
         if (list.length === 0)
             return;
         Quickshell.execDetached(["localsend"].concat(list.map(e => e.path)));
-        say("ABIERTO EN LOCALSEND · " + label(list));
+        say(Lang.t("ABIERTO EN LOCALSEND · ") + label(list));
     }
     function openWith(e, app) {
         Quickshell.execDetached(["gio", "launch", app.file, e.path]);
@@ -944,10 +944,10 @@ Item {
         if (appsFor !== e.path || apps.length === 0 || appsType === "")
             return;
         const kind = appsType;
-        palette.choose("ABRIR SIEMPRE " + Fmt.kind(e.name, false).toUpperCase() + " CON", apps.map(a => ({
+        palette.choose(Lang.t("ABRIR SIEMPRE ") + Fmt.kind(e.name, false).toUpperCase() + Lang.t(" CON"), apps.map(a => ({
             label: a.name,
             hint: "",
-            act: () => run(["gio", "mime", kind, a.file.slice(a.file.lastIndexOf("/") + 1)], "PREDETERMINADA · " + a.name.toUpperCase())
+            act: () => run(["gio", "mime", kind, a.file.slice(a.file.lastIndexOf("/") + 1)], Lang.t("PREDETERMINADA · ") + a.name.toUpperCase())
         })));
     }
     // Copy or move into a folder, asking first when names are already taken there.
@@ -956,7 +956,7 @@ Item {
             return;
         // One question at a time: a second transfer would take the first one's answer.
         if (clash.pending !== null || dialog.visible) {
-            say("RESPONDE PRIMERO A LA PREGUNTA ANTERIOR", true);
+            say(Lang.t("RESPONDE PRIMERO A LA PREGUNTA ANTERIOR"), true);
             return;
         }
         clash.pending = { mode: mode, dest: dest, paths: paths, okText: okText, started: started };
@@ -985,27 +985,27 @@ Item {
     }
     function actionEntries(paths) {
         if (actionsFor !== paths.join("\n") || actions.length === 0)
-            return [{ label: "Sin acciones para esto", armed: false }];
+            return [{ label: Lang.t("Sin acciones para esto"), armed: false }];
         return actions.map(a => ({
             label: (a.group !== "" ? a.group + " · " : "") + a.name,
-            act: () => run([engine, "act", a.file, a.id].concat(paths), "ACCIÓN · " + a.name.toUpperCase())
+            act: () => run([engine, "act", a.file, a.id].concat(paths), Lang.t("ACCIÓN · ") + a.name.toUpperCase())
         }));
     }
     // Packs of actions fetched from a repository: { name, url, count }.
     property var packs: []
     function packJob(args, okText) {
-        say("TRAYENDO…");
+        say(Lang.t("TRAYENDO…"));
         packer.okText = okText;
         packer.command = [engine].concat(args);
         packer.running = true;
     }
     function installPack() {
-        dialog.ask("INSTALAR ACCIONES · DIRECCIÓN DEL REPOSITORIO", "https://github.com/", url => packJob(["pack-add", url], "ACCIONES INSTALADAS"));
-        dialog.preview(() => "Se copian a tu equipo y aparecen en el clic derecho. Son programas de otra persona: instala solo los de quien te fíes.");
+        dialog.ask(Lang.t("INSTALAR ACCIONES · DIRECCIÓN DEL REPOSITORIO"), "https://github.com/", url => packJob(["pack-add", url], Lang.t("ACCIONES INSTALADAS")));
+        dialog.preview(() => Lang.t("Se copian a tu equipo y aparecen en el clic derecho. Son programas de otra persona: instala solo los de quien te fíes."));
     }
     function removePack(p) {
-        dialog.confirm("QUITAR ACCIONES", "Se borrará «" + p.name + "» con sus " + p.count + " acciones.",
-            () => packJob(["pack-remove", p.name], "ACCIONES QUITADAS · " + p.name.toUpperCase()), "QUITAR");
+        dialog.confirm(Lang.t("QUITAR ACCIONES"), Lang.t("Se borrará «") + p.name + Lang.t("» con sus ") + p.count + Lang.t(" acciones."),
+            () => packJob(["pack-remove", p.name], Lang.t("ACCIONES QUITADAS · ") + p.name.toUpperCase()), Lang.t("QUITAR"));
     }
     function openActionsFolder() {
         const dir = home + "/.config/archivos/acciones";
@@ -1013,13 +1013,13 @@ Item {
         go(dir);
     }
     function mount(d) {
-        say("MONTANDO " + d.name.toUpperCase() + "…");
-        run(["udisksctl", "mount", "-b", d.dev], "MONTADO · " + d.name.toUpperCase());
+        say(Lang.t("MONTANDO ") + d.name.toUpperCase() + "…");
+        run(["udisksctl", "mount", "-b", d.dev], Lang.t("MONTADO · ") + d.name.toUpperCase());
     }
     function eject(d) {
         if (path === d.path || path.indexOf(d.path + "/") === 0)
             go(home);
-        run(["udisksctl", "unmount", "-b", d.dev], "EXPULSADO · " + d.name.toUpperCase(), "NO SE EXPULSÓ " + d.name.toUpperCase());
+        run(["udisksctl", "unmount", "-b", d.dev], Lang.t("EXPULSADO · ") + d.name.toUpperCase(), Lang.t("NO SE EXPULSÓ ") + d.name.toUpperCase());
     }
 
     function contextMenu(x, y) {
@@ -1030,95 +1030,95 @@ Item {
         const many = n > 1 ? " · " + n : "";
         const items = [];
         if (inTrash) {
-            items.push({ label: "Restaurar" + many, armed: n > 0, act: () => restore() });
-            items.push({ label: "Vaciar papelera", armed: trashList.length > 0, act: () => emptyTrash() });
+            items.push({ label: Lang.t("Restaurar") + many, armed: n > 0, act: () => restore() });
+            items.push({ label: Lang.t("Vaciar papelera"), armed: trashList.length > 0, act: () => emptyTrash() });
             menu.popup(x, y, items);
             return;
         }
         sources.loadTargets();
         if (one && deep)
-            items.push({ label: "Mostrar en su carpeta", act: () => showInFolder(one) });
+            items.push({ label: Lang.t("Mostrar en su carpeta"), act: () => showInFolder(one) });
         if (one) {
-            items.push({ label: "Abrir", hint: "ENTER", act: () => open(current) });
+            items.push({ label: Lang.t("Abrir"), hint: "ENTER", act: () => open(current) });
             if (one.isDir)
-                items.push({ label: "Abrir en pestaña nueva", hint: "CTRL+ENTER", act: () => newTab(one.path) });
+                items.push({ label: Lang.t("Abrir en pestaña nueva"), hint: Lang.t("CTRL+ENTER"), act: () => newTab(one.path) });
             if (!one.isDir) {
                 loadApps(one.path);
-                items.push({ label: "Abrir con", sub: () => appEntries(one) });
+                items.push({ label: Lang.t("Abrir con"), sub: () => appEntries(one) });
             }
-            items.push({ label: "Vista rápida", hint: "ESPACIO", armed: !one.isDir, act: () => look.open() });
+            items.push({ label: Lang.t("Vista rápida"), hint: Lang.t("ESPACIO"), armed: !one.isDir, act: () => look.open() });
             items.push({ sep: true });
         }
         if (n > 0 && menuCount > 0) {
             const paths = list.map(e => e.path);
             loadActions(paths);
-            items.push({ label: "Acciones" + many, sub: () => actionEntries(paths) });
+            items.push({ label: Lang.t("Acciones") + many, sub: () => actionEntries(paths) });
             items.push({ sep: true });
         }
         if (n > 0)
-            items.push({ label: "Etiqueta" + many, sub: () => labelEntries() });
+            items.push({ label: Lang.t("Etiqueta") + many, sub: () => labelEntries() });
         if (n > 0) {
-            items.push({ label: "Copiar" + many, hint: "CTRL+C", act: () => hold(false) });
-            items.push({ label: "Cortar" + many, hint: "CTRL+X", act: () => hold(true) });
+            items.push({ label: Lang.t("Copiar") + many, hint: "CTRL+C", act: () => hold(false) });
+            items.push({ label: Lang.t("Cortar") + many, hint: "CTRL+X", act: () => hold(true) });
         }
-        items.push({ label: "Pegar aquí", hint: "CTRL+V", act: () => paste() });
+        items.push({ label: Lang.t("Pegar aquí"), hint: "CTRL+V", act: () => paste() });
         if (n > 0)
-            items.push({ label: "Renombrar" + many, hint: "F2", act: () => rename() });
+            items.push({ label: Lang.t("Renombrar") + many, hint: "F2", act: () => rename() });
         if (n > 0)
-            items.push({ label: "Duplicar" + many, hint: "CTRL+SHIFT+D", act: () => duplicate() });
-            items.push({ label: dual ? "Enlazar en el otro panel" : "Crear enlace", hint: "CTRL+SHIFT+L", act: () => makeLink() });
-        items.push({ label: "Nueva carpeta", hint: "CTRL+SHIFT+N", act: () => newFolder() });
-        items.push({ label: "Nuevo archivo", hint: "CTRL+N", act: () => newFile() });
+            items.push({ label: Lang.t("Duplicar") + many, hint: Lang.t("CTRL+SHIFT+D"), act: () => duplicate() });
+            items.push({ label: dual ? Lang.t("Enlazar en el otro panel") : Lang.t("Crear enlace"), hint: Lang.t("CTRL+SHIFT+L"), act: () => makeLink() });
+        items.push({ label: Lang.t("Nueva carpeta"), hint: Lang.t("CTRL+SHIFT+N"), act: () => newFolder() });
+        items.push({ label: Lang.t("Nuevo archivo"), hint: "CTRL+N", act: () => newFile() });
         if (undo)
-            items.push({ label: "Deshacer", hint: "CTRL+Z", act: () => undoLast() });
+            items.push({ label: Lang.t("Deshacer"), hint: "CTRL+Z", act: () => undoLast() });
         items.push({ sep: true });
         if (n > 0) {
             items.push({
-                label: "Comprimir" + many,
+                label: Lang.t("Comprimir") + many,
                 sub: [
-                    { label: "En .zip", act: () => compress("zip") },
-                    { label: "En .tar.gz", act: () => compress("tar.gz") },
-                    { label: "En .tar.xz", act: () => compress("tar.xz") },
-                    { label: "En .7z", act: () => compress("7z") }
+                    { label: Lang.t("En .zip"), act: () => compress("zip") },
+                    { label: Lang.t("En .tar.gz"), act: () => compress("tar.gz") },
+                    { label: Lang.t("En .tar.xz"), act: () => compress("tar.xz") },
+                    { label: Lang.t("En .7z"), act: () => compress("7z") }
                 ]
             });
         }
         if (one && !one.isDir && Fmt.icon(one.name, false) === "archive")
-            items.push({ label: "Ver por dentro", act: () => peek() });
-            items.push({ label: "Extraer aquí", act: () => extract() });
+            items.push({ label: Lang.t("Ver por dentro"), act: () => peek() });
+            items.push({ label: Lang.t("Extraer aquí"), act: () => extract() });
         if (one && one.isDir)
-            items.push({ label: isBookmarked(one.path) ? "Quitar marcador" : "Añadir a marcadores", hint: "CTRL+D", act: () => toggleBookmark(one.path) });
+            items.push({ label: isBookmarked(one.path) ? Lang.t("Quitar marcador") : Lang.t("Añadir a marcadores"), hint: "CTRL+D", act: () => toggleBookmark(one.path) });
         if (n > 0)
-            items.push({ label: "Enviar por Tailscale" + many, armed: sendable, sub: sendable ? () => sendEntries() : null });
+            items.push({ label: Lang.t("Enviar por Tailscale") + many, armed: sendable, sub: sendable ? () => sendEntries() : null });
         if (n > 0)
-            items.push({ label: "Enviar por LocalSend" + many, armed: sendable, act: () => localSend() });
+            items.push({ label: Lang.t("Enviar por LocalSend") + many, armed: sendable, act: () => localSend() });
         if (one)
-            items.push({ label: "Copiar ruta", act: () => copyPath(one.path) });
-        items.push({ label: "Terminal aquí", act: () => terminal(one && one.isDir ? one.path : path) });
-        items.push({ label: "Seleccionar todo", hint: "CTRL+A", act: () => markAll() });
-        items.push({ label: "Propiedades", hint: "CTRL+I", act: () => properties() });
+            items.push({ label: Lang.t("Copiar ruta"), act: () => copyPath(one.path) });
+        items.push({ label: Lang.t("Terminal aquí"), act: () => terminal(one && one.isDir ? one.path : path) });
+        items.push({ label: Lang.t("Seleccionar todo"), hint: "CTRL+A", act: () => markAll() });
+        items.push({ label: Lang.t("Propiedades"), hint: "CTRL+I", act: () => properties() });
         if (n > 0) {
             items.push({ sep: true });
-            items.push({ label: "A la papelera" + many, hint: "SUPR", act: () => trash() });
-            items.push({ label: "Eliminar para siempre" + many, hint: "MAYÚS+SUPR", act: () => erase() });
+            items.push({ label: Lang.t("A la papelera") + many, hint: Lang.t("SUPR"), act: () => trash() });
+            items.push({ label: Lang.t("Eliminar para siempre") + many, hint: Lang.t("MAYÚS+SUPR"), act: () => erase() });
         }
         menu.popup(x, y, items);
     }
     function sendEntries() {
         if (targets.length === 0)
-            return [{ label: "Sin dispositivos", armed: false }];
+            return [{ label: Lang.t("Sin dispositivos"), armed: false }];
         return targets.map(t => ({
             label: t.name,
-            hint: t.online ? "EN LÍNEA" : "FUERA",
+            hint: t.online ? Lang.t("EN LÍNEA") : Lang.t("FUERA"),
             armed: t.online,
             act: () => sendTo(t)
         }));
     }
     function appEntries(e) {
         if (appsFor !== e.path || apps.length === 0)
-            return [{ label: "Sin aplicaciones", armed: false }];
-        return apps.map((a, i) => ({ label: a.name, hint: i === 0 ? "PREDET." : "", act: () => openWith(e, a) }))
-            .concat([{ sep: true }, { label: "Abrir siempre con…", act: () => chooseDefault(e) }]);
+            return [{ label: Lang.t("Sin aplicaciones"), armed: false }];
+        return apps.map((a, i) => ({ label: a.name, hint: i === 0 ? Lang.t("PREDET.") : "", act: () => openWith(e, a) }))
+            .concat([{ sep: true }, { label: Lang.t("Abrir siempre con…"), act: () => chooseDefault(e) }]);
     }
 
     // Everything the palette can run, built when it opens.
@@ -1129,103 +1129,104 @@ Item {
         const add = (text, hint, act) => out.push({ label: text, hint: hint, act: act });
         if (inTrash) {
             if (n > 0)
-                add("Restaurar " + label(list).toLowerCase(), "PAPELERA", () => restore());
-            add("Vaciar papelera", "PAPELERA", () => emptyTrash());
+                add(Lang.t("Restaurar ") + label(list).toLowerCase(), Lang.t("PAPELERA"), () => restore());
+            add(Lang.t("Vaciar papelera"), Lang.t("PAPELERA"), () => emptyTrash());
         } else {
             if (n === 1 && deep)
-                add("Mostrar " + list[0].name + " en su carpeta", "ACCIÓN", () => showInFolder(list[0]));
+                add(Lang.t("Mostrar ") + list[0].name + Lang.t(" en su carpeta"), Lang.t("ACCIÓN"), () => showInFolder(list[0]));
             if (n === 1) {
-                add("Abrir " + list[0].name, "ENTER", () => open(current));
-                add("Renombrar " + list[0].name, "F2", () => rename());
+                add(Lang.t("Abrir ") + list[0].name, "ENTER", () => open(current));
+                add(Lang.t("Renombrar ") + list[0].name, "F2", () => rename());
                 if (!list[0].isDir)
-                    add("Vista rápida", "ESPACIO", () => look.open());
+                    add(Lang.t("Vista rápida"), Lang.t("ESPACIO"), () => look.open());
             }
             if (n > 0) {
-                add("Duplicar " + label(list).toLowerCase(), "CTRL+SHIFT+D", () => duplicate());
-                add((dual ? "Enlazar en el otro panel " : "Crear un enlace a ") + label(list).toLowerCase(), "CTRL+SHIFT+L", () => makeLink());
-                add("Copiar " + label(list).toLowerCase(), "CTRL+C", () => hold(false));
-                add("Cortar " + label(list).toLowerCase(), "CTRL+X", () => hold(true));
-                add("Mandar a la papelera " + label(list).toLowerCase(), "SUPR", () => trash());
+                add(Lang.t("Duplicar ") + label(list).toLowerCase(), Lang.t("CTRL+SHIFT+D"), () => duplicate());
+                add((dual ? Lang.t("Enlazar en el otro panel ") : Lang.t("Crear un enlace a ")) + label(list).toLowerCase(), Lang.t("CTRL+SHIFT+L"), () => makeLink());
+                add(Lang.t("Copiar ") + label(list).toLowerCase(), "CTRL+C", () => hold(false));
+                add(Lang.t("Cortar ") + label(list).toLowerCase(), "CTRL+X", () => hold(true));
+                add(Lang.t("Mandar a la papelera ") + label(list).toLowerCase(), Lang.t("SUPR"), () => trash());
                 if (list.some(e => !e.isDir)) {
                     for (const t of targets) {
                         if (t.online)
-                            add("Enviar a " + t.name, "TAILSCALE", () => sendTo(t));
+                            add(Lang.t("Enviar a ") + t.name, "TAILSCALE", () => sendTo(t));
                     }
-                    add("Enviar por LocalSend", "LOCALSEND", () => localSend());
+                    add(Lang.t("Enviar por LocalSend"), "LOCALSEND", () => localSend());
                 }
             }
             if (n > 0) {
-                add("Comprimir en .zip", "ACCIÓN", () => compress("zip"));
-                add("Comprimir en .tar.gz", "ACCIÓN", () => compress("tar.gz"));
-                add("Comprimir en .7z", "ACCIÓN", () => compress("7z"));
+                add(Lang.t("Comprimir en .zip"), Lang.t("ACCIÓN"), () => compress("zip"));
+                add(Lang.t("Comprimir en .tar.gz"), Lang.t("ACCIÓN"), () => compress("tar.gz"));
+                add(Lang.t("Comprimir en .7z"), Lang.t("ACCIÓN"), () => compress("7z"));
             }
             if (n === 1 && !list[0].isDir && Fmt.icon(list[0].name, false) === "archive")
-                add("Ver por dentro sin extraer", "ACCIÓN", () => peek());
-                add("Extraer aquí", "ACCIÓN", () => extract());
-            add("Pegar aquí", "CTRL+V", () => paste());
-            add("Nueva carpeta", "CTRL+SHIFT+N", () => newFolder());
-            add("Nuevo archivo", "CTRL+N", () => newFile());
-            add("Buscar dentro de los archivos", "CTRL+SHIFT+F", () => searchInside());
-            add("Buscar en toda tu carpeta personal", "CTRL+ALT+F", () => searchEverywhere());
-            add("Rehacer el índice de búsqueda", "ACCIÓN", () => run([engine, "index"], "ÍNDICE REHECHO"));
-            add("Invertir la selección", "CTRL+SHIFT+I", () => invertMarks());
+                add(Lang.t("Ver por dentro sin extraer"), Lang.t("ACCIÓN"), () => peek());
+                add(Lang.t("Extraer aquí"), Lang.t("ACCIÓN"), () => extract());
+            add(Lang.t("Pegar aquí"), "CTRL+V", () => paste());
+            add(Lang.t("Nueva carpeta"), Lang.t("CTRL+SHIFT+N"), () => newFolder());
+            add(Lang.t("Nuevo archivo"), "CTRL+N", () => newFile());
+            add(Lang.t("Buscar dentro de los archivos"), Lang.t("CTRL+SHIFT+F"), () => searchInside());
+            add(Lang.t("Buscar en toda tu carpeta personal"), "CTRL+ALT+F", () => searchEverywhere());
+            add(Lang.t("Rehacer el índice de búsqueda"), Lang.t("ACCIÓN"), () => run([engine, "index"], Lang.t("ÍNDICE REHECHO")));
+            add(Lang.t("Invertir la selección"), Lang.t("CTRL+SHIFT+I"), () => invertMarks());
             if (undo)
-                add("Deshacer: " + undo.text.toLowerCase(), "CTRL+Z", () => undoLast());
-            add(isBookmarked(path) ? "Quitar esta carpeta de marcadores" : "Añadir esta carpeta a marcadores", "CTRL+D", () => toggleBookmark(path));
-            add("Seleccionar todo", "CTRL+A", () => markAll());
+                add(Lang.t("Deshacer: ") + undo.text.toLowerCase(), "CTRL+Z", () => undoLast());
+            add(isBookmarked(path) ? Lang.t("Quitar esta carpeta de marcadores") : Lang.t("Añadir esta carpeta a marcadores"), "CTRL+D", () => toggleBookmark(path));
+            add(Lang.t("Seleccionar todo"), "CTRL+A", () => markAll());
         }
-        add("Ver como lista", "CTRL+1", () => setMode("list"));
-        add("Ver como cuadrícula", "CTRL+2", () => setMode("grid"));
-        add("Ver como lista compacta", "CTRL+3", () => setMode("compact"));
-        add("Ver como galería", "CTRL+4", () => setMode("gallery"));
-        add(showHidden ? "Esconder los ocultos" : "Mostrar los ocultos", "CTRL+H", () => showHidden = !showHidden);
-        add("Filtrar esta carpeta", "CTRL+F", () => focusFilter());
+        add(Lang.t("Ver como lista"), "CTRL+1", () => setMode("list"));
+        add(Lang.t("Ver como cuadrícula"), "CTRL+2", () => setMode("grid"));
+        add(Lang.t("Ver como lista compacta"), "CTRL+3", () => setMode("compact"));
+        add(Lang.t("Ver como galería"), "CTRL+4", () => setMode("gallery"));
+        add(showHidden ? Lang.t("Esconder los ocultos") : Lang.t("Mostrar los ocultos"), "CTRL+H", () => showHidden = !showHidden);
+        add(Lang.t("Filtrar esta carpeta"), "CTRL+F", () => focusFilter());
         if (deep)
-            add("Cerrar la búsqueda", "ESC", () => endSearch());
-        add("Abrir la carpeta de acciones propias", "ACCIÓN", () => openActionsFolder());
-        add("Instalar acciones desde un repositorio", "ACCIÓN", () => installPack());
+            add(Lang.t("Cerrar la búsqueda"), "ESC", () => endSearch());
+        add(Lang.t("Abrir la carpeta de acciones propias"), Lang.t("ACCIÓN"), () => openActionsFolder());
+        add(Lang.t("Instalar acciones desde un repositorio"), Lang.t("ACCIÓN"), () => installPack());
         for (const p of packs) {
-            add("Actualizar las acciones de " + p.name, "ACCIONES", () => packJob(["pack-add", p.url], "ACTUALIZADAS · " + p.name.toUpperCase()));
-            add("Quitar las acciones de " + p.name, "ACCIONES", () => removePack(p));
+            add(Lang.t("Actualizar las acciones de ") + p.name, Lang.t("ACCIONES"), () => packJob(["pack-add", p.url], Lang.t("ACTUALIZADAS · ") + p.name.toUpperCase()));
+            add(Lang.t("Quitar las acciones de ") + p.name, Lang.t("ACCIONES"), () => removePack(p));
         }
-        add("Cambiar de tema", "ACCIÓN", () => chooseTheme());
-        add("Terminal aquí", "ACCIÓN", () => terminal(path));
-        add("Copiar la ruta de esta carpeta", "ACCIÓN", () => copyPath(path));
-        add("Subir una carpeta", "ALT+↑", () => goUp());
-        add("Atrás", "ALT+←", () => goBack());
-        add("Adelante", "ALT+→", () => goForward());
-        add("Actualizar", "F5", () => refresh());
-        add(dual ? "Cerrar el segundo panel" : "Abrir un segundo panel", "F6", () => toggleDual());
+        add(Lang.t("Cambiar de tema"), Lang.t("ACCIÓN"), () => chooseTheme());
+        add(Lang.t("Cambiar de idioma"), Lang.t("ACCIÓN"), () => chooseLanguage());
+        add(Lang.t("Terminal aquí"), Lang.t("ACCIÓN"), () => terminal(path));
+        add(Lang.t("Copiar la ruta de esta carpeta"), Lang.t("ACCIÓN"), () => copyPath(path));
+        add(Lang.t("Subir una carpeta"), "ALT+↑", () => goUp());
+        add(Lang.t("Atrás"), "ALT+←", () => goBack());
+        add(Lang.t("Adelante"), "ALT+→", () => goForward());
+        add(Lang.t("Actualizar"), "F5", () => refresh());
+        add(dual ? Lang.t("Cerrar el segundo panel") : Lang.t("Abrir un segundo panel"), "F6", () => toggleDual());
         if (dual) {
-            add("Cambiar de panel", "TAB", () => swapPanes());
+            add(Lang.t("Cambiar de panel"), "TAB", () => swapPanes());
             if (n > 0) {
-                add("Copiar al otro panel", "CTRL+SHIFT+C", () => sendToOther(false));
-                add("Mover al otro panel", "CTRL+SHIFT+M", () => sendToOther(true));
+                add(Lang.t("Copiar al otro panel"), Lang.t("CTRL+SHIFT+C"), () => sendToOther(false));
+                add(Lang.t("Mover al otro panel"), Lang.t("CTRL+SHIFT+M"), () => sendToOther(true));
             }
         }
         if (width < 860)
-            add(railForced ? "Esconder el panel lateral" : "Mostrar el panel lateral", "F9", () => railForced = !railForced);
-        add(showSorter ? "Esconder el orden y los tipos" : "Mostrar el orden y los tipos", "ACCIÓN", () => setPref("sorter", !showSorter));
-        add("Pestaña nueva", "CTRL+T", () => newTab());
+            add(railForced ? Lang.t("Esconder el panel lateral") : Lang.t("Mostrar el panel lateral"), "F9", () => railForced = !railForced);
+        add(showSorter ? Lang.t("Esconder el orden y los tipos") : Lang.t("Mostrar el orden y los tipos"), Lang.t("ACCIÓN"), () => setPref("sorter", !showSorter));
+        add(Lang.t("Pestaña nueva"), "CTRL+T", () => newTab());
         if (tabs.length > 1)
-            add("Cerrar la pestaña", "CTRL+W", () => closeTab(tab));
-        add("Añadir un servidor", "RED", () => addServer());
+            add(Lang.t("Cerrar la pestaña"), "CTRL+W", () => closeTab(tab));
+        add(Lang.t("Añadir un servidor"), Lang.t("RED"), () => addServer());
         for (const server of servers)
-            add((remotes[server.uri] ? "Ir a " : "Conectar a ") + server.name, "RED", () => connectServer(server));
-        add("Ordenar por tipo", "ACCIÓN", () => sortBy(3));
+            add((remotes[server.uri] ? Lang.t("Ir a ") : Lang.t("Conectar a ")) + server.name, Lang.t("RED"), () => connectServer(server));
+        add(Lang.t("Ordenar por tipo"), Lang.t("ACCIÓN"), () => sortBy(3));
         if (redo)
-            add("Rehacer: " + redo.text.toLowerCase(), "CTRL+SHIFT+Z", () => redoLast());
-        add("Ver lo abierto recientemente", "LUGAR", () => showRecent());
-        add("Ajustes", "CTRL+,", () => prefs.open());
-        add("Propiedades", "CTRL+I", () => properties());
-        add("Ver los atajos de teclado", "F1", () => keysSheet.open());
+            add(Lang.t("Rehacer: ") + redo.text.toLowerCase(), Lang.t("CTRL+SHIFT+Z"), () => redoLast());
+        add(Lang.t("Ver lo abierto recientemente"), Lang.t("LUGAR"), () => showRecent());
+        add(Lang.t("Ajustes"), "CTRL+,", () => prefs.open());
+        add(Lang.t("Propiedades"), "CTRL+I", () => properties());
+        add(Lang.t("Ver los atajos de teclado"), "F1", () => keysSheet.open());
         for (const b of bookmarks)
-            add("Ir a " + b.name, "MARCADOR", () => go(b.path));
+            add(Lang.t("Ir a ") + b.name, Lang.t("MARCADOR"), () => go(b.path));
         for (const p of places)
-            add("Ir a " + p.name, "LUGAR", () => go(p.path));
+            add(Lang.t("Ir a ") + p.name, Lang.t("LUGAR"), () => go(p.path));
         for (const d of devices)
-            add((d.mounted ? "Ir a " : "Montar ") + d.name, "DISCO", () => (d.mounted ? go(d.path) : mount(d)));
-        add("Salir", "CTRL+Q", () => quit());
+            add((d.mounted ? Lang.t("Ir a ") : Lang.t("Montar ")) + d.name, Lang.t("DISCO"), () => (d.mounted ? go(d.path) : mount(d)));
+        add(Lang.t("Salir"), "CTRL+Q", () => quit());
         return out;
     }
 
@@ -1332,9 +1333,9 @@ Item {
     }
     // Colour labels: a file or folder can wear one, kept by path in the settings.
     readonly property var labelHues: [
-        { key: "red", name: "Rojo", hue: "#e8707a" }, { key: "orange", name: "Naranja", hue: "#e8a25c" },
-        { key: "yellow", name: "Amarillo", hue: "#e6cf6a" }, { key: "green", name: "Verde", hue: "#8fd18a" },
-        { key: "blue", name: "Azul", hue: "#7fb4f0" }, { key: "purple", name: "Morado", hue: "#c39af0" }
+        { key: "red", name: Lang.t("Rojo"), hue: "#e8707a" }, { key: "orange", name: Lang.t("Naranja"), hue: "#e8a25c" },
+        { key: "yellow", name: Lang.t("Amarillo"), hue: "#e6cf6a" }, { key: "green", name: Lang.t("Verde"), hue: "#8fd18a" },
+        { key: "blue", name: Lang.t("Azul"), hue: "#7fb4f0" }, { key: "purple", name: Lang.t("Morado"), hue: "#c39af0" }
     ]
     readonly property var labels: settings.labels
     // The colours in use, with how many things wear each.
@@ -1403,7 +1404,7 @@ Item {
     }
     function labelEntries() {
         return labelHues.map(h => ({ label: h.name, act: () => setLabel(h.key) }))
-            .concat([{ sep: true }, { label: "Quitar la etiqueta", act: () => setLabel("") }]);
+            .concat([{ sep: true }, { label: Lang.t("Quitar la etiqueta"), act: () => setLabel("") }]);
     }
     function flagFor(filePath) {
         const flag = flags[filePath];
@@ -1415,7 +1416,7 @@ Item {
         if (!countsReady || deep)
             return "";
         const n = counts[dirPath] || 0;
-        return long ? Fmt.plural(n, "elemento", "elementos") : n + " elem.";
+        return long ? Fmt.plural(n, Lang.t("elemento"), Lang.t("elementos")) : n + Lang.t(" elem.");
     }
 
     function select(i) {
@@ -1540,7 +1541,7 @@ Item {
             return;
         const gone = title;
         path = path.slice(0, path.lastIndexOf("/")) || "/";
-        say("YA NO EXISTE · " + gone.toUpperCase(), true);
+        say(Lang.t("YA NO EXISTE · ") + gone.toUpperCase(), true);
     }
     // Leave a search or the recent list and land on the item, in its own folder.
     function showInFolder(e) {
@@ -1661,6 +1662,7 @@ Item {
             property var servers: []
             property var labels: ({})
             property string theme: ""
+            property string language: ""
             property bool dual: false
             property bool hidden: false
             property bool sorter: false
@@ -1711,10 +1713,10 @@ Item {
                 if (/Choice:$/.test(tail)) {
                     const print = /SHA256:[A-Za-z0-9+\/=]+/.exec(heard);
                     heard = "";
-                    dialog.confirm("SERVIDOR NUEVO · " + name,
-                        "Es la primera vez que entras en este equipo, así que no se puede comprobar que sea quien dice ser."
-                        + (print ? " Su huella es " + print[0] + "." : "") + " ¿Confiar en él y seguir?",
-                        () => mount.answer("1"), "CONFIAR");
+                    dialog.confirm(Lang.t("SERVIDOR NUEVO · ") + name,
+                        Lang.t("Es la primera vez que entras en este equipo, así que no se puede comprobar que sea quien dice ser.")
+                        + (print ? Lang.t(" Su huella es ") + print[0] + "." : "") + Lang.t(" ¿Confiar en él y seguir?"),
+                        () => mount.answer("1"), Lang.t("CONFIAR"));
                     dialog.orElse(() => mount.answer("2"));
                 } else if (/Password:$/.test(tail)) {
                     heard = "";
@@ -1723,13 +1725,13 @@ Item {
                         secret = "";
                         answer(once);
                     } else {
-                        dialog.askSecret("CONTRASEÑA · " + name, text => mount.answer(text));
+                        dialog.askSecret(Lang.t("CONTRASEÑA · ") + name, text => mount.answer(text));
                         dialog.orElse(() => mount.giveUp());
                     }
                 } else if (/(User|Domain):$/.test(tail)) {
                     const domain = /Domain:$/.test(tail);
                     heard = "";
-                    dialog.ask((domain ? "DOMINIO · " : "USUARIO · ") + name, domain ? "WORKGROUP" : "", text => mount.answer(text));
+                    dialog.ask((domain ? Lang.t("DOMINIO · ") : Lang.t("USUARIO · ")) + name, domain ? "WORKGROUP" : "", text => mount.answer(text));
                     dialog.orElse(() => mount.giveUp());
                 }
             }
@@ -1747,11 +1749,11 @@ Item {
                 const name = server.name.toUpperCase();
                 const why = mountErrors.text.trim().split("\n").pop();
                 if (exitCode === 0)
-                    app.say("CONECTADO · " + name);
+                    app.say(Lang.t("CONECTADO · ") + name);
                 else if (gaveUp)
-                    app.say("CONEXIÓN CANCELADA · " + name, true);
+                    app.say(Lang.t("CONEXIÓN CANCELADA · ") + name, true);
                 else
-                    app.say("NO SE CONECTÓ A " + name + (why ? " · " + why.toUpperCase() : ""), true);
+                    app.say(Lang.t("NO SE CONECTÓ A ") + name + (why ? " · " + Lang.message(why).toUpperCase() : ""), true);
                 app.refresh();
                 destroy();
             }
@@ -1800,13 +1802,13 @@ Item {
                     const again = command;
                     const done = okText;
                     const sorry = failText;
-                    app.say(failText + " · HACE FALTA SER ADMINISTRADOR", true);
+                    app.say(failText + Lang.t(" · HACE FALTA SER ADMINISTRADOR"), true);
                     app.offerElevated(again, done, sorry);
                 }
                 else if (/access denied/i.test(why) && command[0] === "tailscale")
                     app.say(failText + " · FALTA EL PERMISO: SUDO TAILSCALE SET --OPERATOR=$USER", true);
                 else
-                    app.say(failText + (why ? " · " + why.toUpperCase() : ""), true);
+                    app.say(failText + (why ? " · " + Lang.message(why).toUpperCase() : ""), true);
                 app.refresh();
                 destroy();
             }
@@ -1847,12 +1849,12 @@ Item {
                     go("");
                     return;
                 }
-                dialog.choose("YA EXISTE",
-                    (names.length === 1 ? "«" + names[0] + "» ya está" : names.length + " elementos ya están") + " en el destino. Reemplazar manda lo que había a la papelera.",
+                dialog.choose(Lang.t("YA EXISTE"),
+                    (names.length === 1 ? "«" + names[0] + Lang.t("» ya está") : names.length + Lang.t(" elementos ya están")) + Lang.t(" en el destino. Reemplazar manda lo que había a la papelera."),
                     [
-                        { text: "OMITIR", act: () => (names.length === job.paths.length ? app.say("OMITIDO · NO SE COPIÓ NADA") : go("--skip")) },
-                        { text: "REEMPLAZAR", act: () => go("--replace") },
-                        { text: "CONSERVAR AMBOS", act: () => go("") }
+                        { text: Lang.t("OMITIR"), act: () => (names.length === job.paths.length ? app.say(Lang.t("OMITIDO · NO SE COPIÓ NADA")) : go("--skip")) },
+                        { text: Lang.t("REEMPLAZAR"), act: () => go("--replace") },
+                        { text: Lang.t("CONSERVAR AMBOS"), act: () => go("") }
                     ]);
             }
         }
@@ -1882,7 +1884,7 @@ Item {
     Process {
         id: summer
         stdout: StdioCollector {
-            onStreamFinished: app.digest = text.trim() || "no se pudo calcular"
+            onStreamFinished: app.digest = text.trim() || Lang.t("no se pudo calcular")
         }
     }
     Process {
@@ -1993,7 +1995,7 @@ Item {
         onExited: code => {
             const dir = peekOut.text.trim();
             if (code !== 0 || dir === "") {
-                app.say("NO SE PUDO ABRIR" + (peekErr.text.trim() ? " · " + peekErr.text.trim().toUpperCase() : ""), true);
+                app.say(Lang.t("NO SE PUDO ABRIR") + (peekErr.text.trim() ? " · " + peekErr.text.trim().toUpperCase() : ""), true);
                 return;
             }
             const next = Object.assign({}, app.peeks);
@@ -2062,8 +2064,34 @@ Item {
             }
         }
     }
+    Binding { target: Lang; property: "wanted"; value: settings.language }
+    Binding { target: Lang; property: "root"; value: decodeURIComponent(Qt.resolvedUrl("idiomas").toString().replace("file://", "")) }
     Binding { target: Tokens; property: "themeName"; value: settings.theme }
     Binding { target: Tokens; property: "themeRoot"; value: decodeURIComponent(Qt.resolvedUrl("temas").toString().replace("file://", "")) }
+    // The languages there are, besides the Spanish the program is written in.
+    property var languages: []
+    function chooseLanguage() {
+        languageLister.running = true;
+        const options = [{ text: Lang.t("EL DEL SISTEMA"), act: () => setPref("language", "") }, { text: "ESPAÑOL", act: () => setPref("language", "es") }]
+            .concat(languages.map(l => ({ text: l.name.toUpperCase(), act: () => setPref("language", l.key) })));
+        dialog.choose(Lang.t("IDIOMA"), Lang.t("Los tuyos van en ~/.config/archivos/idiomas, un archivo .json por idioma."), options);
+    }
+    Process {
+        id: languageLister
+        command: [app.engine, "languages", Lang.root]
+        running: Lang.root !== ""
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const list = [];
+                for (const line of text.split("\n")) {
+                    const cols = line.split("\t");
+                    if (cols.length === 2)
+                        list.push({ key: cols[0], name: cols[1] });
+                }
+                app.languages = list;
+            }
+        }
+    }
     // The themes there are: the ones that come along, and the user's own.
     property var themes: []
     function loadThemes() {
@@ -2071,9 +2099,9 @@ Item {
     }
     function chooseTheme() {
         loadThemes();
-        const options = [{ text: "EL DE SIEMPRE", act: () => setPref("theme", "") }]
+        const options = [{ text: Lang.t("EL DE SIEMPRE"), act: () => setPref("theme", "") }]
             .concat(themes.map(t => ({ text: t.name.toUpperCase(), act: () => setPref("theme", t.key) })));
-        dialog.choose("TEMA", "Los tuyos van en ~/.config/archivos/temas, un archivo .json por tema.", options);
+        dialog.choose(Lang.t("TEMA"), Lang.t("Los tuyos van en ~/.config/archivos/temas, un archivo .json por tema."), options);
     }
     Process {
         id: themeLister
@@ -2121,7 +2149,7 @@ Item {
         stderr: StdioCollector { id: packErrors }
         onExited: code => {
             const why = packErrors.text.trim().split("\n").pop();
-            app.say(code === 0 ? okText : "NO SE PUDO" + (why ? " · " + why.toUpperCase() : ""), code !== 0);
+            app.say(code === 0 ? okText : Lang.t("NO SE PUDO") + (why ? " · " + Lang.message(why).toUpperCase() : ""), code !== 0);
             // What is on offer changed: count again and forget what was listed.
             app.actionsFor = "";
             menuCounter.running = true;
@@ -2170,9 +2198,9 @@ Item {
                         paths.push(decodeURIComponent(uri.slice(7)));
                 }
                 if (paths.length === 0)
-                    app.say("NADA QUE PEGAR", true);
+                    app.say(Lang.t("NADA QUE PEGAR"), true);
                 else
-                    app.transferTo("copy", app.path, paths, "PEGADO · " + (paths.length === 1 ? paths[0].slice(paths[0].lastIndexOf("/") + 1).toUpperCase() : paths.length + " ELEMENTOS"));
+                    app.transferTo("copy", app.path, paths, Lang.t("PEGADO · ") + (paths.length === 1 ? paths[0].slice(paths[0].lastIndexOf("/") + 1).toUpperCase() : paths.length + Lang.t(" ELEMENTOS")));
             }
         }
     }

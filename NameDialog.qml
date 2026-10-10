@@ -8,7 +8,7 @@ Item {
     property var done: null
     property string detail: ""
     property bool plain: false
-    property string yesText: "ACEPTAR"
+    property string yesText: Lang.t("ACEPTAR")
     property var choices: []
     property bool masked: false
     // Runs when the question is put away without an answer.
@@ -31,7 +31,7 @@ Item {
         done = callback;
         plain = false;
         choices = [];
-        yesText = "ACEPTAR";
+        yesText = Lang.t("ACEPTAR");
         field.text = value;
         visible = true;
         field.grabFocus();
@@ -54,7 +54,7 @@ Item {
     // A yes or no question; the callback runs only on yes.
     function confirm(title, text, callback, yesLabel) {
         choices = [];
-        yesText = yesLabel || "SÍ";
+        yesText = yesLabel || Lang.t("SÍ");
         heading = title;
         detail = text;
         done = callback;
@@ -160,7 +160,7 @@ Item {
                 anchors.right: parent.right
                 spacing: Tokens.s2
 
-                Btn { text: "CANCELAR"; onAct: dialog.close() }
+                Btn { text: Lang.t("CANCELAR"); onAct: dialog.close() }
                 Repeater {
                     model: dialog.choices
                     Btn {

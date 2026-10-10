@@ -5,21 +5,21 @@ Item {
     id: sheet
 
     readonly property var groups: [
-        { name: "MOVERSE", keys: [
-            ["Enter", "Abrir"], ["Retroceso · Alt+↑", "Subir una carpeta"], ["Alt+← · Alt+→", "Atrás y adelante"],
-            ["Alt+Inicio", "Carpeta personal"], ["Ctrl+L · Tab", "Escribir una ruta y completarla"], ["Inicio · Fin", "Primero y último"], ["F5", "Actualizar"],
-            ["Ctrl+T · Ctrl+W", "Pestaña nueva y cerrar"], ["Ctrl+RePág · AvPág", "Cambiar de pestaña"], ["F6 · Tab", "Segundo panel y cambiar"]] },
-        { name: "SELECCIONAR", keys: [
-            ["Ctrl+clic", "Añadir o quitar"], ["Mayús+clic · Mayús+↑↓", "Marcar un tramo"], ["Ctrl+A", "Todo"],
-            ["Ctrl+Mayús+I", "Invertir"], ["Esc", "Soltar la selección"]] },
-        { name: "ARCHIVOS", keys: [
-            ["Ctrl+C · Ctrl+X · Ctrl+V", "Copiar, cortar y pegar"], ["Ctrl+Z · Ctrl+Mayús+Z", "Deshacer y rehacer"], ["F2 · Ctrl+Mayús+D", "Renombrar y duplicar"], ["Ctrl+Mayús+L", "Crear un enlace"], ["→ · ←", "Abrir y cerrar una carpeta en la lista"],
-            ["Ctrl+Mayús+N · Ctrl+N", "Carpeta nueva y archivo nuevo"], ["Supr · Mayús+Supr", "A la papelera o para siempre"],
-            ["Ctrl+Mayús+C · Ctrl+Mayús+M", "Copiar o mover al otro panel"],
-            ["Ctrl+I", "Propiedades"], ["Ctrl+D", "Marcador"]] },
-        { name: "VER Y BUSCAR", keys: [
-            ["Espacio · ← →", "Vista rápida y pasar de archivo"], ["Ctrl+G", "Lista o cuadrícula"], ["Ctrl+1 a Ctrl+4", "Lista, cuadrícula, compacta, galería"], ["Ctrl+más · Ctrl+menos", "Zoom"], ["Ctrl+H", "Ocultos"],
-            ["Ctrl+F · / · escribir", "Filtrar la carpeta"], ["Ctrl+Shift+F", "Buscar dentro de los archivos"], ["Ctrl+Alt+F", "Buscar en toda la carpeta personal"], ["Ctrl+K", "Comandos"], ["Ctrl+,", "Ajustes"], ["F1", "Esta hoja"], ["Ctrl+Q", "Salir"]] }
+        { name: Lang.t("MOVERSE"), keys: [
+            ["Enter", Lang.t("Abrir")], [Lang.t("Retroceso · Alt+↑"), Lang.t("Subir una carpeta")], ["Alt+← · Alt+→", Lang.t("Atrás y adelante")],
+            ["Alt+Inicio", Lang.t("Carpeta personal")], ["Ctrl+L · Tab", Lang.t("Escribir una ruta y completarla")], [Lang.t("Inicio · Fin"), Lang.t("Primero y último")], ["F5", Lang.t("Actualizar")],
+            ["Ctrl+T · Ctrl+W", Lang.t("Pestaña nueva y cerrar")], [Lang.t("Ctrl+RePág · AvPág"), Lang.t("Cambiar de pestaña")], [Lang.t("F6 · Tab"), Lang.t("Segundo panel y cambiar")]] },
+        { name: Lang.t("SELECCIONAR"), keys: [
+            ["Ctrl+clic", Lang.t("Añadir o quitar")], [Lang.t("Mayús+clic · Mayús+↑↓"), Lang.t("Marcar un tramo")], ["Ctrl+A", Lang.t("Todo")],
+            [Lang.t("Ctrl+Mayús+I"), Lang.t("Invertir")], ["Esc", Lang.t("Soltar la selección")]] },
+        { name: Lang.t("ARCHIVOS"), keys: [
+            ["Ctrl+C · Ctrl+X · Ctrl+V", Lang.t("Copiar, cortar y pegar")], [Lang.t("Ctrl+Z · Ctrl+Mayús+Z"), Lang.t("Deshacer y rehacer")], [Lang.t("F2 · Ctrl+Mayús+D"), Lang.t("Renombrar y duplicar")], [Lang.t("Ctrl+Mayús+L"), Lang.t("Crear un enlace")], ["→ · ←", Lang.t("Abrir y cerrar una carpeta en la lista")],
+            [Lang.t("Ctrl+Mayús+N · Ctrl+N"), Lang.t("Carpeta nueva y archivo nuevo")], [Lang.t("Supr · Mayús+Supr"), Lang.t("A la papelera o para siempre")],
+            [Lang.t("Ctrl+Mayús+C · Ctrl+Mayús+M"), Lang.t("Copiar o mover al otro panel")],
+            ["Ctrl+I", Lang.t("Propiedades")], ["Ctrl+D", Lang.t("Marcador")]] },
+        { name: Lang.t("VER Y BUSCAR"), keys: [
+            [Lang.t("Espacio · ← →"), Lang.t("Vista rápida y pasar de archivo")], ["Ctrl+G", Lang.t("Lista o cuadrícula")], ["Ctrl+1 a Ctrl+4", Lang.t("Lista, cuadrícula, compacta, galería")], [Lang.t("Ctrl+más · Ctrl+menos"), "Zoom"], ["Ctrl+H", Lang.t("Ocultos")],
+            [Lang.t("Ctrl+F · / · escribir"), Lang.t("Filtrar la carpeta")], ["Ctrl+Shift+F", Lang.t("Buscar dentro de los archivos")], ["Ctrl+Alt+F", Lang.t("Buscar en toda la carpeta personal")], ["Ctrl+K", Lang.t("Comandos")], ["Ctrl+,", Lang.t("Ajustes")], ["F1", Lang.t("Esta hoja")], ["Ctrl+Q", Lang.t("Salir")]] }
     ]
 
     signal closed()
@@ -68,7 +68,7 @@ Item {
 
             Text {
                 anchors { left: parent.left; leftMargin: Tokens.s4; verticalCenter: parent.verticalCenter }
-                text: "// ATAJOS"
+                text: Lang.t("// ATAJOS")
                 color: Tokens.ink
                 font.family: Tokens.mono
                 font.pixelSize: 12

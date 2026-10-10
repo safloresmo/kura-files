@@ -81,7 +81,7 @@ Rectangle {
 
         Text {
             anchors { left: parent.left; leftMargin: Tokens.s4; verticalCenter: parent.verticalCenter }
-            text: card.app.inTrash ? "PAPELERA" : (card.app.recent ? "RECIENTES" : card.app.deep ? (card.app.deepInside ? "DENTRO · " : "RESULTADOS · ") + card.app.deepQuery.toUpperCase() : "CONTENIDO")
+            text: card.app.inTrash ? Lang.t("PAPELERA") : (card.app.recent ? Lang.t("RECIENTES") : card.app.deep ? (card.app.deepInside ? Lang.t("DENTRO · ") : Lang.t("RESULTADOS · ")) + card.app.deepQuery.toUpperCase() : Lang.t("CONTENIDO"))
             color: Tokens.ink
             font.family: Tokens.mono
             font.pixelSize: 12
@@ -89,8 +89,8 @@ Rectangle {
         }
         Text {
             anchors { right: parent.right; rightMargin: Tokens.s4; verticalCenter: parent.verticalCenter }
-            text: card.app.markedCount > 0 ? card.app.markedCount + " MARCADOS"
-                : (card.app.query !== "" ? "FILTRO · " + card.app.query.toUpperCase() : (card.app.showHidden ? "CON OCULTOS" : ""))
+            text: card.app.markedCount > 0 ? card.app.markedCount + Lang.t(" MARCADOS")
+                : (card.app.query !== "" ? Lang.t("FILTRO · ") + card.app.query.toUpperCase() : (card.app.showHidden ? Lang.t("CON OCULTOS") : ""))
             color: card.app.markedCount > 0 ? Tokens.inkDim : Tokens.inkFaint
             font.family: Tokens.mono
             font.pixelSize: 10
@@ -113,14 +113,14 @@ Rectangle {
         HeadCell {
             anchors.left: parent.left
             width: card.app.grid ? 120 : parent.width - card.sizeW - card.whenW - card.kindW
-            label: "NOMBRE"
+            label: Lang.t("NOMBRE")
             key: 0
         }
         HeadCell {
             visible: card.app.grid ? parent.width >= 240 : card.showSize
             x: card.app.grid ? 140 : parent.width - card.kindW - card.whenW - card.sizeW
             width: 110 - Tokens.s5
-            label: "TAMAÑO"
+            label: Lang.t("TAMAÑO")
             key: 1
             alignRight: !card.app.grid
         }
@@ -128,14 +128,14 @@ Rectangle {
             visible: card.app.grid ? parent.width >= 400 : card.showWhen
             x: card.app.grid ? 260 : parent.width - card.kindW - card.whenW
             width: 160
-            label: card.app.inTrash ? "BORRADO" : "MODIFICADO"
+            label: card.app.inTrash ? Lang.t("BORRADO") : Lang.t("MODIFICADO")
             key: 2
         }
         HeadCell {
             visible: card.app.grid ? parent.width >= 500 : card.showKind
             x: card.app.grid ? 420 : parent.width - card.kindW
             width: 96
-            label: card.app.inTrash ? "ESTABA EN" : "TIPO"
+            label: card.app.inTrash ? Lang.t("ESTABA EN") : Lang.t("TIPO")
             key: 3
         }
     }
@@ -261,7 +261,7 @@ Rectangle {
                 visible: card.showWhen
                 x: row.width - Tokens.s4 - card.kindW - card.whenW
                 anchors.verticalCenter: parent.verticalCenter
-                text: Fmt.when(row.modelData.modified)
+                text: Lang.words(Fmt.when(row.modelData.modified))
                 color: Tokens.inkFaint
                 font.family: Tokens.mono
                 font.pixelSize: 11
@@ -272,7 +272,7 @@ Rectangle {
                 width: 96
                 elide: Text.ElideLeft
                 anchors.verticalCenter: parent.verticalCenter
-                text: card.app.inTrash && row.modelData.from ? card.app.folderOf(row.modelData.from) : Fmt.kind(row.modelData.name, row.modelData.isDir)
+                text: card.app.inTrash && row.modelData.from ? card.app.folderOf(row.modelData.from) : Lang.words(Fmt.kind(row.modelData.name, row.modelData.isDir))
                 color: Tokens.inkFaint
                 font.family: Tokens.mono
                 font.pixelSize: 11
@@ -476,10 +476,10 @@ Rectangle {
     Empty {
         anchors.centerIn: view
         visible: card.app.ready && card.app.rows.length === 0
-        caption: card.app.unreadable && !card.app.deep ? "No tienes permiso para ver esta carpeta."
-            : card.app.recent ? "Todavía no hay nada reciente."
-            : card.app.deep ? (card.app.deepInside ? "Ningún archivo de texto contiene «" : "Nada coincide con «") + card.app.deepQuery + (card.app.deepWide ? "»." : "» en las subcarpetas.")
-            : card.app.query !== "" ? "Nada coincide con «" + card.app.query + "»."
-            : (card.app.inTrash ? "La papelera está vacía." : "Esta carpeta está vacía.")
+        caption: card.app.unreadable && !card.app.deep ? Lang.t("No tienes permiso para ver esta carpeta.")
+            : card.app.recent ? Lang.t("Todavía no hay nada reciente.")
+            : card.app.deep ? (card.app.deepInside ? Lang.t("Ningún archivo de texto contiene «") : Lang.t("Nada coincide con «")) + card.app.deepQuery + (card.app.deepWide ? "»." : Lang.t("» en las subcarpetas."))
+            : card.app.query !== "" ? Lang.t("Nada coincide con «") + card.app.query + "»."
+            : (card.app.inTrash ? Lang.t("La papelera está vacía.") : Lang.t("Esta carpeta está vacía."))
     }
 }

@@ -51,7 +51,7 @@ Rectangle {
                 Text {
                     anchors { left: what.left; right: what.right; top: what.bottom; topMargin: 4 }
                     elide: Text.ElideMiddle
-                    text: (row.modelData.paused ? "EN PAUSA · " : "") + (row.modelData.total > 0 ? Math.floor(100 * row.modelData.done / row.modelData.total) : 0) + "% · " + row.modelData.name
+                    text: (row.modelData.paused ? Lang.t("EN PAUSA · ") : "") + (row.modelData.total > 0 ? Math.floor(100 * row.modelData.done / row.modelData.total) : 0) + "% · " + row.modelData.name
                     color: Tokens.inkMuted
                     font.family: Tokens.ui
                     font.pixelSize: 12
@@ -61,8 +61,8 @@ Rectangle {
                     anchors { right: parent.right; rightMargin: Tokens.s3; verticalCenter: parent.verticalCenter }
                     spacing: Tokens.s2
 
-                    Btn { compact: true; text: row.modelData.paused ? "SEGUIR" : "PAUSA"; onAct: jobs.app.pauseJob(row.modelData.id) }
-                    Btn { compact: true; text: "CANCELAR"; onAct: jobs.app.cancelJob(row.modelData.id) }
+                    Btn { compact: true; text: row.modelData.paused ? Lang.t("SEGUIR") : Lang.t("PAUSA"); onAct: jobs.app.pauseJob(row.modelData.id) }
+                    Btn { compact: true; text: Lang.t("CANCELAR"); onAct: jobs.app.cancelJob(row.modelData.id) }
                 }
                 Rectangle {
                     anchors.bottom: parent.bottom

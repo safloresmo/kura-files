@@ -21,7 +21,7 @@ Item {
     }
     function stamp(seconds) {
         const n = Number(seconds);
-        return n > 0 ? Fmt.when(new Date(n * 1000)) : "—";
+        return n > 0 ? Lang.words(Fmt.when(new Date(n * 1000))) : "—";
     }
 
     anchors.fill: parent
@@ -92,7 +92,7 @@ Item {
 
                 Text {
                     anchors { left: parent.left; leftMargin: Tokens.s4; verticalCenter: parent.verticalCenter }
-                    text: "// PROPIEDADES"
+                    text: Lang.t("// PROPIEDADES")
                     color: Tokens.ink
                     font.family: Tokens.mono
                     font.pixelSize: 12
@@ -111,7 +111,7 @@ Item {
                 leftPadding: Tokens.s4
                 bottomPadding: Tokens.s3
                 width: parent.width - Tokens.s4
-                text: sheet.info.name || "Leyendo…"
+                text: sheet.info.name || Lang.t("Leyendo…")
                 color: Tokens.ink
                 font.family: Tokens.ui
                 font.pixelSize: 20
@@ -119,28 +119,28 @@ Item {
                 elide: Text.ElideMiddle
             }
 
-            Fact { label: "Ruta"; value: sheet.info.path ? sheet.app.shorten(sheet.info.path) : "" }
-            Fact { label: "Enlace a"; value: sheet.info.link || "" }
+            Fact { label: Lang.t("Ruta"); value: sheet.info.path ? sheet.app.shorten(sheet.info.path) : "" }
+            Fact { label: Lang.t("Enlace a"); value: sheet.info.link || "" }
             Fact { label: "SHA-256"; value: sheet.app.digest }
-            Fact { label: "Tipo"; value: sheet.info.kind === "inode/directory" ? "carpeta" : (sheet.info.kind || "") }
+            Fact { label: Lang.t("Tipo"); value: sheet.info.kind === "inode/directory" ? "carpeta" : (sheet.info.kind || "") }
             Fact {
-                label: "Tamaño"
+                label: Lang.t("Tamaño")
                 value: sheet.info.size === undefined ? ""
-                    : Fmt.size(sheet.info.size) + (sheet.info.complete === "false" ? " o más" : "")
+                    : Fmt.size(sheet.info.size) + (sheet.info.complete === "false" ? Lang.t(" o más") : "")
             }
             Fact {
-                label: "Contenido"
+                label: Lang.t("Contenido")
                 value: sheet.info.items === undefined ? ""
-                    : Fmt.plural(Number(sheet.info.items), "elemento", "elementos") + (sheet.info.complete === "false" ? " o más" : "")
+                    : Fmt.plural(Number(sheet.info.items), Lang.t("elemento"), Lang.t("elementos")) + (sheet.info.complete === "false" ? Lang.t(" o más") : "")
             }
-            Fact { label: "Modificado"; value: sheet.info.modified ? sheet.stamp(sheet.info.modified) : "" }
-            Fact { label: "Abierto"; value: sheet.info.accessed ? sheet.stamp(sheet.info.accessed) : "" }
-            Fact { label: "Creado"; value: sheet.info.created ? sheet.stamp(sheet.info.created) : "" }
-            Fact { label: "Permisos"; value: sheet.info.mode ? sheet.info.mode.replace("\t", " · ") : "" }
+            Fact { label: Lang.t("Modificado"); value: sheet.info.modified ? sheet.stamp(sheet.info.modified) : "" }
+            Fact { label: Lang.t("Abierto"); value: sheet.info.accessed ? sheet.stamp(sheet.info.accessed) : "" }
+            Fact { label: Lang.t("Creado"); value: sheet.info.created ? sheet.stamp(sheet.info.created) : "" }
+            Fact { label: Lang.t("Permisos"); value: sheet.info.mode ? sheet.info.mode.replace("\t", " · ") : "" }
             Item {
                 id: bits
                 readonly property int mode: sheet.info.mode ? parseInt(sheet.info.mode.split("\t")[1], 8) : -1
-                readonly property var who: ["Dueño", "Grupo", "Otros"]
+                readonly property var who: [Lang.t("Dueño"), Lang.t("Grupo"), Lang.t("Otros")]
 
                 visible: mode >= 0 && sheet.info.owner === sheet.app.user
                 width: parent.width
@@ -153,7 +153,7 @@ Item {
                 }
                 Text {
                     anchors { left: parent.left; leftMargin: Tokens.s4; verticalCenter: parent.verticalCenter }
-                    text: "Cambiar permisos"
+                    text: Lang.t("Cambiar permisos")
                     color: Tokens.inkDim
                     font.family: Tokens.ui
                     font.pixelSize: Tokens.fBody
@@ -210,7 +210,7 @@ Item {
                     }
                 }
             }
-            Fact { label: "Propietario"; value: sheet.info.owner ? sheet.info.owner + " · " + (sheet.info.group || "") : "" }
+            Fact { label: Lang.t("Propietario"); value: sheet.info.owner ? sheet.info.owner + " · " + (sheet.info.group || "") : "" }
 
             Item {
                 width: parent.width
@@ -227,7 +227,7 @@ Item {
 
                     Btn {
                         visible: sheet.info.kind === "inode/directory" && sheet.info.mode !== undefined
-                        text: "PERMISOS A TODO LO DE DENTRO"
+                        text: Lang.t("PERMISOS A TODO LO DE DENTRO")
                         onAct: sheet.app.chmodTree()
                     }
                     Btn {
@@ -235,8 +235,8 @@ Item {
                         text: "SHA-256"
                         onAct: sheet.app.checksum()
                     }
-                    Btn { text: "COPIAR RUTA"; onAct: sheet.app.copyPath(sheet.info.path || sheet.app.path) }
-                    Btn { text: "CERRAR"; primary: true; onAct: sheet.close() }
+                    Btn { text: Lang.t("COPIAR RUTA"); onAct: sheet.app.copyPath(sheet.info.path || sheet.app.path) }
+                    Btn { text: Lang.t("CERRAR"); primary: true; onAct: sheet.close() }
                 }
             }
         }

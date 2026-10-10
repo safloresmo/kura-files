@@ -66,7 +66,7 @@ ShellRoot {
         function zoom(percent: int): void { app.setZoom(percent / 100); }
         function compress(format: string): void { app.compress(format); }
         function extract(): void { app.extract(); }
-        function touch(name: string): void { app.op(["touch", app.path, name], "ARCHIVO CREADO · " + name.toUpperCase()); }
+        function touch(name: string): void { app.op(["touch", app.path, name], Lang.t("ARCHIVO CREADO · ") + name.toUpperCase()); }
         function bookmark(path: string): void { app.toggleBookmark(path); }
         function properties(): void { app.properties(); }
         function keys(): void { app.openKeys(); }
@@ -82,8 +82,8 @@ ShellRoot {
         function grid(): void { app.toggleGrid(); }
         function palette(): void { app.openPalette(); }
         function send(device: string): void { app.sendTo({ name: device }); }
-        function mkdir(name: string): void { app.op(["mkdir", app.path, name], "CARPETA CREADA · " + name.toUpperCase()); }
-        function rename(name: string): void { if (app.selected) app.op(["rename", app.selected.path, name], "RENOMBRADO · " + name.toUpperCase()); }
+        function mkdir(name: string): void { app.op(["mkdir", app.path, name], Lang.t("CARPETA CREADA · ") + name.toUpperCase()); }
+        function rename(name: string): void { if (app.selected) app.op(["rename", app.selected.path, name], Lang.t("RENOMBRADO · ") + name.toUpperCase()); }
         function state(): string {
             return JSON.stringify({
                 path: app.path,
@@ -106,7 +106,7 @@ ShellRoot {
                 bookmarks: app.bookmarks.map(b => b.name),
                 info: app.info,
                 grid: app.grid,
-                devices: app.devices.map(d => d.name + (d.mounted ? "" : " (sin montar)")),
+                devices: app.devices.map(d => d.name + (d.mounted ? "" : Lang.t(" (sin montar)"))),
                 first: app.rows.length ? app.rows[0].name : "",
                 last: app.rows.length ? app.rows[app.rows.length - 1].name : ""
             });

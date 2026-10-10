@@ -35,9 +35,9 @@ Item {
         }
         Text {
             text: app.markedCount > 0
-                ? app.markedCount + (app.markedCount === 1 ? " MARCADO" : " MARCADOS") + " · " + app.markedWeight
-                : (app.query !== "" ? app.rows.length + " DE " + app.folderTotal + " · " : "")
-                    + Fmt.plural(app.dirTotal, "CARPETA", "CARPETAS") + " · " + Fmt.plural(app.fileTotal, "ARCHIVO", "ARCHIVOS")
+                ? app.markedCount + (app.markedCount === 1 ? Lang.t(" MARCADO") : Lang.t(" MARCADOS")) + " · " + app.markedWeight
+                : (app.query !== "" ? app.rows.length + Lang.t(" DE ") + app.folderTotal + " · " : "")
+                    + Fmt.plural(app.dirTotal, Lang.t("CARPETA"), Lang.t("CARPETAS")) + " · " + Fmt.plural(app.fileTotal, Lang.t("ARCHIVO"), Lang.t("ARCHIVOS"))
             color: Tokens.ink
             font.family: Tokens.mono
             font.pixelSize: 10
@@ -56,14 +56,14 @@ Item {
         visible: app.transfer !== null
         anchors { right: parent.right; rightMargin: Tokens.s6; verticalCenter: parent.verticalCenter }
         compact: true
-        text: app.transfers.length > 1 || app.jobsPanel.visible ? "TRABAJOS" : "CANCELAR"
+        text: app.transfers.length > 1 || app.jobsPanel.visible ? Lang.t("TRABAJOS") : Lang.t("CANCELAR")
         onAct: app.transfers.length > 1 || app.jobsPanel.visible ? app.jobsPanel.visible = !app.jobsPanel.visible : app.cancelTransfer()
     }
     Text {
         anchors { right: cancel.visible ? cancel.left : parent.right; rightMargin: cancel.visible ? Tokens.s3 : Tokens.s6; verticalCenter: parent.verticalCenter }
         text: app.transfer !== null
-            ? (app.transfers.length > 1 ? "" : "COPIANDO · ") + app.transfer.name.toUpperCase() + " · " + (app.transfer.total > 0 ? Math.floor(100 * app.transfer.done / app.transfer.total) : 0) + "%"
-            : app.notice !== "" ? app.notice : (app.clip ? "PORTAPAPELES · " + app.clip.text + "   " : "") + app.space
+            ? (app.transfers.length > 1 ? "" : Lang.t("COPIANDO · ")) + app.transfer.name.toUpperCase() + " · " + (app.transfer.total > 0 ? Math.floor(100 * app.transfer.done / app.transfer.total) : 0) + "%"
+            : app.notice !== "" ? app.notice : (app.clip ? Lang.t("PORTAPAPELES · ") + app.clip.text + "   " : "") + app.space
         color: app.transfer !== null ? Tokens.ink : (app.notice !== "" && app.noticeBad ? Tokens.alert : (app.notice !== "" ? Tokens.ink : Tokens.inkMuted))
         // The message gets what the count leaves free; a notice may take the count's place.
         width: Math.max(0, foot.width - (tally.visible ? tally.width + Tokens.s5 * 2 : Tokens.s5) - Tokens.s6 - (cancel.visible ? cancel.width + Tokens.s3 : 0))

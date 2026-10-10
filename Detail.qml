@@ -55,7 +55,7 @@ Rectangle {
 
             Text {
                 anchors { left: parent.left; leftMargin: Tokens.s4; verticalCenter: parent.verticalCenter }
-                text: "SELECCIÓN"
+                text: Lang.t("SELECCIÓN")
                 color: Tokens.ink
                 font.family: Tokens.mono
                 font.pixelSize: 12
@@ -63,7 +63,7 @@ Rectangle {
             }
             Text {
                 anchors { right: parent.right; rightMargin: Tokens.s4; verticalCenter: parent.verticalCenter }
-                text: card.item ? (card.app.current + 1) + " DE " + card.app.total : "NADA"
+                text: card.item ? (card.app.current + 1) + Lang.t(" DE ") + card.app.total : Lang.t("NADA")
                 color: Tokens.inkFaint
                 font.family: Tokens.mono
                 font.pixelSize: 10
@@ -152,19 +152,19 @@ Rectangle {
         }
 
         Fact {
-            label: "Tipo"
-            value: card.item ? Fmt.kind(card.item.name, card.item.isDir) : "carpeta"
+            label: Lang.t("Tipo")
+            value: card.item ? Lang.words(Fmt.kind(card.item.name, card.item.isDir)) : Lang.t("carpeta")
         }
         Fact {
-            label: card.item && !card.item.isDir ? "Tamaño" : "Contenido"
-            value: !card.item ? Fmt.plural(card.app.total, "elemento", "elementos")
+            label: card.item && !card.item.isDir ? Lang.t("Tamaño") : Lang.t("Contenido")
+            value: !card.item ? Fmt.plural(card.app.total, Lang.t("elemento"), Lang.t("elementos"))
                 : (card.item.isDir ? card.app.countLabel(card.item.path, true) : Fmt.size(card.item.size))
         }
         Fact {
             visible: card.item !== null
             height: visible ? 38 : 0
-            label: "Modificado"
-            value: card.item ? Fmt.when(card.item.modified) : ""
+            label: Lang.t("Modificado")
+            value: card.item ? Lang.words(Fmt.when(card.item.modified)) : ""
         }
         Repeater {
             model: card.app.facts
@@ -193,37 +193,37 @@ Rectangle {
 
                 Btn {
                     width: (parent.width - Tokens.s2) / 2
-                    text: "ABRIR"
+                    text: Lang.t("ABRIR")
                     primary: true
                     armed: card.item !== null
                     onAct: card.app.open(card.app.current)
                 }
                 Btn {
                     width: (parent.width - Tokens.s2) / 2
-                    text: "VISTA RÁPIDA"
+                    text: Lang.t("VISTA RÁPIDA")
                     armed: card.item !== null && !card.item.isDir
                     onAct: card.app.quickLook()
                 }
                 Btn {
                     width: (parent.width - Tokens.s2) / 2
-                    text: "RENOMBRAR"
+                    text: Lang.t("RENOMBRAR")
                     armed: card.item !== null && !card.app.inTrash
                     onAct: card.app.rename()
                 }
                 Btn {
                     width: (parent.width - Tokens.s2) / 2
-                    text: card.app.inTrash ? "RESTAURAR" : "A LA PAPELERA"
+                    text: card.app.inTrash ? Lang.t("RESTAURAR") : Lang.t("A LA PAPELERA")
                     armed: card.item !== null
                     onAct: card.app.inTrash ? card.app.restore() : card.app.trash()
                 }
                 Btn {
                     width: (parent.width - Tokens.s2) / 2
-                    text: "COPIAR RUTA"
+                    text: Lang.t("COPIAR RUTA")
                     onAct: card.app.copyPath(card.item ? card.item.path : card.app.path)
                 }
                 Btn {
                     width: (parent.width - Tokens.s2) / 2
-                    text: "TERMINAL AQUÍ"
+                    text: Lang.t("TERMINAL AQUÍ")
                     onAct: card.app.terminal(card.item && card.item.isDir ? card.item.path : card.app.path)
                 }
             }

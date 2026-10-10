@@ -38,6 +38,19 @@ También aparecen ahí los scripts de `~/.local/share/nautilus/scripts`, que rec
 
 Un repositorio de scripts se instala entero desde la paleta de comandos, con «Instalar acciones desde un repositorio»: se clona en `~/.local/share/archivos/acciones/` y sus programas pasan al mismo menú. Desde ahí también se actualiza o se quita.
 
+## Idiomas
+
+La ventana está escrita en español y trae inglés. Usa el idioma del sistema, o el que elijas en Ajustes → Idioma.
+
+Un idioma es un archivo `idiomas/<código>.json` que da a cada texto en español su traducción. Para añadir uno:
+
+```sh
+archivos idioma > idiomas/pt.json     # plantilla con todos los textos, sin traducir
+archivos idioma pt                    # lo que todavía le falta
+```
+
+Rellena las traducciones, pon el nombre del idioma en `"name"` y envía el archivo en un pull request. Lo que quede vacío se muestra en español, así que un idioma a medias ya sirve. Mientras traduces puedes dejarlo en `~/.config/archivos/idiomas/`: se recarga al guardar.
+
 ## Requisitos
 
 Linux con [Quickshell](https://quickshell.org) (probado con la 0.3.1) en cualquier compositor Wayland: Hyprland, Niri, Sway, KDE u otro. No depende de ningún escritorio concreto.

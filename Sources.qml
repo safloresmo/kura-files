@@ -61,7 +61,7 @@ Item {
                 if (mounts.wanted && map[mounts.wanted]) {
                     app.go(map[mounts.wanted]);
                     mounts.wanted = "";
-                } else if (fresh && !first && app.notice.indexOf("CONECTADO") === 0)
+                } else if (fresh && !first && app.notice.indexOf(Lang.t("CONECTADO")) === 0)
                     app.go(map[fresh]);
             }
         }
@@ -179,8 +179,8 @@ Item {
                 const row = text.trim().split("\n")[1];
                 const cols = row ? row.trim().split(/\s+/) : [];
                 app.space = cols.length !== 2 ? ""
-                    : cols[0].indexOf("fuse.gvfsd") === 0 ? "EN RED"
-                    : cols[0].toUpperCase() + " · " + Fmt.size(cols[1]).toUpperCase() + " LIBRES";
+                    : cols[0].indexOf("fuse.gvfsd") === 0 ? Lang.t("EN RED")
+                    : cols[0].toUpperCase() + " · " + Fmt.size(cols[1]).toUpperCase() + Lang.t(" LIBRES");
             }
         }
     }
@@ -191,16 +191,16 @@ Item {
         stdout: StdioCollector {
             onStreamFinished: {
                 const known = {
-                    DESKTOP: ["Escritorio", "desktop", "机上"],
-                    DOCUMENTS: ["Documentos", "doc", "文書"],
-                    DOWNLOAD: ["Descargas", "download", "受信"],
-                    MUSIC: ["Música", "music", "音楽"],
-                    PICTURES: ["Imágenes", "image", "画像"],
-                    VIDEOS: ["Vídeos", "video", "動画"]
+                    DESKTOP: [Lang.t("Escritorio"), "desktop", "机上"],
+                    DOCUMENTS: [Lang.t("Documentos"), "doc", "文書"],
+                    DOWNLOAD: [Lang.t("Descargas"), "download", "受信"],
+                    MUSIC: [Lang.t("Música"), "music", "音楽"],
+                    PICTURES: [Lang.t("Imágenes"), "image", "画像"],
+                    VIDEOS: [Lang.t("Vídeos"), "video", "動画"]
                 };
                 const list = [
-                    { name: "Carpeta personal", path: app.home, icon: "home", seal: "自宅" },
-                    { name: "Recientes", path: "", icon: "clock", seal: "最近", special: "recent" }
+                    { name: Lang.t("Carpeta personal"), path: app.home, icon: "home", seal: "自宅" },
+                    { name: Lang.t("Recientes"), path: "", icon: "clock", seal: "最近", special: "recent" }
                 ];
                 for (const line of text.split("\n")) {
                     const cols = line.split("\t");
@@ -209,7 +209,7 @@ Item {
                         continue;
                     list.push({ name: meta[0], path: app.clean(cols[1]), icon: meta[1], seal: meta[2] });
                 }
-                list.push({ name: "Papelera", path: app.home + "/.local/share/Trash/files", icon: "trash", seal: "屑籠" });
+                list.push({ name: Lang.t("Papelera"), path: app.home + "/.local/share/Trash/files", icon: "trash", seal: "屑籠" });
                 app.places = list;
             }
         }
@@ -230,7 +230,7 @@ Item {
                         const name = n.label || Fmt.size(n.size) + " · " + n.name;
                         if (at) {
                             found.push({
-                                name: at === "/" ? "Sistema" : name,
+                                name: at === "/" ? Lang.t("Sistema") : name,
                                 path: at,
                                 dev: n.path,
                                 used: parseInt(n["fsuse%"]) || 0,

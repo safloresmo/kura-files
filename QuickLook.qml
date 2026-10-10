@@ -66,7 +66,7 @@ Item {
             Text {
                 id: tag
                 anchors { right: parent.right; rightMargin: Tokens.s4; verticalCenter: parent.verticalCenter }
-                text: "VISTA RÁPIDA · ESC"
+                text: Lang.t("VISTA RÁPIDA · ESC")
                 color: Tokens.inkFaint
                 font.family: Tokens.mono
                 font.pixelSize: 10

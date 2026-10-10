@@ -52,7 +52,7 @@ Rectangle {
 
         Text {
             anchors { left: parent.left; leftMargin: Tokens.s4; right: buttons.left; rightMargin: Tokens.s3; verticalCenter: parent.verticalCenter }
-            text: "OTRO PANEL · " + pane.app.shorten(pane.path).toUpperCase()
+            text: Lang.t("OTRO PANEL · ") + pane.app.shorten(pane.path).toUpperCase()
             color: Tokens.ink
             font.family: Tokens.mono
             font.pixelSize: 12
@@ -65,7 +65,7 @@ Rectangle {
             spacing: Tokens.s2
 
             Btn { compact: true; text: "↑"; armed: pane.path !== "/"; onAct: pane.app.otherUp() }
-            Btn { compact: true; text: "CAMBIAR"; onAct: pane.app.swapPanes() }
+            Btn { compact: true; text: Lang.t("CAMBIAR"); onAct: pane.app.swapPanes() }
         }
         Rectangle {
             anchors.bottom: parent.bottom
@@ -157,12 +157,12 @@ Rectangle {
             anchors { left: parent.left; leftMargin: Tokens.s3; verticalCenter: parent.verticalCenter }
             spacing: Tokens.s2
 
-            Btn { text: "COPIAR AQUÍ"; armed: pane.app.picked().length > 0; onAct: pane.app.sendToOther(false) }
-            Btn { text: "MOVER AQUÍ"; armed: pane.app.picked().length > 0; onAct: pane.app.sendToOther(true) }
+            Btn { text: Lang.t("COPIAR AQUÍ"); armed: pane.app.picked().length > 0; onAct: pane.app.sendToOther(false) }
+            Btn { text: Lang.t("MOVER AQUÍ"); armed: pane.app.picked().length > 0; onAct: pane.app.sendToOther(true) }
         }
         Text {
             anchors { right: parent.right; rightMargin: Tokens.s4; verticalCenter: parent.verticalCenter }
-            text: pane.rows.length + " ELEM."
+            text: pane.rows.length + Lang.t(" ELEM.")
             color: Tokens.inkFaint
             font.family: Tokens.mono
             font.pixelSize: 10

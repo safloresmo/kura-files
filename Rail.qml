@@ -108,7 +108,7 @@ Item {
             id: filterField
             width: parent.width
             toolbar: true
-            placeholder: "Filtrar esta carpeta…"
+            placeholder: Lang.t("Filtrar esta carpeta…")
             onEdited: t => rail.app.query = t
             onAccepted: rail.app.focusList()
         }
@@ -116,7 +116,7 @@ Item {
             visible: rail.app.query !== "" && !rail.app.inTrash
             width: parent.width
             compact: true
-            text: "BUSCAR EN SUBCARPETAS"
+            text: Lang.t("BUSCAR EN SUBCARPETAS")
             onAct: rail.app.search(rail.app.query)
         }
     }
@@ -135,7 +135,7 @@ Item {
             id: list
             width: flick.width
 
-            GroupHead { number: 1; label: "LUGARES" }
+            GroupHead { number: 1; label: Lang.t("LUGARES") }
 
             Repeater {
                 model: rail.app.places
@@ -215,7 +215,7 @@ Item {
                 visible: rail.app.bookmarks.length > 0
                 height: visible ? 34 : 0
                 number: 2
-                label: "MARCADORES"
+                label: Lang.t("MARCADORES")
             }
 
             Repeater {
@@ -288,7 +288,7 @@ Item {
             }
 
             Item { width: 1; height: Tokens.s2 }
-            GroupHead { id: devicesHead; number: rail.app.bookmarks.length > 0 ? 3 : 2; label: "DISPOSITIVOS" }
+            GroupHead { id: devicesHead; number: rail.app.bookmarks.length > 0 ? 3 : 2; label: Lang.t("DISPOSITIVOS") }
 
             Repeater {
                 model: rail.app.devices
@@ -331,7 +331,7 @@ Item {
                     Text {
                         anchors { right: parent.right; rightMargin: Tokens.s3 + (ejectButton.visible ? 22 : 0) }
                         y: device.modelData.mounted ? 11 : 12
-                        text: device.modelData.mounted ? device.modelData.used + "%" : "MONTAR"
+                        text: device.modelData.mounted ? device.modelData.used + "%" : Lang.t("MONTAR")
                         color: Tokens.inkFaint
                         font.family: Tokens.mono
                         font.pixelSize: device.modelData.mounted ? 10 : 9
@@ -384,7 +384,7 @@ Item {
             }
 
             Item { width: 1; height: Tokens.s2 }
-            GroupHead { number: devicesHead.number + 1; label: "RED" }
+            GroupHead { number: devicesHead.number + 1; label: Lang.t("RED") }
 
             Repeater {
                 model: rail.app.servers
@@ -438,7 +438,7 @@ Item {
                     }
                     Text {
                         anchors { right: parent.right; rightMargin: Tokens.s3; verticalCenter: parent.verticalCenter }
-                        text: server.mounted !== "" ? "接続" : "CONECTAR"
+                        text: server.mounted !== "" ? "接続" : Lang.t("CONECTAR")
                         color: server.sel ? Tokens.inkOnBoneDim : Tokens.inkFaint
                         font.family: server.mounted !== "" ? Tokens.jp : Tokens.mono
                         font.pixelSize: server.mounted !== "" ? 12 : 9
@@ -463,7 +463,7 @@ Item {
                 Text {
                     x: Tokens.s3
                     anchors.verticalCenter: parent.verticalCenter
-                    text: "+  AÑADIR SERVIDOR"
+                    text: Lang.t("+  AÑADIR SERVIDOR")
                     color: addHover.hovered ? Tokens.ink : Tokens.inkFaint
                     font.family: Tokens.mono
                     font.pixelSize: 9
@@ -474,7 +474,7 @@ Item {
             }
 
             Item { visible: rail.app.labelCounts.length > 0; width: 1; height: visible ? Tokens.s2 : 0 }
-            GroupHead { visible: rail.app.labelCounts.length > 0; height: visible ? 34 : 0; number: devicesHead.number + 2; label: "ETIQUETAS" }
+            GroupHead { visible: rail.app.labelCounts.length > 0; height: visible ? 34 : 0; number: devicesHead.number + 2; label: Lang.t("ETIQUETAS") }
 
             Repeater {
                 model: rail.app.labelCounts

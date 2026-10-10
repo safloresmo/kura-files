@@ -120,7 +120,7 @@ Item {
 
             Text {
                 anchors { left: parent.left; leftMargin: Tokens.s4; verticalCenter: parent.verticalCenter }
-                text: "// AJUSTES"
+                text: Lang.t("// AJUSTES")
                 color: Tokens.ink
                 font.family: Tokens.mono
                 font.pixelSize: 12
@@ -128,7 +128,7 @@ Item {
             }
             Text {
                 anchors { right: parent.right; rightMargin: Tokens.s4; verticalCenter: parent.verticalCenter }
-                text: "SE GUARDAN SOLOS · ESC"
+                text: Lang.t("SE GUARDAN SOLOS · ESC")
                 color: Tokens.inkFaint
                 font.family: Tokens.mono
                 font.pixelSize: 10
@@ -152,98 +152,111 @@ Item {
                 id: body
                 width: parent.width
 
-                Head { number: 1; label: "MARCA" }
+                Head { number: 1; label: Lang.t("MARCA") }
                 Line {
-                    label: "Nombre"
+                    label: Lang.t("Nombre")
                     Field { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; width: 240; text: sheet.store.ownName; onCommitted: value => sheet.app.setPref("ownName", value) }
                 }
                 Line {
-                    label: "Subtítulo"
+                    label: Lang.t("Subtítulo")
                     Field { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; width: 240; text: sheet.store.ownTag; onCommitted: value => sheet.app.setPref("ownTag", value) }
                 }
                 Line {
-                    label: "Título de la ventana"
+                    label: Lang.t("Título de la ventana")
                     Field { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; width: 240; text: sheet.store.ownTitle; onCommitted: value => sheet.app.setPref("ownTitle", value) }
                 }
                 Line {
-                    label: "Símbolo"
-                    note: "Una letra o un kanji"
+                    label: Lang.t("Símbolo")
+                    note: Lang.t("Una letra o un kanji")
                     Field { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; width: 70; text: sheet.store.ownMark; onCommitted: value => sheet.app.setPref("ownMark", value) }
                 }
 
-                Head { number: 2; label: "VER" }
+                Head { number: 2; label: Lang.t("VER") }
                 Line {
-                    label: "Vista al abrir una carpeta"
-                    note: "Cada carpeta recuerda la suya si la cambias"
+                    label: Lang.t("Vista al abrir una carpeta")
+                    note: Lang.t("Cada carpeta recuerda la suya si la cambias")
                     Seg {
                         anchors.right: parent.right
                         anchors.verticalCenter: parent.verticalCenter
-                        options: ["LISTA", "CUADRÍCULA"]
-                        current: sheet.store.grid ? "CUADRÍCULA" : "LISTA"
-                        onChose: key => sheet.app.setPref("grid", key === "CUADRÍCULA")
+                        options: [Lang.t("LISTA"), Lang.t("CUADRÍCULA")]
+                        current: sheet.store.grid ? Lang.t("CUADRÍCULA") : Lang.t("LISTA")
+                        onChose: key => sheet.app.setPref("grid", key === Lang.t("CUADRÍCULA"))
                     }
                 }
                 Line {
-                    label: "Iconos"
-                    note: "Línea, hoja con la extensión escrita, o los del sistema"
+                    label: Lang.t("Iconos")
+                    note: Lang.t("Línea, hoja con la extensión escrita, o los del sistema")
                     Seg {
                         anchors.right: parent.right
                         anchors.verticalCenter: parent.verticalCenter
-                        options: ["LÍNEA", "HOJA", "SISTEMA"]
-                        current: sheet.store.iconStyle === "sheet" ? "HOJA" : (sheet.store.iconStyle === "system" ? "SISTEMA" : "LÍNEA")
-                        onChose: key => sheet.app.setPref("iconStyle", key === "HOJA" ? "sheet" : (key === "SISTEMA" ? "system" : "line"))
+                        options: [Lang.t("LÍNEA"), Lang.t("HOJA"), Lang.t("SISTEMA")]
+                        current: sheet.store.iconStyle === "sheet" ? Lang.t("HOJA") : (sheet.store.iconStyle === "system" ? Lang.t("SISTEMA") : Lang.t("LÍNEA"))
+                        onChose: key => sheet.app.setPref("iconStyle", key === Lang.t("HOJA") ? "sheet" : (key === Lang.t("SISTEMA") ? "system" : "line"))
                     }
                 }
                 Line {
-                    label: "Tema"
-                    note: "Colores, letra, esquinas y lado del panel"
+                    label: Lang.t("Idioma")
+                    note: Lang.t("El de la ventana; un texto sin traducir sale en español")
+                    Btn {
+                        anchors.right: parent.right
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: {
+                            const on = sheet.app.languages.find(l => l.key === sheet.store.language);
+                            return sheet.store.language === "" ? Lang.t("EL DEL SISTEMA") : (on ? on.name.toUpperCase() : "ESPAÑOL");
+                        }
+                        onAct: sheet.app.chooseLanguage()
+                    }
+                }
+                Line {
+                    label: Lang.t("Tema")
+                    note: Lang.t("Colores, letra, esquinas y lado del panel")
                     Btn {
                         anchors.right: parent.right
                         anchors.verticalCenter: parent.verticalCenter
                         text: {
                             const on = sheet.app.themes.find(t => t.key === sheet.store.theme);
-                            return (on ? on.name : "El de siempre").toUpperCase();
+                            return (on ? on.name : Lang.t("El de siempre")).toUpperCase();
                         }
                         onAct: sheet.app.chooseTheme()
                     }
                 }
                 Line {
-                    label: "Cabecera"
-                    note: "Cuánto sitio ocupa el nombre de la carpeta"
+                    label: Lang.t("Cabecera")
+                    note: Lang.t("Cuánto sitio ocupa el nombre de la carpeta")
                     Seg {
                         anchors.right: parent.right
                         anchors.verticalCenter: parent.verticalCenter
-                        options: ["COMPLETA", "COMPACTA", "MÍNIMA"]
-                        current: sheet.store.header === "minimal" ? "MÍNIMA" : (sheet.store.header === "compact" ? "COMPACTA" : "COMPLETA")
-                        onChose: key => sheet.app.setPref("header", key === "MÍNIMA" ? "minimal" : (key === "COMPACTA" ? "compact" : "full"))
+                        options: [Lang.t("COMPLETA"), Lang.t("COMPACTA"), Lang.t("MÍNIMA")]
+                        current: sheet.store.header === "minimal" ? Lang.t("MÍNIMA") : (sheet.store.header === "compact" ? Lang.t("COMPACTA") : Lang.t("COMPLETA"))
+                        onChose: key => sheet.app.setPref("header", key === Lang.t("MÍNIMA") ? "minimal" : (key === Lang.t("COMPACTA") ? "compact" : "full"))
                     }
                 }
                 Line {
-                    label: "Orden y tipos bajo la ruta"
+                    label: Lang.t("Orden y tipos bajo la ruta")
                     Sw { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; on: sheet.store.sorter; onToggled: value => sheet.app.setPref("sorter", value) }
                 }
                 Line {
-                    label: "Abrir donde lo dejé"
-                    note: "En vez de la carpeta personal"
+                    label: Lang.t("Abrir donde lo dejé")
+                    note: Lang.t("En vez de la carpeta personal")
                     Sw { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; on: sheet.store.reopen; onToggled: value => sheet.app.setPref("reopen", value) }
                 }
                 Line {
-                    label: "Mostrar los ocultos al abrir"
+                    label: Lang.t("Mostrar los ocultos al abrir")
                     Sw { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; on: sheet.store.hidden; onToggled: value => sheet.app.setPref("hidden", value) }
                 }
                 Line {
-                    label: "Dos paneles"
+                    label: Lang.t("Dos paneles")
                     Sw { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; on: sheet.store.dual; onToggled: sheet.app.toggleDual() }
                 }
 
-                Head { number: 3; label: "HERRAMIENTAS" }
+                Head { number: 3; label: Lang.t("HERRAMIENTAS") }
                 Line {
                     label: "Terminal"
-                    note: "La carpeta se añade al final"
+                    note: Lang.t("La carpeta se añade al final")
                     Field { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; width: 240; tabular: true; text: sheet.store.terminal; onCommitted: value => sheet.app.setPref("terminal", value) }
                 }
 
-                Head { number: 4; label: "RED" }
+                Head { number: 4; label: Lang.t("RED") }
                 Repeater {
                     model: sheet.store.servers
 
@@ -251,17 +264,17 @@ Item {
                         required property var modelData
                         label: modelData.name
                         note: modelData.uri
-                        Btn { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; compact: true; text: "QUITAR"; onAct: sheet.app.removeServer(modelData) }
+                        Btn { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; compact: true; text: Lang.t("QUITAR"); onAct: sheet.app.removeServer(modelData) }
                     }
                 }
                 Line {
-                    label: "Servidor nuevo"
-                    note: "SFTP, FTP o WebDAV"
+                    label: Lang.t("Servidor nuevo")
+                    note: Lang.t("SFTP, FTP o WebDAV")
                     Btn {
                         anchors.right: parent.right
                         anchors.verticalCenter: parent.verticalCenter
                         compact: true
-                        text: "AÑADIR"
+                        text: Lang.t("AÑADIR")
                         onAct: {
                             sheet.close();
                             sheet.app.addServer();

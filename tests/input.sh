@@ -15,7 +15,7 @@ failed=0
 export QT_QPA_PLATFORM=offscreen QT_QUICK_BACKEND=software XDG_CONFIG_HOME=$work/config XDG_DATA_HOME=$work/data
 # The clicks below are placed for the full header.
 mkdir -p "$XDG_CONFIG_HOME/archivos"
-echo '{ "header": "full" }' >"$XDG_CONFIG_HOME/archivos/config.json"
+echo '{ "header": "full", "language": "es" }' >"$XDG_CONFIG_HOME/archivos/config.json"
 
 CTRL=67108864 SHIFT=33554432 ALT=134217728
 ENTER=16777220 ESC=16777216 BACKSPACE=16777219 DELETE=16777223 TAB=16777217
@@ -390,6 +390,20 @@ expect "a theme changes the colours" ink "#123456"
 expect "and can move the side panel" railRight true
 call set theme ""; sleep 1
 expect "going back puts the panel where it was" railRight false
+
+echo "-- languages"
+mkdir -p "$XDG_CONFIG_HOME/archivos/idiomas"
+echo '{ "name": "Test", "Abrir": "Aufmachen" }' >"$XDG_CONFIG_HOME/archivos/idiomas/xx.json"
+open_at "$zone"
+expect "the user's languages are listed with the given ones" languages "xx en"
+expect "the program speaks Spanish by itself" word "Abrir"
+call set language en; sleep 1
+expect "a language that comes along changes the words" word "Open"
+call set language xx; sleep 1
+expect "and so does one of the user's own" word "Aufmachen"
+call key 78 $((CTRL + SHIFT)); call key $ENTER 0; sleep 1
+expect "what has no translation stays in Spanish" notice "CARPETA CREADA · NUEVA CARPETA"
+call set language es; sleep 0.6
 
 echo "-- the selection panel"
 open_at "$zone"

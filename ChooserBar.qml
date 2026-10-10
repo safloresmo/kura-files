@@ -29,7 +29,7 @@ Item {
         visible: app.pick === "save"
         anchors { left: ask.right; leftMargin: Tokens.s4; right: buttons.left; rightMargin: Tokens.s4; verticalCenter: parent.verticalCenter }
         toolbar: true
-        placeholder: "Nombre del archivo…"
+        placeholder: Lang.t("Nombre del archivo…")
         text: app.pickName
         onAccepted: app.pickDone()
     }
@@ -47,9 +47,9 @@ Item {
         anchors { right: parent.right; rightMargin: Tokens.s5; verticalCenter: parent.verticalCenter }
         spacing: Tokens.s2
 
-        Btn { text: "CANCELAR"; onAct: app.quit() }
+        Btn { text: Lang.t("CANCELAR"); onAct: app.quit() }
         Btn {
-            text: app.pick === "save" ? "GUARDAR" : (app.pick === "folder" ? "ELEGIR ESTA CARPETA" : "ABRIR")
+            text: app.pick === "save" ? Lang.t("GUARDAR") : (app.pick === "folder" ? Lang.t("ELEGIR ESTA CARPETA") : Lang.t("ABRIR"))
             primary: true
             armed: app.pickReady
             onAct: app.pickDone()

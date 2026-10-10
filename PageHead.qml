@@ -95,10 +95,10 @@ Item {
                     const parts = shown.split("/").filter(s => s !== "");
                     for (const s of parts) {
                         at = s === "~" ? app.home : at + "/" + s;
-                        out.push({ label: s === "~" ? "INICIO" : s.toUpperCase(), path: at });
+                        out.push({ label: s === "~" ? Lang.t("INICIO") : s.toUpperCase(), path: at });
                     }
                     if (!remote && app.path.indexOf(app.home) !== 0)
-                        out.unshift({ label: "RAÍZ", path: "/" });
+                        out.unshift({ label: Lang.t("RAÍZ"), path: "/" });
                     return out.slice(-5);
                 }
 
@@ -139,10 +139,10 @@ Item {
             anchors { right: parent.right; verticalCenter: parent.verticalCenter }
             spacing: Tokens.s2
 
-            Btn { text: "COMANDOS"; onAct: app.openPalette() }
-            Btn { visible: head.width >= 420; text: app.grid ? "LISTA" : "CUADRÍCULA"; onAct: app.toggleGrid() }
-            Btn { visible: head.width >= 560; text: "OCULTOS"; primary: app.showHidden; onAct: app.showHidden = !app.showHidden }
-            Btn { visible: head.width >= 700; text: "TERMINAL AQUÍ"; onAct: app.terminal(app.path) }
+            Btn { text: Lang.t("COMANDOS"); onAct: app.openPalette() }
+            Btn { visible: head.width >= 420; text: app.grid ? Lang.t("LISTA") : Lang.t("CUADRÍCULA"); onAct: app.toggleGrid() }
+            Btn { visible: head.width >= 560; text: Lang.t("OCULTOS"); primary: app.showHidden; onAct: app.showHidden = !app.showHidden }
+            Btn { visible: head.width >= 700; text: Lang.t("TERMINAL AQUÍ"); onAct: app.terminal(app.path) }
         }
     }
 
@@ -160,13 +160,13 @@ Item {
         id: blurb
         visible: !app.short
         anchors { left: parent.left; right: parent.right; top: heading.bottom; topMargin: Tokens.s1 }
-        text: app.inTrash && !app.deep ? Fmt.plural(app.rows.length, "elemento", "elementos") + " en la papelera, de todos los discos."
-            : app.recent ? "Lo último que abriste, esté donde esté."
-            : app.deep ? Fmt.plural(app.rows.length, "resultado", "resultados") + (app.deepInside ? " con «" : " para «") + app.deepQuery + (app.deepInside ? "» dentro, en esta carpeta y sus subcarpetas." : app.deepWide ? "» en toda tu carpeta personal." : "» en esta carpeta y sus subcarpetas.")
-            : !app.ready ? "Leyendo…"
-            : app.unreadable ? "No se puede leer."
-            : (app.folderTotal === 0 ? "Sin contenido."
-                : Fmt.plural(app.dirTotal, "carpeta", "carpetas") + " y " + Fmt.plural(app.fileTotal, "archivo", "archivos") + ".")
+        text: app.inTrash && !app.deep ? Fmt.plural(app.rows.length, Lang.t("elemento"), Lang.t("elementos")) + Lang.t(" en la papelera, de todos los discos.")
+            : app.recent ? Lang.t("Lo último que abriste, esté donde esté.")
+            : app.deep ? Fmt.plural(app.rows.length, Lang.t("resultado"), Lang.t("resultados")) + (app.deepInside ? " con «" : Lang.t(" para «")) + app.deepQuery + (app.deepInside ? Lang.t("» dentro, en esta carpeta y sus subcarpetas.") : app.deepWide ? Lang.t("» en toda tu carpeta personal.") : Lang.t("» en esta carpeta y sus subcarpetas."))
+            : !app.ready ? Lang.t("Leyendo…")
+            : app.unreadable ? Lang.t("No se puede leer.")
+            : (app.folderTotal === 0 ? Lang.t("Sin contenido.")
+                : Fmt.plural(app.dirTotal, Lang.t("carpeta"), Lang.t("carpetas")) + Lang.t(" y ") + Fmt.plural(app.fileTotal, Lang.t("archivo"), Lang.t("archivos")) + ".")
         color: Tokens.inkMuted
         font.family: Tokens.ui
         font.pixelSize: Tokens.fBody
@@ -186,7 +186,7 @@ Item {
             width: parent.width - 3 * (40 + Tokens.s2) - (head.searchShown ? searchField.width + Tokens.s2 : 0) - sorterButton.width - Tokens.s2 - head.toolCount * (36 + Tokens.s2)
             toolbar: true
             tabular: true
-            placeholder: "Ir a una ruta…"
+            placeholder: Lang.t("Ir a una ruta…")
             onAccepted: app.tryPath(text)
             Keys.onTabPressed: app.completePath(text)
         }
@@ -195,7 +195,7 @@ Item {
             visible: head.searchShown
             width: 220
             toolbar: true
-            placeholder: "Buscar por nombre…"
+            placeholder: Lang.t("Buscar por nombre…")
             onEdited: t => app.query = t
             onAccepted: app.focusList()
         }
@@ -204,14 +204,14 @@ Item {
             id: sorterButton
             height: 36
             width: 92
-            text: "ORDENAR" + (!app.showSorter && (app.pinType !== "" || app.sortKey !== 0 || app.sortReversed) ? " •" : "")
+            text: Lang.t("ORDENAR") + (!app.showSorter && (app.pinType !== "" || app.sortKey !== 0 || app.sortReversed) ? " •" : "")
             primary: app.showSorter
             onAct: app.setPref("sorter", !app.showSorter)
         }
-        Tool { visible: head.toolCount >= 1; icon: "command"; hint: "COMANDOS"; onAct: app.openPalette() }
-        Tool { visible: head.toolCount >= 2; icon: app.grid ? "rows" : "grid"; hint: app.grid ? "LISTA" : "CUADRÍCULA"; onAct: app.toggleGrid() }
-        Tool { visible: head.toolCount >= 3; icon: "eye"; hint: "OCULTOS"; on: app.showHidden; onAct: app.showHidden = !app.showHidden }
-        Tool { visible: head.toolCount >= 4; icon: "script"; hint: "TERMINAL AQUÍ"; onAct: app.terminal(app.path) }
+        Tool { visible: head.toolCount >= 1; icon: "command"; hint: Lang.t("COMANDOS"); onAct: app.openPalette() }
+        Tool { visible: head.toolCount >= 2; icon: app.grid ? "rows" : "grid"; hint: app.grid ? Lang.t("LISTA") : Lang.t("CUADRÍCULA"); onAct: app.toggleGrid() }
+        Tool { visible: head.toolCount >= 3; icon: "eye"; hint: Lang.t("OCULTOS"); on: app.showHidden; onAct: app.showHidden = !app.showHidden }
+        Tool { visible: head.toolCount >= 4; icon: "script"; hint: Lang.t("TERMINAL AQUÍ"); onAct: app.terminal(app.path) }
     }
 
     // How the folder is ordered, and which kinds of file it holds.
@@ -250,7 +250,7 @@ Item {
         clip: true
 
         Text {
-            text: "ORDEN"
+            text: Lang.t("ORDEN")
             color: Tokens.inkFaint
             font.family: Tokens.mono
             font.pixelSize: 9
@@ -259,7 +259,7 @@ Item {
             rightPadding: 4
         }
         Repeater {
-            model: ["NOMBRE", "TAMAÑO", "FECHA", "TIPO"]
+            model: [Lang.t("NOMBRE"), Lang.t("TAMAÑO"), Lang.t("FECHA"), Lang.t("TIPO")]
 
             Chip {
                 required property string modelData
@@ -271,7 +271,7 @@ Item {
         }
         Text {
             visible: app.typeCounts.length > 0
-            text: "TIPOS"
+            text: Lang.t("TIPOS")
             color: Tokens.inkFaint
             font.family: Tokens.mono
             font.pixelSize: 9
@@ -292,7 +292,7 @@ Item {
         }
         Chip {
             visible: app.pinType !== ""
-            label: "SOLO ESTOS"
+            label: Lang.t("SOLO ESTOS")
             on: app.onlyType
             onAct: app.onlyType = !app.onlyType
         }

@@ -54,6 +54,8 @@ ShellRoot {
                 query: app.query,
                 deep: app.deep,
                 hidden: app.showHidden,
+                languages: app.languages.map(l => l.key).join(" "),
+                word: Lang.t("Abrir"),
                 themes: app.themes.map(t => t.key).join(" "),
                 ink: String(Tokens.ink),
                 railRight: Tokens.railRight,

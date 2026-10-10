@@ -27,7 +27,7 @@ Column {
     }
     Text {
         anchors.horizontalCenter: parent.horizontalCenter
-        text: "// VACÍO"
+        text: Lang.t("// VACÍO")
         color: Tokens.inkDim
         font.family: Tokens.mono
         font.pixelSize: 10

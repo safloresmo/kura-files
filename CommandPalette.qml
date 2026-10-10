@@ -8,7 +8,7 @@ Item {
     property var all: []
     property string query: ""
     property int at: 0
-    property string heading: "COMANDOS"
+    property string heading: Lang.t("COMANDOS")
     property bool searching: true
 
     readonly property var shown: {
@@ -16,7 +16,7 @@ Item {
         const out = [];
         if (searching && (q.charAt(0) === "/" || q.charAt(0) === "~")) {
             const target = query.trim();
-            out.push({ label: "Ir a " + target, hint: "RUTA", act: () => palette.app.tryPath(target) });
+            out.push({ label: Lang.t("Ir a ") + target, hint: Lang.t("RUTA"), act: () => palette.app.tryPath(target) });
         }
         const words = q.split(/\s+/).filter(w => w !== "");
         for (const c of all) {
@@ -26,7 +26,7 @@ Item {
         }
         if (searching && (q !== "" && out.length === 0 || (q !== "" && q.charAt(0) !== "/" && q.charAt(0) !== "~"))) {
             const text = query.trim();
-            out.push({ label: "Buscar «" + text + "» en subcarpetas", hint: "BÚSQUEDA", act: () => palette.app.search(text) });
+            out.push({ label: Lang.t("Buscar «") + text + Lang.t("» en subcarpetas"), hint: Lang.t("BÚSQUEDA"), act: () => palette.app.search(text) });
         }
         return out;
     }
@@ -45,7 +45,7 @@ Item {
         field.grabFocus();
     }
     function open() {
-        heading = "COMANDOS";
+        heading = Lang.t("COMANDOS");
         searching = true;
         all = app.commands();
         query = "";
@@ -123,7 +123,7 @@ Item {
                 }
                 Text {
                     anchors.right: parent.right
-                    text: palette.shown.length + " · ENTER PARA EJECUTAR"
+                    text: palette.shown.length + Lang.t(" · ENTER PARA EJECUTAR")
                     color: Tokens.inkFaint
                     font.family: Tokens.mono
                     font.pixelSize: 9
@@ -134,7 +134,7 @@ Item {
                 id: field
                 width: parent.width
                 toolbar: true
-                placeholder: "Una acción, un lugar o una ruta…"
+                placeholder: Lang.t("Una acción, un lugar o una ruta…")
                 onEdited: t => {
                     palette.query = t;
                     palette.at = 0;
