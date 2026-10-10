@@ -194,6 +194,12 @@ expect "the chips stay out of the way" sorter false
 call click 1318 165 1 0;           expect "until the button brings them out" sorter true
 call click 1318 165 1 0;           expect "and puts them away again" sorter false
 
+echo "-- the selection panel"
+open_at "$zone"
+expect "nothing picked, no panel" detail false
+call click 400 380 1 0;            expect "picking a file brings it" detail true
+call key $ESC 0;                   expect "and escape sends it away" detail false
+
 echo "-- the minimal header"
 call set header minimal; sleep 0.6
 call click 1306 42 1 0;            expect "its eye shows the hidden files" hidden true

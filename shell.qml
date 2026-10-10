@@ -41,7 +41,6 @@ ShellRoot {
         function open(): void { app.open(app.current); }
         function look(): void { app.quickLook(); }
         function menu(x: int, y: int): void { app.contextMenu(x, y); }
-        function brand(): void { app.toggleBrand(); }
         function copy(): void { app.hold(false); }
         function cut(): void { app.hold(true); }
         function paste(): void { app.paste(); }

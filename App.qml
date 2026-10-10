@@ -67,7 +67,7 @@ Item {
     // The layout sheds pieces as the window shrinks: the selection card first,
     // then the rail, then the roomy page header.
     property bool railForced: false
-    readonly property bool showDetail: width >= 1180
+    readonly property bool showDetail: width >= 1180 && (current >= 0 || markedCount > 0)
     readonly property bool showRail: width >= 860 || railForced
     // full, compact or minimal: how much room the folder's name takes.
     readonly property string header: settings.header
@@ -88,9 +88,7 @@ Item {
     property bool noticeBad: false
 
     readonly property string engine: decodeURIComponent(Qt.resolvedUrl("motor/target/release/archivos-motor").toString().replace("file://", ""))
-    readonly property var brand: settings.brand === "ryoku"
-        ? { mark: "力", name: "RYOKU FILES", tag: "RYOKU // FILES", title: "Ryoku Files" }
-        : { mark: settings.ownMark, name: settings.ownName, tag: settings.ownTag, title: settings.ownTitle }
+    readonly property var brand: ({ mark: settings.ownMark, name: settings.ownName, tag: settings.ownTag, title: settings.ownTitle })
 
     readonly property int total: rows.length
     readonly property int folderTotal: dir.count
@@ -355,10 +353,6 @@ Item {
     function copyPath(p) {
         Spawn.run(["wl-copy", "--", p]);
         say("RUTA COPIADA");
-    }
-    function toggleBrand() {
-        settings.brand = settings.brand === "ryoku" ? "own" : "ryoku";
-        settingsFile.writeAdapter();
     }
 
     function say(text, bad) {
@@ -952,7 +946,6 @@ Item {
         add("Ajustes", "CTRL+,", () => prefs.open());
         add("Propiedades", "CTRL+I", () => properties());
         add("Ver los atajos de teclado", "F1", () => keysSheet.open());
-        add("Cambiar la marca", "ACCIÓN", () => toggleBrand());
         for (const b of bookmarks)
             add("Ir a " + b.name, "MARCADOR", () => go(b.path));
         for (const p of places)
@@ -1275,7 +1268,6 @@ Item {
 
         JsonAdapter {
             id: settings
-            property string brand: "own"
             property bool grid: false
             property var servers: []
             property bool dual: false

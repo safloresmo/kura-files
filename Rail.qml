@@ -63,7 +63,7 @@ Item {
 
         Rectangle {
             width: parent.width
-            height: 64
+            height: 36
             color: "transparent"
             radius: Tokens.radius
             border.width: Tokens.border
@@ -77,13 +77,15 @@ Item {
                     text: rail.app.brand.mark
                     color: Tokens.ink
                     font.family: Tokens.jp
-                    font.pixelSize: 22
+                    font.pixelSize: 16
+                    anchors.verticalCenter: parent.verticalCenter
                 }
-                Column {
-                    spacing: 1
+                Row {
+                    spacing: 8
                     anchors.verticalCenter: parent.verticalCenter
 
                     Text {
+                        id: brandName
                         text: rail.app.brand.name
                         color: Tokens.ink
                         font.family: Tokens.ui
@@ -92,17 +94,16 @@ Item {
                         font.letterSpacing: 2.4
                     }
                     Text {
-                        visible: text !== ""
+                        visible: text !== "" && brandName.width + implicitWidth < rail.width - 110
                         text: rail.app.brand.tag
                         color: Tokens.inkMuted
                         font.family: Tokens.mono
                         font.pixelSize: 10
                         font.letterSpacing: 1.4
+                        anchors.baseline: brandName.baseline
                     }
                 }
             }
-            HoverHandler { cursorShape: Qt.PointingHandCursor }
-            TapHandler { onTapped: rail.app.toggleBrand() }
         }
 
         Field {

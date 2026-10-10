@@ -156,17 +156,7 @@ Item {
 
                 Head { number: 1; label: "MARCA" }
                 Line {
-                    label: "Nombre que se muestra"
-                    Seg {
-                        anchors.right: parent.right
-                        anchors.verticalCenter: parent.verticalCenter
-                        options: ["PROPIA", "RYOKU FILES"]
-                        current: sheet.store.brand === "ryoku" ? "RYOKU FILES" : "PROPIA"
-                        onChose: key => sheet.app.setPref("brand", key === "PROPIA" ? "own" : "ryoku")
-                    }
-                }
-                Line {
-                    label: "Nombre propio"
+                    label: "Nombre"
                     Field { anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; width: 240; text: sheet.store.ownName; onCommitted: value => sheet.app.setPref("ownName", value) }
                 }
                 Line {
