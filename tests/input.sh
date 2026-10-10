@@ -223,6 +223,20 @@ rm -f "$zone/twin-of-b.txt"
 call click 400 312 1 0; call actions; sleep 1
 expect "but not to a folder" actions ""
 
+echo "-- choosing a file for another program"
+pkill -f "qs -p $harness" 2>/dev/null; sleep 0.3
+ARCHIVOS_PICK=open ARCHIVOS_PICK_OUT=$work/answer ARCHIVOS_DIR=$zone qs -p "$harness" >"$work/window.log" 2>&1 &
+sleep 4
+expect "nothing is offered before a file is picked" pick ""
+call click 400 380 1 0;            expect "a picked file is the answer" pick "$zone/b.txt"
+call pickDone; sleep 1
+[ "$(cat "$work/answer" 2>/dev/null)" = "$zone/b.txt" ] && echo "ok    it is handed over" || { echo "FAIL  it is handed over"; failed=1; }
+pgrep -f "qs -p $harness" >/dev/null && { echo "FAIL  and the window leaves"; failed=1; } || echo "ok    and the window leaves"
+ARCHIVOS_PICK=save ARCHIVOS_PICK_NAME=draft.txt ARCHIVOS_PICK_OUT=$work/answer ARCHIVOS_DIR=$zone qs -p "$harness" >"$work/window.log" 2>&1 &
+sleep 4
+call pickDone; sleep 1
+[ "$(cat "$work/answer" 2>/dev/null)" = "$zone/draft.txt" ] && echo "ok    saving answers with the name in this folder" || { echo "FAIL  saving answers with the name in this folder"; failed=1; }
+
 echo "-- the selection panel"
 open_at "$zone"
 expect "nothing picked, no panel" detail false

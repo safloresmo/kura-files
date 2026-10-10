@@ -17,6 +17,7 @@ ShellRoot {
 
         App {
             id: app
+            onQuit: Qt.quit()
             anchors.fill: parent
         }
     }
@@ -47,6 +48,7 @@ ShellRoot {
                 query: app.query,
                 deep: app.deep,
                 hidden: app.showHidden,
+                pick: app.pickPaths.join(" | "),
                 actions: app.actions.map(a => (a.group !== "" ? a.group + " · " : "") + a.name).join(" | "),
                 detail: app.showDetail,
                 digest: app.digest,
@@ -88,6 +90,8 @@ ShellRoot {
         function point(path: string): void { app.showPath(path); }
         function actions(): void { app.loadActions(app.picked().map(e => e.path)); }
         function act(index: int): void { app.actionEntries(app.picked().map(e => e.path))[index].act(); }
+        function pickName(text: string): void { app.pickBar.nameField.text = text; }
+        function pickDone(): void { app.pickDone(); }
         function reveal(): void { app.showInFolder(app.selected); }
         function pref(key: string, on: bool): void { app.setPref(key, on); }
         function set(key: string, value: string): void { app.setPref(key, value); }

@@ -259,6 +259,50 @@ Item {
     }
 
     signal quit()
+    property alias pickBar: pickBar
+
+    // Set when another program is waiting for a file: open, save or folder.
+    readonly property string pick: Quickshell.env("ARCHIVOS_PICK") || ""
+    readonly property bool pickMulti: Quickshell.env("ARCHIVOS_PICK_MULTI") === "1"
+    readonly property string pickName: Quickshell.env("ARCHIVOS_PICK_NAME") || ""
+    readonly property string pickTitle: Quickshell.env("ARCHIVOS_PICK_TITLE")
+        || (pick === "save" ? "Guardar como" : pick === "folder" ? "Elegir carpeta" : pick === "open" ? "Abrir archivo" : "")
+    // What would be handed over if the button were pressed now.
+    readonly property var pickPaths: {
+        if (pick === "folder") {
+            const dirs = picked().filter(e => e.isDir);
+            return dirs.length === 1 ? [dirs[0].path] : [path];
+        }
+        if (pick === "open") {
+            const files = picked().filter(e => !e.isDir);
+            return pickMulti ? files.map(e => e.path) : (files.length === 1 ? [files[0].path] : []);
+        }
+        return [];
+    }
+    readonly property bool pickReady: pick === "save" ? !inTrash : pickPaths.length > 0
+    readonly property string pickSummary: pickPaths.length === 0 ? "Elige un archivo."
+        : pickPaths.length === 1 ? shorten(pickPaths[0]) : Fmt.plural(pickPaths.length, "archivo", "archivos")
+    function pickAnswer(paths) {
+        answer.command = ["sh", "-c", 'out=$1; shift; printf "%s\\n" "$@" > "$out"', "sh", Quickshell.env("ARCHIVOS_PICK_OUT") || "/dev/null"].concat(paths);
+        answer.running = true;
+    }
+    function pickDone() {
+        if (pick !== "save") {
+            if (pickPaths.length > 0)
+                pickAnswer(pickPaths);
+            return;
+        }
+        const name = pickBar.nameField.text.trim();
+        if (name === "" || name.indexOf("/") >= 0 || inTrash) {
+            say("ESCRIBE UN NOMBRE", true);
+            return;
+        }
+        const target = (path === "/" ? "" : path) + "/" + name;
+        if (rows.some(e => e.name === name))
+            dialog.confirm("YA EXISTE", "«" + name + "» ya está en esta carpeta. ¿Reemplazarlo?", () => pickAnswer([target]), "REEMPLAZAR");
+        else
+            pickAnswer([target]);
+    }
 
     function clean(p) {
         p = String(p).trim();
@@ -348,7 +392,11 @@ Item {
             return;
         if (e.isDir)
             go(e.path);
-        else
+        else if (pick === "open")
+            pickAnswer([e.path]);
+        else if (pick === "save")
+            pickBar.nameField.text = e.name;
+        else if (pick === "")
             Spawn.run(["gio", "open", e.path]);
     }
     function terminal(p) {
@@ -1225,7 +1273,7 @@ Item {
     onPathChanged: {
         pinType = "";
         onlyType = false;
-        if (settled && settings.reopen && settings.lastPath !== path)
+        if (settled && pick === "" && settings.reopen && settings.lastPath !== path)
             setPref("lastPath", path);
         unreadable = false;
         changed = {};
@@ -1568,6 +1616,10 @@ Item {
         }
     }
     Process {
+        id: answer
+        onExited: app.quit()
+    }
+    Process {
         id: menuCounter
         command: [app.engine, "menus"]
         running: true
@@ -1781,7 +1833,7 @@ Item {
 
     Item {
         id: page
-        anchors { left: rail.right; right: parent.right; top: parent.top; bottom: foot.top }
+        anchors { left: rail.right; right: parent.right; top: parent.top; bottom: pickBar.top }
         anchors.leftMargin: app.width < 700 ? Tokens.s4 : Tokens.s6
         anchors.rightMargin: app.width < 700 ? Tokens.s4 : Tokens.s6
         anchors.topMargin: app.short && !app.bare ? Tokens.s3 : Tokens.s5
@@ -1832,6 +1884,11 @@ Item {
         id: foot
         app: app
         anchors { left: parent.left; right: parent.right; bottom: parent.bottom }
+    }
+    ChooserBar {
+        id: pickBar
+        app: app
+        anchors { left: rail.right; right: parent.right; bottom: foot.top }
     }
 
     QuickLook {

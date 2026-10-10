@@ -1,0 +1,113 @@
+#!/usr/bin/env python3
+"""File chooser backend for xdg-desktop-portal: when a program asks to open
+or save a file, show this file manager's window and hand back what was chosen."""
+
+import os
+import subprocess
+import sys
+import tempfile
+
+from gi.repository import Gio, GLib
+
+NAME = "org.freedesktop.impl.portal.desktop.kura"
+PATH = "/org/freedesktop/portal/desktop"
+INTERFACE = """
+<node>
+  <interface name="org.freedesktop.impl.portal.FileChooser">
+    <method name="OpenFile">
+      <arg type="o" name="handle" direction="in"/>
+      <arg type="s" name="app_id" direction="in"/>
+      <arg type="s" name="parent_window" direction="in"/>
+      <arg type="s" name="title" direction="in"/>
+      <arg type="a{sv}" name="options" direction="in"/>
+      <arg type="u" name="response" direction="out"/>
+      <arg type="a{sv}" name="results" direction="out"/>
+    </method>
+    <method name="SaveFile">
+      <arg type="o" name="handle" direction="in"/>
+      <arg type="s" name="app_id" direction="in"/>
+      <arg type="s" name="parent_window" direction="in"/>
+      <arg type="s" name="title" direction="in"/>
+      <arg type="a{sv}" name="options" direction="in"/>
+      <arg type="u" name="response" direction="out"/>
+      <arg type="a{sv}" name="results" direction="out"/>
+    </method>
+    <method name="SaveFiles">
+      <arg type="o" name="handle" direction="in"/>
+      <arg type="s" name="app_id" direction="in"/>
+      <arg type="s" name="parent_window" direction="in"/>
+      <arg type="s" name="title" direction="in"/>
+      <arg type="a{sv}" name="options" direction="in"/>
+      <arg type="u" name="response" direction="out"/>
+      <arg type="a{sv}" name="results" direction="out"/>
+    </method>
+  </interface>
+</node>
+"""
+CANCELLED = 1
+
+root = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+window = os.environ.get("ARCHIVOS_PICKER", os.path.join(root, "picker.qml"))
+loop = GLib.MainLoop()
+
+
+def text(raw):
+    """A portal byte string: a path with a trailing zero."""
+    return bytes(raw).rstrip(b"\0").decode("utf-8", "replace") if raw else ""
+
+
+def start_folder(options):
+    folder = text(options.get("current_folder"))
+    current = text(options.get("current_file"))
+    if not folder and current:
+        folder = os.path.dirname(current)
+    return folder if os.path.isdir(folder) else os.path.expanduser("~")
+
+
+def on_call(connection, sender, path, interface, method, parameters, invocation):
+    handle, app_id, parent, title, options = parameters.unpack()
+    kind = "open"
+    if method == "SaveFile":
+        kind = "save"
+    elif method == "SaveFiles" or options.get("directory"):
+        kind = "folder"
+    answer = tempfile.NamedTemporaryFile(prefix="archivos-pick-", delete=False)
+    answer.close()
+    name = options.get("current_name") or os.path.basename(text(options.get("current_file")))
+    env = dict(
+        os.environ,
+        ARCHIVOS_PICK=kind,
+        ARCHIVOS_PICK_OUT=answer.name,
+        ARCHIVOS_PICK_TITLE=title,
+        ARCHIVOS_PICK_NAME=name,
+        ARCHIVOS_PICK_MULTI="1" if options.get("multiple") else "0",
+        ARCHIVOS_DIR=start_folder(options),
+    )
+    child = subprocess.Popen(["qs", "-p", window], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+    def finished(pid, status):
+        with open(answer.name, encoding="utf-8") as file:
+            chosen = [line for line in file.read().split("\n") if line]
+        os.unlink(answer.name)
+        if method == "SaveFiles" and chosen:
+            chosen = [os.path.join(chosen[0], text(item)) for item in options.get("files", [])]
+        if not chosen:
+            invocation.return_value(GLib.Variant("(ua{sv})", (CANCELLED, {})))
+            return
+        uris = [Gio.File.new_for_path(item).get_uri() for item in chosen]
+        invocation.return_value(GLib.Variant("(ua{sv})", (0, {"uris": GLib.Variant("as", uris)})))
+
+    GLib.child_watch_add(GLib.PRIORITY_DEFAULT, child.pid, finished)
+
+
+def on_bus(connection, name):
+    node = Gio.DBusNodeInfo.new_for_xml(INTERFACE)
+    connection.register_object(PATH, node.interfaces[0], on_call, None, None)
+
+
+def on_lost(connection, name):
+    sys.exit(1)
+
+
+Gio.bus_own_name(Gio.BusType.SESSION, NAME, Gio.BusNameOwnerFlags.NONE, on_bus, None, on_lost)
+loop.run()

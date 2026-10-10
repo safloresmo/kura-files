@@ -15,6 +15,7 @@ Gestor de archivos de escritorio para Linux: interfaz en QML sobre Quickshell y 
 - Envío de archivos por Tailscale y LocalSend.
 - Paleta de comandos (Ctrl+K) y hoja de atajos (F1).
 - Atiende «mostrar en carpeta» de otros programas (`bin/archivos-servicio`).
+- Sirve de selector de archivos para otros programas a través del portal del escritorio (`bin/archivos-portal`).
 
 ## Acciones
 
@@ -35,7 +36,7 @@ Exec=magick %f %f.jpg
 
 ## Requisitos
 
-Quickshell con los módulos de interfaz del escritorio, Rust para compilar el motor, y `gio`, `bsdtar` y `sha256sum` en el sistema. El servicio usa Python con PyGObject.
+Quickshell con los módulos de interfaz del escritorio, Rust para compilar el motor, y `gio`, `bsdtar` y `sha256sum` en el sistema. Los dos servicios usan Python con PyGObject.
 
 ## Uso
 
