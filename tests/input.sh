@@ -380,6 +380,17 @@ call click 400 392 1 0; call key $F2 0; call key 65 $CTRL; call type twig.txt; c
 [ -f "$zone/folder/twig.txt" ] && echo "ok    a file is renamed where it sits" || { echo "FAIL  a file is renamed where it sits"; failed=1; }
 expect "and the opened folder shows it" names "folder | inner | twig.txt | a.txt | b.txt | c.txt"
 
+echo "-- themes"
+mkdir -p "$XDG_CONFIG_HOME/archivos/temas"
+echo '{ "name": "Mine", "follow": false, "ink": "#123456", "rail": "right" }' >"$XDG_CONFIG_HOME/archivos/temas/mine.json"
+open_at "$zone"
+expect "the user's themes are listed with the given ones" themes "mine claro medianoche terminal"
+call set theme mine; sleep 1
+expect "a theme changes the colours" ink "#123456"
+expect "and can move the side panel" railRight true
+call set theme ""; sleep 1
+expect "going back puts the panel where it was" railRight false
+
 echo "-- the selection panel"
 open_at "$zone"
 expect "nothing picked, no panel" detail false

@@ -10,7 +10,7 @@ Item {
     width: Tokens.railW
 
     Rectangle {
-        anchors.right: parent.right
+        x: Tokens.railRight ? 0 : parent.width - 1
         width: 1
         height: parent.height
         color: Tokens.line

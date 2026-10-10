@@ -1188,6 +1188,7 @@ Item {
             add("Actualizar las acciones de " + p.name, "ACCIONES", () => packJob(["pack-add", p.url], "ACTUALIZADAS · " + p.name.toUpperCase()));
             add("Quitar las acciones de " + p.name, "ACCIONES", () => removePack(p));
         }
+        add("Cambiar de tema", "ACCIÓN", () => chooseTheme());
         add("Terminal aquí", "ACCIÓN", () => terminal(path));
         add("Copiar la ruta de esta carpeta", "ACCIÓN", () => copyPath(path));
         add("Subir una carpeta", "ALT+↑", () => goUp());
@@ -1305,7 +1306,10 @@ Item {
         const glyph = iconFor(name, filePath, isDir);
         if (isDir)
             return Tokens.sun;
-        return hues[glyph] || Tokens.inkFaint;
+        const own = Tokens.hue(glyph);
+        if (own !== "")
+            return own;
+        return hues[glyph] ? Tokens.onPaper(hues[glyph]) : Tokens.inkFaint;
     }
     // The extension as a short tag, so two files with the same icon still differ.
     function tagFor(name, isDir) {
@@ -1656,6 +1660,7 @@ Item {
             property bool grid: false
             property var servers: []
             property var labels: ({})
+            property string theme: ""
             property bool dual: false
             property bool hidden: false
             property bool sorter: false
@@ -2057,6 +2062,35 @@ Item {
             }
         }
     }
+    Binding { target: Tokens; property: "themeName"; value: settings.theme }
+    Binding { target: Tokens; property: "themeRoot"; value: decodeURIComponent(Qt.resolvedUrl("temas").toString().replace("file://", "")) }
+    // The themes there are: the ones that come along, and the user's own.
+    property var themes: []
+    function loadThemes() {
+        themeLister.running = true;
+    }
+    function chooseTheme() {
+        loadThemes();
+        const options = [{ text: "EL DE SIEMPRE", act: () => setPref("theme", "") }]
+            .concat(themes.map(t => ({ text: t.name.toUpperCase(), act: () => setPref("theme", t.key) })));
+        dialog.choose("TEMA", "Los tuyos van en ~/.config/archivos/temas, un archivo .json por tema.", options);
+    }
+    Process {
+        id: themeLister
+        command: [app.engine, "themes", Tokens.themeRoot]
+        running: true
+        stdout: StdioCollector {
+            onStreamFinished: {
+                const list = [];
+                for (const line of text.split("\n")) {
+                    const cols = line.split("\t");
+                    if (cols.length === 2)
+                        list.push({ key: cols[0], name: cols[1] });
+                }
+                app.themes = list;
+            }
+        }
+    }
     Process {
         id: menuCounter
         command: [app.engine, "menus"]
@@ -2306,14 +2340,16 @@ Item {
         app: app
         visible: app.showRail
         width: visible ? Tokens.railW : 0
-        anchors { left: parent.left; top: parent.top; bottom: foot.top }
+        x: Tokens.railRight ? parent.width - width : 0
+        anchors { top: parent.top; bottom: foot.top }
     }
 
     Item {
         id: page
-        anchors { left: rail.right; right: parent.right; top: parent.top; bottom: pickBar.top }
-        anchors.leftMargin: app.width < 700 ? Tokens.s4 : Tokens.s6
-        anchors.rightMargin: app.width < 700 ? Tokens.s4 : Tokens.s6
+        // The side panel sits on the left, or on the right when the theme asks.
+        anchors { left: parent.left; right: parent.right; top: parent.top; bottom: pickBar.top }
+        anchors.leftMargin: (Tokens.railRight ? 0 : rail.width) + (app.width < 700 ? Tokens.s4 : Tokens.s6)
+        anchors.rightMargin: (Tokens.railRight ? rail.width : 0) + (app.width < 700 ? Tokens.s4 : Tokens.s6)
         anchors.topMargin: app.short && !app.bare ? Tokens.s3 : Tokens.s5
 
         PageHead {
@@ -2371,7 +2407,9 @@ Item {
     ChooserBar {
         id: pickBar
         app: app
-        anchors { left: rail.right; right: parent.right; bottom: foot.top }
+        anchors { left: parent.left; right: parent.right; bottom: foot.top }
+        anchors.leftMargin: Tokens.railRight ? 0 : rail.width
+        anchors.rightMargin: Tokens.railRight ? rail.width : 0
     }
 
     QuickLook {

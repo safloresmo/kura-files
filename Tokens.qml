@@ -4,24 +4,54 @@ import Quickshell
 import Quickshell.Io
 
 // The look of the whole window: colours, type and spacing in one place.
-// Everything has a built-in value. `~/.config/archivos/tema.json` may replace
-// any of them, and where the desktop publishes a palette taken from the
-// wallpaper (its own file, or the one pywal and its relatives write) the
-// colours follow it.
+// Everything has a built-in value. A theme (a file in `temas/`, here or in
+// `~/.config/archivos/temas/`) may replace any of them, and so may
+// `~/.config/archivos/tema.json`, which wins over the theme. Where the desktop
+// publishes a palette taken from the wallpaper (its own file, or the one pywal
+// and its relatives write) the colours follow it, unless the theme says no.
 Singleton {
     id: t
 
     readonly property string configDir: Quickshell.env("XDG_CONFIG_HOME") || (Quickshell.env("HOME") + "/.config")
     readonly property string cacheDir: Quickshell.env("XDG_CACHE_HOME") || (Quickshell.env("HOME") + "/.cache")
 
-    // The user's own choices: { paper, paperLift, ink, inkDim, bone, inkOnBone, sun, ui, mono, scale }.
-    property var own: ({})
+    // The user's own choices, over whatever theme is on. Same keys as a theme:
+    // paper, paperLift, ink, inkDim, bone, inkOnBone, sun, ui, mono, scale,
+    // radius, border, railWidth, rail ("left" or "right"), follow, hues.
+    property var personal: ({})
+    // The theme picked in the settings, by file name without ".json". The
+    // folder of the themes that come with the program is told by the window.
+    property string themeName: ""
+    property string themeRoot: ""
+    property var themeMine: ({})
+    property var themeGiven: ({})
+    readonly property var theme: Object.keys(themeMine).length > 0 ? themeMine : themeGiven
+    // Both layers as one: what the user set by hand, then the theme.
+    readonly property var own: {
+        const all = {};
+        for (const k in theme)
+            all[k] = theme[k];
+        for (const k in personal)
+            all[k] = personal[k];
+        return all;
+    }
+    function amount(key, base, low, high) {
+        const v = own[key];
+        return typeof v === "number" && v >= low && v <= high ? v : base;
+    }
+    // A file kind's own colour, when the theme names one.
+    function hue(kind) {
+        const table = own.hues;
+        return table && usable(table[kind]) ? table[kind] : "";
+    }
+    readonly property bool railRight: own.rail === "right"
     // The desktop's palette, by role, and whether it is meant to be followed.
     property var fromDesk: ({})
     property var wal: ({})
     readonly property var desk: Object.keys(fromDesk).length > 0 ? fromDesk : wal
     property var deskScheme: null
-    property bool follow: true
+    property bool followDesk: true
+    readonly property bool follow: followDesk && own.follow !== false
     property string deskFont: ""
     property var screenScales: ({})
 
@@ -51,6 +81,11 @@ Singleton {
     }
 
     readonly property color paper: tone("paper", "surface", "#000000")
+    // On light paper the soft colours of the file kinds are deepened to stay readable.
+    readonly property bool light: 0.299 * paper.r + 0.587 * paper.g + 0.114 * paper.b > 0.5
+    function onPaper(colour) {
+        return light ? Qt.darker(colour, 1.9) : colour;
+    }
     readonly property color paperLift: tone("paperLift", "surfaceContainerLow", "#0a0a0a")
     readonly property color ink: tone("ink", "onSurface", "#cdc4ba")
     // A palette that only names its text colour gets the dimmer one from it.
@@ -68,7 +103,7 @@ Singleton {
     readonly property color tint10: faded(ink, 0.10)
     readonly property color tint16: faded(ink, 0.16)
     readonly property color sun: tone("sun", "primary", "#e2342a")
-    readonly property color alert: "#e2342a"
+    readonly property color alert: usable(own.alert) ? own.alert : "#e2342a"
 
     readonly property string ui: usable(own.ui) ? own.ui : (deskFont !== "" ? deskFont : "Space Grotesk")
     readonly property string mono: usable(own.mono) ? own.mono : (deskFont !== "" ? deskFont : "SpaceMono Nerd Font")
@@ -100,9 +135,9 @@ Singleton {
     readonly property int s6: px(32)
     readonly property int s7: px(48)
 
-    readonly property int radius: px(6)
-    readonly property real border: 1
-    readonly property int railW: px(268)
+    readonly property int radius: px(amount("radius", 6, 0, 24))
+    readonly property real border: amount("border", 1, 0, 4)
+    readonly property int railW: px(amount("railWidth", 268, 200, 420))
     readonly property int snap: 90
 
     FileView {
@@ -110,8 +145,24 @@ Singleton {
         watchChanges: true
         printErrors: false
         onFileChanged: reload()
-        onLoaded: t.own = t.parsed(text())
-        onLoadFailed: t.own = ({})
+        onLoaded: t.personal = t.parsed(text())
+        onLoadFailed: t.personal = ({})
+    }
+    FileView {
+        path: t.themeName !== "" ? t.configDir + "/archivos/temas/" + t.themeName + ".json" : ""
+        watchChanges: true
+        printErrors: false
+        onPathChanged: t.themeMine = ({})
+        onFileChanged: reload()
+        onLoaded: t.themeMine = t.parsed(text())
+        onLoadFailed: t.themeMine = ({})
+    }
+    FileView {
+        path: t.themeName !== "" && t.themeRoot !== "" ? t.themeRoot + "/" + t.themeName + ".json" : ""
+        printErrors: false
+        onPathChanged: t.themeGiven = ({})
+        onLoaded: t.themeGiven = t.parsed(text())
+        onLoadFailed: t.themeGiven = ({})
     }
     FileView {
         path: t.cacheDir + "/ryoku/colors.json"
@@ -156,9 +207,9 @@ Singleton {
         onFileChanged: reload()
         onLoaded: {
             const o = t.parsed(text());
-            t.follow = typeof o.followWallpaper === "boolean" ? o.followWallpaper : true;
+            t.followDesk = typeof o.followWallpaper === "boolean" ? o.followWallpaper : true;
         }
-        onLoadFailed: t.follow = true
+        onLoadFailed: t.followDesk = true
     }
     FileView {
         path: t.configDir + "/ryoku/shell.json"

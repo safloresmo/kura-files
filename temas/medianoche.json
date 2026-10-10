@@ -1,0 +1,12 @@
+{
+    "name": "Medianoche",
+    "follow": false,
+    "paper": "#0b1220",
+    "paperLift": "#111a2c",
+    "ink": "#d6e2f5",
+    "inkDim": "#93a4c0",
+    "bone": "#d6e2f5",
+    "inkOnBone": "#0b1220",
+    "sun": "#6ea8ff",
+    "radius": 10
+}

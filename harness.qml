@@ -14,10 +14,17 @@ ShellRoot {
         implicitHeight: Number(Quickshell.env("HARNESS_H")) || 900
         color: Tokens.paper
 
-        App {
-            id: app
-            onQuit: Qt.quit()
+        // The window's own colour, as an item, so a picture of the stage has it.
+        Rectangle {
+            id: stage
             anchors.fill: parent
+            color: Tokens.paper
+
+            App {
+                id: app
+                onQuit: Qt.quit()
+                anchors.fill: parent
+            }
         }
     }
 
@@ -47,6 +54,9 @@ ShellRoot {
                 query: app.query,
                 deep: app.deep,
                 hidden: app.showHidden,
+                themes: app.themes.map(t => t.key).join(" "),
+                ink: String(Tokens.ink),
+                railRight: Tokens.railRight,
                 labels: app.labelCounts.map(l => l.key + ":" + l.count).join(" "),
                 packs: app.packs.map(p => p.name + ":" + p.count).join(" "),
                 hint: app.dialog.hintText,
@@ -114,7 +124,7 @@ ShellRoot {
         function pref(key: string, on: bool): void { app.setPref(key, on); }
         function set(key: string, value: string): void { app.setPref(key, value); }
         function other(path: string): void { app.otherPath = path; }
-        function shot(file: string): void { app.grabToImage(result => result.saveToFile(file)); }
+        function shot(file: string): void { stage.grabToImage(result => result.saveToFile(file)); }
         function focused(): string { return String(win.backingWindow ? win.backingWindow.active : "?"); }
     }
 }

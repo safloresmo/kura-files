@@ -51,13 +51,35 @@ Linux con [Quickshell](https://quickshell.org) (probado con la 0.3.1) en cualqui
 
 Los colores siguen la paleta que el escritorio saca del fondo de pantalla, si publica una: la de pywal (`~/.cache/wal/colors.json`) o la propia de algunos escritorios. Sin ninguna, usa un tema oscuro propio.
 
-Cualquier valor se puede fijar en `~/.config/archivos/tema.json`:
+### Temas
+
+Un tema es un archivo `.json` que cambia colores, tipografía, redondeo de las esquinas y el lado del panel. Vienen tres de ejemplo en `temas/` (Claro, Medianoche y Terminal) y se eligen en Ajustes → Tema o desde la paleta de comandos.
+
+Para hacer uno propio, deja un archivo en `~/.config/archivos/temas/`, por ejemplo `mio.json`:
+
+```json
+{
+    "name": "Mío",
+    "follow": false,
+    "paper": "#101418", "paperLift": "#161b21",
+    "ink": "#e6e1d8", "inkDim": "#a9a399",
+    "bone": "#e6e1d8", "inkOnBone": "#101418",
+    "sun": "#f2a65a",
+    "ui": "Inter", "mono": "JetBrains Mono",
+    "radius": 10, "border": 1, "railWidth": 268, "rail": "left",
+    "hues": { "pdf": "#ff8a8a", "image": "#ffd27a" }
+}
+```
+
+Todas las claves son opcionales. `follow: false` hace que el tema no tome colores del fondo de pantalla; `rail` admite `left` o `right`; `hues` cambia el color de un tipo de archivo por el nombre de su icono (`pdf`, `image`, `video`, `music`, `code`, `archive`…). Los cambios en el archivo se ven al guardarlo.
+
+Además, cualquier valor se puede fijar por encima del tema en `~/.config/archivos/tema.json`:
 
 ```json
 { "paper": "#0b1626", "ink": "#cfe0f5", "sun": "#6ea8ff", "ui": "Inter", "mono": "JetBrains Mono", "scale": 1.1 }
 ```
 
-Las claves son `paper`, `paperLift`, `ink`, `inkDim`, `bone`, `inkOnBone`, `sun`, `ui`, `mono` y `scale`.
+Admite las mismas claves que un tema, y además `scale`.
 
 ## Instalación
 

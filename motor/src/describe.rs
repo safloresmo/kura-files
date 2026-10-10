@@ -279,6 +279,34 @@ pub fn list(dir: &Path, hidden: bool) -> Result<(), String> {
     Ok(())
 }
 
+/// The themes on offer, the user's own first: `FILE-NAME  SHOWN-NAME` per line.
+pub fn themes(given: &Path) -> Result<(), String> {
+    let config = env::var("XDG_CONFIG_HOME").map(PathBuf::from).unwrap_or_else(|_| home().join(".config"));
+    let mut seen: Vec<String> = Vec::new();
+    for dir in [config.join("archivos/temas"), given.to_path_buf()] {
+        let mut files: Vec<PathBuf> = fs::read_dir(&dir).into_iter().flatten().flatten().map(|entry| entry.path()).collect();
+        files.sort();
+        for file in files {
+            let Some(key) = file_name(&file).strip_suffix(".json").map(str::to_string) else { continue };
+            if key.is_empty() || key.starts_with('.') || seen.contains(&key) {
+                continue;
+            }
+            // The name a theme gives itself, read without taking the file apart.
+            let text = fs::read_to_string(&file).unwrap_or_default();
+            let shown = text
+                .split("\"name\"")
+                .nth(1)
+                .and_then(|rest| rest.split('"').nth(1))
+                .filter(|name| !name.is_empty() && !name.contains(['\t', '\n']))
+                .unwrap_or(&key)
+                .to_string();
+            println!("{key}\t{shown}");
+            seen.push(key);
+        }
+    }
+    Ok(())
+}
+
 /// The same line a search gives, for each of the paths that still exists.
 pub fn stat(paths: &[String]) -> Result<(), String> {
     for path in paths {

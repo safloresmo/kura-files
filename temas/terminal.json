@@ -1,0 +1,16 @@
+{
+    "name": "Terminal",
+    "follow": false,
+    "paper": "#050805",
+    "paperLift": "#0a100a",
+    "ink": "#9be89b",
+    "inkDim": "#5fa85f",
+    "bone": "#9be89b",
+    "inkOnBone": "#050805",
+    "sun": "#e8d77a",
+    "ui": "monospace",
+    "mono": "monospace",
+    "radius": 0,
+    "rail": "right",
+    "hues": { "pdf": "#e8d77a", "image": "#e8d77a", "video": "#e8d77a", "music": "#e8d77a" }
+}

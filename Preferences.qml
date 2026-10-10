@@ -195,6 +195,19 @@ Item {
                     }
                 }
                 Line {
+                    label: "Tema"
+                    note: "Colores, letra, esquinas y lado del panel"
+                    Btn {
+                        anchors.right: parent.right
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: {
+                            const on = sheet.app.themes.find(t => t.key === sheet.store.theme);
+                            return (on ? on.name : "El de siempre").toUpperCase();
+                        }
+                        onAct: sheet.app.chooseTheme()
+                    }
+                }
+                Line {
                     label: "Cabecera"
                     note: "Cuánto sitio ocupa el nombre de la carpeta"
                     Seg {

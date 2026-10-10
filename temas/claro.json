@@ -1,0 +1,11 @@
+{
+    "name": "Claro",
+    "follow": false,
+    "paper": "#f4f1ea",
+    "paperLift": "#ebe7de",
+    "ink": "#1c1b19",
+    "inkDim": "#4a4741",
+    "bone": "#1c1b19",
+    "inkOnBone": "#f4f1ea",
+    "sun": "#c2410c"
+}
