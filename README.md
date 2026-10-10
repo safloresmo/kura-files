@@ -4,6 +4,24 @@ Gestor de archivos de escritorio para Linux: interfaz en QML sobre Quickshell y 
 
 ![Kura Files](docs/captura.png)
 
+## En movimiento
+
+**Un vistazo:** lista con iconos por tipo, carpetas que se abren en su sitio, cuadrícula y paleta de órdenes.
+
+![Un vistazo](docs/videos/vistazo.gif)
+
+**Temas:** se cambian desde la paleta o desde Ajustes, y cada quien puede escribir el suyo.
+
+![Temas](docs/videos/temas.gif)
+
+**Acciones y etiquetas:** el clic derecho, las etiquetas de color y la instalación de acciones desde un repositorio.
+
+![Acciones y etiquetas](docs/videos/acciones.gif)
+
+**Nube y servidores:** las cuentas se abren como carpetas y un servidor se añade con un formulario.
+
+![Nube y servidores](docs/videos/nube.gif)
+
 ## Qué hace
 
 - Lista, lista compacta, cuadrícula y galería, con miniaturas y vista rápida.
@@ -12,6 +30,7 @@ Gestor de archivos de escritorio para Linux: interfaz en QML sobre Quickshell y 
 - Búsqueda por nombre, dentro del contenido y en toda la carpeta personal con índice (hace falta `plocate`), filtro por tipo y orden por nombre, tamaño, fecha o tipo.
 - Más de 900 extensiones reconocidas, con icono, color y etiqueta.
 - Discos y servidores de red (SFTP y otros por GVFS).
+- Cuentas en la nube (Drive, Dropbox, OneDrive, iCloud y las demás que conoce `rclone`), como carpetas.
 - Envío de archivos por Tailscale y LocalSend.
 - Paleta de comandos (Ctrl+K) y hoja de atajos (F1).
 - Atiende «mostrar en carpeta» de otros programas (`bin/archivos-servicio`).
@@ -57,7 +76,7 @@ Linux con [Quickshell](https://quickshell.org) (probado con la 0.3.1) en cualqui
 
 - Para compilar el motor: Rust.
 - En el sistema: `gio` (GLib y GVFS), `bsdtar`, `sha256sum`, `wl-clipboard` y `jq`.
-- Opcionales: `plocate` para la búsqueda con índice, `git` para instalar acciones, `tailscale` y `localsend` para enviar archivos, y Python con PyGObject para los dos servicios.
+- Opcionales: `rclone` para la nube, `plocate` para la búsqueda con índice, `git` para instalar acciones, `tailscale` y `localsend` para enviar archivos, y Python con PyGObject para los dos servicios.
 - Tipografías: Space Grotesk y SpaceMono Nerd Font; si faltan, se usan las del sistema.
 
 ## Aspecto
