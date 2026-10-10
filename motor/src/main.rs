@@ -15,6 +15,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::{exit, Command};
 
+const PEEK_SECONDS: u64 = 24 * 60 * 60;
+
 const USAGE: &str = "\
 archivos-motor copy|move|drop [--replace|--skip] DEST SRC...
 archivos-motor conflicts DEST SRC...
@@ -31,6 +33,7 @@ archivos-motor chmod MODE PATH
 archivos-motor chmod-tree DIR
 archivos-motor revert (copy|move|new SRC DEST)...
 archivos-motor extract ARCHIVE
+archivos-motor peek ARCHIVE
 archivos-motor compress zip|tar.gz|tar.xz|7z SRC...
 archivos-motor info PATH
 archivos-motor facts PATH
@@ -101,6 +104,7 @@ fn main() {
         ("complete", [text]) => describe::complete(text),
         ("remote", uris) if !uris.is_empty() => describe::remote(uris),
         ("revert", triples) if !triples.is_empty() && triples.len() % 3 == 0 => revert(triples),
+        ("peek", [archive]) => peek(Path::new(archive)),
         ("extract", [archive]) => extract(Path::new(archive)),
         ("compress", [format, sources @ ..]) if !sources.is_empty() => compress(format, sources),
         ("info", [path]) => describe::info(Path::new(path)),
@@ -506,6 +510,18 @@ fn extract(archive: &Path) -> Result<(), String> {
     let name = file_name(archive);
     let target = parent.join(free_name(parent, archive_stem(&name)));
     fs::create_dir(&target).map_err(|e| format!("No se pudo crear la carpeta: {e}"))?;
+    if !unpack(archive, &target) {
+        // The folder is ours, made a moment ago: take the half extracted files with it.
+        let _ = fs::remove_dir_all(&target);
+        return Err(format!("No se pudo extraer: {name}"));
+    }
+    report("new", archive, &target);
+    Ok(())
+}
+
+/// Unpack an archive into a folder that already exists.
+fn unpack(archive: &Path, target: &Path) -> bool {
+    let name = file_name(archive);
     let mut done = Command::new("bsdtar")
         .arg("-xf")
         .arg(archive)
@@ -515,7 +531,7 @@ fn extract(archive: &Path) -> Result<(), String> {
         .map(|s| s.success())
         .unwrap_or(false);
     if !done && name.to_lowercase().ends_with(".rar") {
-        let mut into = target.clone().into_os_string();
+        let mut into = target.as_os_str().to_os_string();
         into.push("/");
         done = Command::new("unrar")
             .args(["x", "-o-", "-idq"])
@@ -525,12 +541,44 @@ fn extract(archive: &Path) -> Result<(), String> {
             .map(|s| s.success())
             .unwrap_or(false);
     }
-    if !done {
-        // The folder is ours, made a moment ago: take the half extracted files with it.
-        let _ = fs::remove_dir_all(&target);
-        return Err(format!("No se pudo extraer: {name}"));
+    done
+}
+
+fn peek_root() -> PathBuf {
+    let cache = env::var("XDG_CACHE_HOME").map(PathBuf::from).unwrap_or_else(|_| PathBuf::from(env::var("HOME").unwrap_or_default()).join(".cache"));
+    cache.join("archivos/dentro")
+}
+
+/// A look inside an archive: its contents unpacked in the cache, kept for a
+/// day. Prints the folder; the same archive, unchanged, gets the same one.
+fn peek(archive: &Path) -> Result<(), String> {
+    use std::hash::{Hash, Hasher};
+    use std::os::unix::fs::MetadataExt;
+    let meta = archive.metadata().map_err(|e| format!("No se pudo leer: {e}"))?;
+    if !meta.is_file() {
+        return Err(format!("No es un archivo: {}", archive.display()));
     }
-    report("new", archive, &target);
+    let root = peek_root();
+    fs::create_dir_all(&root).map_err(|e| format!("No se pudo crear la carpeta: {e}"))?;
+    // Yesterday's looks go first, so the cache does not grow for ever.
+    for entry in fs::read_dir(&root).into_iter().flatten().flatten() {
+        let old = entry.metadata().and_then(|m| m.modified()).ok().and_then(|t| t.elapsed().ok());
+        if old.is_some_and(|age| age.as_secs() > PEEK_SECONDS) {
+            let _ = fs::remove_dir_all(entry.path());
+        }
+    }
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    (archive, meta.len(), meta.mtime()).hash(&mut hasher);
+    let target = root.join(format!("{:016x}", hasher.finish()));
+    if !target.is_dir() {
+        let partial = root.join(format!(".{:016x}.parcial-{}", hasher.finish(), std::process::id()));
+        fs::create_dir(&partial).map_err(|e| format!("No se pudo crear la carpeta: {e}"))?;
+        if !unpack(archive, &partial) || fs::rename(&partial, &target).is_err() {
+            let _ = fs::remove_dir_all(&partial);
+            return Err(format!("No se pudo abrir: {}", file_name(archive)));
+        }
+    }
+    println!("{}", target.display());
     Ok(())
 }
 

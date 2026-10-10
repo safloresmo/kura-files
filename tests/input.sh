@@ -283,6 +283,29 @@ call serverForm; call type other.test; call key $ENTER 0; sleep 1
 call key $ESC 0; sleep 1
 expect "refusing to trust cancels the login" notice "NO SE CONECTÓ A OTHER.TEST · LOGIN DIALOG CANCELLED"
 
+echo "-- looking inside an archive"
+fresh
+mkdir -p "$work/pack/inner"; echo deep >"$work/pack/inner/note.txt"
+(cd "$work/pack" && bsdtar -a -cf "$zone/pack.zip" inner)
+open_at "$zone"
+call click 400 472 1 0; call peek; sleep 1.5
+expect "the archive opens like a folder" names "inner"
+expect "under its own name" shown "pack.zip:/"
+[ ! -e "$zone/pack" ] && echo "ok    and nothing is unpacked beside it" || { echo "FAIL  and nothing is unpacked beside it"; failed=1; }
+
+echo "-- what the user may not do"
+fresh
+mkdir -p "$zone/locked"; chmod 555 "$zone/locked"
+printf '#!/bin/bash\nshift; echo "$@" >"%s/elevated"\n' "$work" >"$work/fake-pkexec"; chmod +x "$work/fake-pkexec"
+pkill -f "qs -p $harness" 2>/dev/null; sleep 0.3
+ARCHIVOS_PKEXEC=$work/fake-pkexec ARCHIVOS_DIR=$zone/locked qs -p "$harness" >"$work/window.log" 2>&1 &
+sleep 4
+call key 78 $((CTRL + SHIFT)); call type x; call key $ENTER 0; sleep 1
+expect "a refusal offers the administrator" notice "NO SE PUDO · HACE FALTA SER ADMINISTRADOR"
+call key $ENTER 0; sleep 1
+[ "$(cat "$work/elevated" 2>/dev/null)" = "mkdir $zone/locked Nueva carpetax" ] && echo "ok    and repeats the same step as root" || { echo "FAIL  and repeats the same step as root: $(cat "$work/elevated" 2>/dev/null)"; failed=1; }
+chmod 755 "$zone/locked"
+
 echo "-- the selection panel"
 open_at "$zone"
 expect "nothing picked, no panel" detail false

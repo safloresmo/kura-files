@@ -79,6 +79,8 @@ Item {
     property var tabs: [{ path: home, back: [], forward: [] }]
     property int tab: 0
     property var remotes: ({})
+    // Archives being looked into: the cache folder of each, and the name to show for it.
+    property var peeks: ({})
     property var thumbs: ({})
     property real zoom: 1.0
     // The layout sheds pieces as the window shrinks: the selection card first,
@@ -333,6 +335,10 @@ Item {
         return p || "/";
     }
     function shorten(p) {
+        for (const dir in peeks) {
+            if (p === dir || p.indexOf(dir + "/") === 0)
+                return peeks[dir] + ":" + (p.slice(dir.length) || "/");
+        }
         for (const server of servers) {
             const mounted = remotes[server.uri];
             if (mounted && (p === mounted || p.indexOf(mounted + "/") === 0))
@@ -465,6 +471,22 @@ Item {
         redoStack = redoStack.slice(0, -1);
         redoing = true;
         op(again.args, again.text, again.args[0] === "trash" ? ["untrash"].concat(again.args.slice(1)) : "auto");
+    }
+    // What asks for the administrator's password and runs a command as root.
+    readonly property string elevator: Quickshell.env("ARCHIVOS_PKEXEC") || "pkexec"
+    // Whether a failed engine command is worth repeating as root. The trash is
+    // left out: root has a different one.
+    function canElevate(command, why) {
+        const kinds = ["copy", "move", "drop", "mkdir", "touch", "rename", "rename-many", "delete", "chmod", "chmod-tree", "extract", "compress", "link"];
+        return command[0] === engine && kinds.indexOf(command[1]) >= 0 && /os error 13|permission denied|permiso denegado/i.test(why);
+    }
+    function offerElevated(command, okText, failText) {
+        // The command comes as a list of the process, not as an array of ours.
+        const asRoot = [elevator];
+        for (let i = 0; i < command.length; i++)
+            asRoot.push(String(command[i]));
+        dialog.confirm("PERMISO DENEGADO", "Tu usuario no puede hacer esto aquí. ¿Repetirlo como administrador? Te pedirá la contraseña y no se podrá deshacer.",
+            () => run(asRoot, okText, failText, null), "COMO ADMINISTRADOR");
     }
     function pushUndo(step) {
         undoStack = undoStack.concat([step]).slice(-40);
@@ -735,6 +757,16 @@ Item {
         say("EXTRAYENDO…");
         op(["extract", list[0].path], "EXTRAÍDO · " + list[0].name.toUpperCase());
     }
+    // Look inside an archive without unpacking it next to the original.
+    function peek() {
+        const list = picked().filter(e => !e.isDir && Fmt.icon(e.name, false) === "archive");
+        if (list.length !== 1)
+            return;
+        say("ABRIENDO " + list[0].name.toUpperCase() + "…");
+        peeker.name = list[0].name;
+        peeker.command = [engine, "peek", list[0].path];
+        peeker.running = true;
+    }
     function invertMarks() {
         const next = {};
         const base = markedCount > 0 ? marked : (selected ? ({ [selected.path]: true }) : ({}));
@@ -960,6 +992,7 @@ Item {
             });
         }
         if (one && !one.isDir && Fmt.icon(one.name, false) === "archive")
+            items.push({ label: "Ver por dentro", act: () => peek() });
             items.push({ label: "Extraer aquí", act: () => extract() });
         if (one && one.isDir)
             items.push({ label: isBookmarked(one.path) ? "Quitar marcador" : "Añadir a marcadores", hint: "CTRL+D", act: () => toggleBookmark(one.path) });
@@ -1035,6 +1068,7 @@ Item {
                 add("Comprimir en .7z", "ACCIÓN", () => compress("7z"));
             }
             if (n === 1 && !list[0].isDir && Fmt.icon(list[0].name, false) === "archive")
+                add("Ver por dentro sin extraer", "ACCIÓN", () => peek());
                 add("Extraer aquí", "ACCIÓN", () => extract());
             add("Pegar aquí", "CTRL+V", () => paste());
             add("Nueva carpeta", "CTRL+SHIFT+N", () => newFolder());
@@ -1552,6 +1586,13 @@ Item {
                     app.redoStack = [];
                 if (code === 0)
                     app.say(okText);
+                else if (app.canElevate(command, why)) {
+                    const again = command;
+                    const done = okText;
+                    const sorry = failText;
+                    app.say(failText + " · HACE FALTA SER ADMINISTRADOR", true);
+                    app.offerElevated(again, done, sorry);
+                }
                 else if (/access denied/i.test(why) && command[0] === "tailscale")
                     app.say(failText + " · FALTA EL PERMISO: SUDO TAILSCALE SET --OPERATOR=$USER", true);
                 else
@@ -1733,6 +1774,24 @@ Item {
     Process {
         id: answer
         onExited: app.quit()
+    }
+    Process {
+        id: peeker
+        property string name: ""
+        stdout: StdioCollector { id: peekOut }
+        stderr: StdioCollector { id: peekErr }
+        onExited: code => {
+            const dir = peekOut.text.trim();
+            if (code !== 0 || dir === "") {
+                app.say("NO SE PUDO ABRIR" + (peekErr.text.trim() ? " · " + peekErr.text.trim().toUpperCase() : ""), true);
+                return;
+            }
+            const next = Object.assign({}, app.peeks);
+            next[dir] = name;
+            app.peeks = next;
+            app.say("");
+            app.go(dir);
+        }
     }
     Process {
         id: menuCounter

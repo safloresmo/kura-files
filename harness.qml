@@ -48,6 +48,7 @@ ShellRoot {
                 query: app.query,
                 deep: app.deep,
                 hidden: app.showHidden,
+                shown: app.shorten(app.path),
                 servers: app.servers.map(x => x.name + " " + x.uri).join(" | "),
                 undos: app.undoStack.length,
                 redos: app.redoStack.length,
@@ -100,6 +101,7 @@ ShellRoot {
         function pauseAll(): void { for (const t of app.transfers) app.pauseJob(t.id); }
         function cancelAll(): void { app.cancelTransfer(); }
         function serverForm(): void { app.addServer(); }
+        function peek(): void { app.peek(); }
         function reveal(): void { app.showInFolder(app.selected); }
         function pref(key: string, on: bool): void { app.setPref(key, on); }
         function set(key: string, value: string): void { app.setPref(key, value); }
