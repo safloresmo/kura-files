@@ -92,3 +92,7 @@ archivos ayuda         # el resto de órdenes
 archivos compilar      # vuelve a compilar el motor tras actualizar
 archivos pruebas       # pruebas del motor y de la ventana
 ```
+
+## Licencia
+
+MIT. Consulta `LICENSE`.
