@@ -19,6 +19,7 @@ const USAGE: &str = "\
 archivos-motor copy|move|drop [--replace|--skip] DEST SRC...
 archivos-motor conflicts DEST SRC...
 archivos-motor rename SRC NAME
+archivos-motor rename-many PATTERN SRC...
 archivos-motor mkdir|touch DIR NAME
 archivos-motor trash SRC...
 archivos-motor delete SRC...
@@ -77,6 +78,7 @@ fn main() {
             Ok(())
         }
         ("rename", [source, name]) => rename(Path::new(source), name),
+        ("rename-many", [pattern, sources @ ..]) if !sources.is_empty() => rename_many(pattern, sources),
         ("mkdir", [dir, name]) => create(Path::new(dir), name, true),
         ("touch", [dir, name]) => create(Path::new(dir), name, false),
         ("trash", sources) if !sources.is_empty() => trash(sources),
@@ -163,6 +165,49 @@ fn rename(source: &Path, name: &str) -> Result<(), String> {
     }
     fs::rename(source, &dest).map_err(|e| format!("No se pudo renombrar: {e}"))?;
     report("move", source, &dest);
+    Ok(())
+}
+
+/// The name one item gets from a pattern: `{n}` becomes its number, padded so
+/// the set sorts, and the item keeps its extension unless the pattern has one.
+fn patterned(pattern: &str, index: usize, total: usize, original: &str) -> String {
+    let width = total.to_string().len();
+    let number = format!("{:0width$}", index + 1);
+    let mut name = if pattern.contains("{n}") {
+        pattern.replace("{n}", &number)
+    } else {
+        format!("{pattern} {number}")
+    };
+    if !name.contains('.') {
+        if let Some(dot) = original.rfind('.').filter(|&dot| dot > 0) {
+            name.push_str(&original[dot..]);
+        }
+    }
+    name
+}
+
+/// Rename a set in one go. Nothing moves unless every new name is free.
+fn rename_many(pattern: &str, sources: &[String]) -> Result<(), String> {
+    let mut plan = Vec::new();
+    for (index, source) in sources.iter().enumerate() {
+        let source = PathBuf::from(source);
+        let name = patterned(pattern, index, sources.len(), &file_name(&source));
+        if !valid_name(&name) {
+            return Err(format!("Nombre no válido: {name}"));
+        }
+        let dest = source.parent().unwrap_or(Path::new("/")).join(&name);
+        if dest != source && (taken(&dest) || plan.iter().any(|(_, other)| other == &dest)) {
+            return Err(format!("Ya existe: {name}"));
+        }
+        plan.push((source, dest));
+    }
+    for (source, dest) in plan {
+        if source == dest {
+            continue;
+        }
+        fs::rename(&source, &dest).map_err(|e| format!("No se pudo renombrar: {e}"))?;
+        report("move", &source, &dest);
+    }
     Ok(())
 }
 
@@ -621,5 +666,27 @@ mod tests {
         if let Ok(text) = env::var("COMPLETE") {
             describe::complete(&text).unwrap();
         }
+    }
+
+    #[test]
+    fn patterns_number_and_keep_extensions() {
+        assert_eq!(patterned("viaje {n}", 0, 12, "IMG_1.jpg"), "viaje 01.jpg");
+        assert_eq!(patterned("viaje", 11, 12, "IMG_9.png"), "viaje 12.png");
+        assert_eq!(patterned("{n}-nota.md", 2, 3, "a.txt"), "3-nota.md");
+        assert_eq!(patterned("carpeta {n}", 0, 2, "sin-extension"), "carpeta 1");
+    }
+
+    #[test]
+    fn rename_many_is_all_or_nothing() {
+        let dir = Scratch::new();
+        let a = dir.file("a.txt", "1");
+        let b = dir.file("b.txt", "2");
+        dir.file("x 2.txt", "ocupado");
+        let sources = [a.to_string_lossy().into_owned(), b.to_string_lossy().into_owned()];
+        assert!(rename_many("x {n}", &sources).is_err());
+        assert!(taken(&a) && taken(&b));
+        rename_many("y {n}", &sources).unwrap();
+        assert_eq!(text(&dir.0.join("y 1.txt")), "1");
+        assert_eq!(text(&dir.0.join("y 2.txt")), "2");
     }
 }

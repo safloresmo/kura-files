@@ -24,6 +24,8 @@ Item {
     property var devices: []
     property var counts: ({})
     property var flags: ({})
+    property var changed: ({})
+    property bool unreadable: false
     property var facts: []
     property bool countsReady: false
     property string space: ""
@@ -561,8 +563,15 @@ Item {
     }
     function rename() {
         const list = picked();
-        if (list.length !== 1 || inTrash)
+        if (list.length === 0 || inTrash)
             return;
+        if (list.length > 1) {
+            dialog.ask("RENOMBRAR " + list.length + " · {n} ES EL NÚMERO", "nombre {n}", pattern => {
+                marked = {};
+                op(["rename-many", pattern].concat(list.map(x => x.path)), "RENOMBRADOS · " + list.length + " ELEMENTOS");
+            });
+            return;
+        }
         const e = list[0];
         dialog.ask("RENOMBRAR", e.name, value => op(["rename", e.path, value], "RENOMBRADO · " + value.toUpperCase()));
     }
@@ -749,8 +758,8 @@ Item {
             items.push({ label: "Cortar" + many, hint: "CTRL+X", act: () => hold(true) });
         }
         items.push({ label: "Pegar aquí", hint: "CTRL+V", act: () => paste() });
-        if (one)
-            items.push({ label: "Renombrar", hint: "F2", act: () => rename() });
+        if (n > 0)
+            items.push({ label: "Renombrar" + many, hint: "F2", act: () => rename() });
         if (n > 0)
             items.push({ label: "Duplicar" + many, hint: "CTRL+SHIFT+D", act: () => duplicate() });
         items.push({ label: "Nueva carpeta", hint: "CTRL+SHIFT+N", act: () => newFolder() });
@@ -975,7 +984,9 @@ Item {
     }
     function flagFor(filePath) {
         const flag = flags[filePath];
-        return flag === "link" ? "→" : (flag === "exec" ? "*" : "");
+        const mark = flag === "link" ? "→" : (flag === "exec" ? "*" : "");
+        const git = changed[filePath];
+        return git ? (mark === "" ? git : mark + " " + git) : mark;
     }
     function countLabel(dirPath, long) {
         if (!countsReady || deep)
@@ -1056,6 +1067,8 @@ Item {
     onGridChanged: refresh()
 
     onPathChanged: {
+        unreadable = false;
+        changed = {};
         Qt.callLater(loadPreview);
         const view = settings.views[path];
         sortKey = view ? view.sortKey || 0 : 0;

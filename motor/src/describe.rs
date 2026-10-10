@@ -199,11 +199,47 @@ pub fn facts(path: &Path) -> Result<(), String> {
     Ok(())
 }
 
+/// Inside a git work tree, say which entries of `dir` hold changes:
+/// `git<TAB>LETTER<TAB>PATH`, the letter being `?` for new, `M` for the rest.
+fn git_marks(dir: &Path) {
+    let run = |args: &[&str]| {
+        Command::new("git")
+            .arg("-C")
+            .arg(dir)
+            .args(args)
+            .output()
+            .ok()
+            .filter(|out| out.status.success())
+            .map(|out| String::from_utf8_lossy(&out.stdout).into_owned())
+    };
+    let Some(top) = run(&["rev-parse", "--show-toplevel"]) else { return };
+    let top = PathBuf::from(top.trim());
+    let Some(status) = run(&["status", "--porcelain", "--", "."]) else { return };
+    let Ok(here) = dir.canonicalize() else { return };
+    let mut seen: Vec<(PathBuf, char)> = Vec::new();
+    for line in status.lines().filter(|line| line.len() > 3) {
+        let letter = if line.starts_with("??") { '?' } else { 'M' };
+        let changed = line[3..].rsplit(" -> ").next().unwrap_or("").trim_matches('"');
+        let Ok(inside) = top.join(changed).strip_prefix(&here).map(Path::to_path_buf) else { continue };
+        let Some(first) = inside.components().next() else { continue };
+        let entry = dir.join(first.as_os_str());
+        match seen.iter_mut().find(|(path, _)| path == &entry) {
+            Some((_, kept)) if letter == 'M' => *kept = 'M',
+            Some(_) => {}
+            None => seen.push((entry, letter)),
+        }
+    }
+    for (entry, letter) in seen {
+        println!("git\t{letter}\t{}", entry.display());
+    }
+}
+
 /// What a listing cannot tell by name: `COUNT<TAB>PATH` for how many entries
 /// a sub folder holds, `link<TAB>PATH` for a symbolic link and `exec<TAB>PATH`
 /// for a file that can be run.
 pub fn counts(dir: &Path) -> Result<(), String> {
     let entries = fs::read_dir(dir).map_err(|e| format!("No se pudo leer: {e}"))?;
+    git_marks(dir);
     for entry in entries.flatten() {
         let path = entry.path();
         let Ok(meta) = path.symlink_metadata() else { continue };

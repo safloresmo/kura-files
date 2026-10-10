@@ -114,6 +114,7 @@ Item {
             : app.recent ? "Lo último que abriste, esté donde esté."
             : app.deep ? Fmt.plural(app.rows.length, "resultado", "resultados") + " para «" + app.deepQuery + "» en esta carpeta y sus subcarpetas."
             : !app.ready ? "Leyendo…"
+            : app.unreadable ? "No se puede leer."
             : (app.folderTotal === 0 ? "Sin contenido."
                 : Fmt.plural(app.dirTotal, "carpeta", "carpetas") + " y " + Fmt.plural(app.fileTotal, "archivo", "archivos") + ".")
         color: Tokens.inkMuted

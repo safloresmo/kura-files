@@ -422,7 +422,8 @@ Rectangle {
     Empty {
         anchors.centerIn: view
         visible: card.app.ready && card.app.rows.length === 0
-        caption: card.app.recent ? "Todavía no hay nada reciente."
+        caption: card.app.unreadable && !card.app.deep ? "No tienes permiso para ver esta carpeta."
+            : card.app.recent ? "Todavía no hay nada reciente."
             : card.app.deep ? "Nada coincide con «" + card.app.deepQuery + "» en las subcarpetas."
             : card.app.query !== "" ? "Nada coincide con «" + card.app.query + "»."
             : (card.app.inTrash ? "La papelera está vacía." : "Esta carpeta está vacía.")

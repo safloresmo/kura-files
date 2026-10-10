@@ -142,22 +142,28 @@ Item {
             onStreamFinished: {
                 const map = {};
                 const flags = {};
+                const changed = {};
                 for (const line of text.split("\n")) {
                     const cut = line.indexOf("\t");
                     if (cut <= 0)
                         continue;
                     const what = line.slice(0, cut);
                     const where = line.slice(cut + 1);
-                    if (what === "link" || what === "exec")
+                    if (what === "git")
+                        changed[where.slice(2)] = where.charAt(0);
+                    else if (what === "link" || what === "exec")
                         flags[where] = what;
                     else
                         map[where] = Number(what);
                 }
                 app.flags = flags;
+                app.changed = changed;
                 app.counts = map;
                 app.countsReady = true;
             }
         }
+        // The engine fails only when it cannot read the folder at all.
+        onExited: code => app.unreadable = code !== 0
     }
     Process {
         id: disk

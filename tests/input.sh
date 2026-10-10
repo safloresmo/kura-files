@@ -105,6 +105,10 @@ call key 90 $CTRL; sleep 1.2;      expect "ctrl+z removes the copy" names "folde
 call click 500 340 1 0; call key 68 $((CTRL + SHIFT)); sleep 0.8; call click 909 482 1 0; sleep 1.2
 expect "ctrl+shift+d duplicates" names "folder | a (2).txt | a.txt | b.txt | c.txt"
 call key 90 $CTRL; sleep 1.2
+call click 500 340 1 0; call click 500 380 1 $CTRL; call key $F2 0; sleep 0.4
+call key 65 $CTRL; call type "nota {n}"; call key $ENTER 0; sleep 1.2
+expect "f2 on several renames by pattern" names "folder | c.txt | nota 1.txt | nota 2.txt"
+call key 90 $CTRL; sleep 1.2;      expect "and ctrl+z puts the names back" names "folder | a.txt | b.txt | c.txt"
 call key 78 $CTRL; call key $ENTER 0; sleep 1
 expect "ctrl+n makes a file" names "folder | a.txt | b.txt | c.txt | Sin título.txt"
 
