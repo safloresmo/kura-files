@@ -445,6 +445,17 @@ call click 400 472 1 0; sleep 1.5
 expect "a model gets a picture from the installed thumbnailer" preview "image"
 rm -f "$XDG_DATA_HOME/thumbnailers/models.thumbnailer"
 
+echo "-- the order of names"
+rm -rf "$zone"; mkdir -p "$zone/Zeta" "$zone/alfa"
+for name in a10.txt a2.txt Álbum.txt b.txt A1.txt; do echo x >"$zone/$name"; done
+open_at "$zone"
+expect "numbers count as numbers, and case and accents do not" names "alfa | Zeta | A1.txt | a2.txt | a10.txt | Álbum.txt | b.txt"
+call key 70 $CTRL; call type a; sleep 0.8
+expect "the filter keeps that order" names "alfa | Zeta | A1.txt | a2.txt | a10.txt | Álbum.txt"
+call key $ESC 0; call key $ENTER 0
+echo x >"$zone/a5.txt"; sleep 1.5
+expect "a new file lands in its place" names "alfa | Zeta | A1.txt | a2.txt | a5.txt | a10.txt | Álbum.txt | b.txt"
+
 echo "-- the selection panel"
 open_at "$zone"
 expect "nothing picked, no panel" detail false

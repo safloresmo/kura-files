@@ -1514,15 +1514,31 @@ Item {
     }
 
     // The view reads a sorted, filtered copy of the folder model.
+    // With ARCHIVOS_PERF set, how long the list takes is written to the log.
+    readonly property bool perf: Quickshell.env("ARCHIVOS_PERF") === "1"
+    property real perfFrom: Date.now()
+    // The entries of the folder on show as last read from the model, and the
+    // order they were left in; null when the folder has changed since.
+    property var gathered: null
+    property string gatheredOrder: ""
+    // Set on the way to another folder, until the model has read it: what it
+    // still holds meanwhile belongs to the folder just left.
+    property bool awaitingFolder: false
+    function regather() {
+        gathered = null;
+        Qt.callLater(rebuild);
+    }
     function rebuild() {
-        // A huge folder is put together once, when all of it has been read.
-        if (!deep && !inTrash && dir.status === FolderListModel.Loading && dir.count > 5000)
+        const perfStart = Date.now();
+        const fromDir = !deep && !inTrash;
+        // A folder is put together once, when all of it has been read.
+        if (fromDir && (awaitingFolder || dir.status === FolderListModel.Loading))
             return;
         const keep = selected ? selected.path : "";
         let list = [];
         let dirs = 0;
         let regular = 0;
-        const source = [];
+        let source = [];
         if (deep) {
             for (const e of found)
                 source.push(e);
@@ -1531,23 +1547,33 @@ Item {
             for (const e of trashList)
                 source.push(e);
         } else {
-            for (let i = 0; i < dir.count; i++) {
-                source.push({
-                    name: dir.get(i, "fileName"),
-                    path: dir.get(i, "filePath"),
-                    size: dir.get(i, "fileSize"),
-                    modified: dir.get(i, "fileModified"),
-                    isDir: dir.isFolder(i)
-                });
+            // Read out of the model once per change of the folder: typing in
+            // the filter or picking a kind works on what was gathered then.
+            if (gathered === null) {
+                const fresh = [];
+                for (let i = 0; i < dir.count; i++) {
+                    fresh.push({
+                        name: dir.get(i, "fileName"),
+                        path: dir.get(i, "filePath"),
+                        size: dir.get(i, "fileSize"),
+                        modified: dir.get(i, "fileModified"),
+                        isDir: dir.isFolder(i)
+                    });
+                }
+                gathered = fresh;
+                gatheredOrder = "";
             }
+            source = gathered;
         }
         const kinds = {};
         for (const e of source) {
-            if (!e.isDir) {
-                const ext = Fmt.suffix(e.name);
-                if (ext !== "")
-                    kinds[ext] = (kinds[ext] || 0) + 1;
+            if (e.key === undefined) {
+                e.key = Fmt.sortKey(e.shown || e.name);
+                e.plain = Fmt.plain(e.name);
+                e.ext = e.isDir ? "" : Fmt.suffix(e.name);
             }
+            if (e.ext !== "")
+                kinds[e.ext] = (kinds[e.ext] || 0) + 1;
         }
         typeCounts = Object.keys(kinds).map(ext => ({ ext: ext, count: kinds[ext] }))
             .sort((a, b) => b.count - a.count || a.ext.localeCompare(b.ext)).slice(0, 12);
@@ -1555,19 +1581,7 @@ Item {
             pinType = "";
             onlyType = false;
         }
-        const pinned = e => pinType !== "" && !e.isDir && Fmt.suffix(e.name) === pinType;
-        for (const e of source) {
-            if (onlyType && pinType !== "" && !pinned(e))
-                continue;
-            if (e.isDir)
-                dirs++;
-            else
-                regular++;
-            if (matches(e.name))
-                list.push(e);
-        }
-        for (const e of list)
-            e.key = Fmt.sortKey(e.shown || e.name);
+        const pinned = e => pinType !== "" && e.ext === pinType;
         const flip = sortReversed ? -1 : 1;
         // Recent items arrive newest first; keep that until a column is chosen.
         const asGiven = recent && sortKey === 0 && !sortReversed;
@@ -1587,7 +1601,44 @@ Item {
                 d = Fmt.kind(a.name, a.isDir).localeCompare(Fmt.kind(b.name, b.isDir));
             return flip * (d || Fmt.compareKeys(a.key, b.key));
         };
-        list.sort(order);
+        // A folder is sorted whole, and only when the order asked for changes;
+        // what the filter lets through then comes out already in order.
+        const asked = [sortKey, sortReversed, pinType].join("|");
+        if (fromDir && gatheredOrder !== asked) {
+            if (sortKey === 0 && pinType === "") {
+                // By name, the usual case: one string per entry and the
+                // engine's own sort, which is far quicker than asking a
+                // function about every pair.
+                const tagged = source.map((e, i) => (e.isDir ? "0" : "1") + e.key + "\u0000" + i);
+                tagged.sort();
+                const ordered = tagged.map(t => source[Number(t.slice(t.lastIndexOf("\u0000") + 1))]);
+                if (sortReversed) {
+                    const folders = ordered.filter(e => e.isDir).reverse();
+                    const files = ordered.filter(e => !e.isDir).reverse();
+                    source = folders.concat(files);
+                } else {
+                    source = ordered;
+                }
+                gathered = source;
+            } else {
+                source.sort(order);
+            }
+            gatheredOrder = asked;
+        }
+        // The filter does not mind case or accents: "album" finds "Álbum".
+        const needle = Fmt.plain(query);
+        for (const e of source) {
+            if (onlyType && pinType !== "" && !pinned(e))
+                continue;
+            if (e.isDir)
+                dirs++;
+            else
+                regular++;
+            if (needle === "" || e.plain.indexOf(needle) >= 0)
+                list.push(e);
+        }
+        if (!fromDir)
+            list.sort(order);
         // Opened folders show what they hold right under them, a step in.
         let shown = list;
         if (canExpand && Object.keys(expanded).length > 0) {
@@ -1610,6 +1661,8 @@ Item {
         dirTotal = dirs;
         fileTotal = regular;
         rows = list;
+        if (perf)
+            console.log("perf", "rows", list.length, "built", Date.now() - perfStart, "ms", "since-go", Date.now() - perfFrom, "ms", "status", dir.status);
         const target = wanted !== "" ? list.findIndex(e => e.path === wanted) : -1;
         if (target >= 0) {
             wanted = "";
@@ -1645,15 +1698,19 @@ Item {
     }
     function refresh() {
         countsReady = false;
+        regather();
         sources.reload();
         loadClouds();
         // Opened folders are read again too.
         for (const p in expanded)
             branch.createObject(app, { dirPath: p }).running = true;
     }
-    onGridChanged: refresh()
+    onGridChanged: sources.reload()
 
     onPathChanged: {
+        perfFrom = Date.now();
+        awaitingFolder = true;
+        arrival.restart();
         expanded = ({});
         repo = null;
         pinType = "";
@@ -1709,6 +1766,15 @@ Item {
         focusList();
     }
 
+    // Should the model never say it is ready, the wait ends by itself.
+    Timer {
+        id: arrival
+        interval: 2500
+        onTriggered: {
+            app.awaitingFolder = false;
+            app.regather();
+        }
+    }
     FolderListModel {
         id: dir
         folder: app.url(app.path)
@@ -1716,11 +1782,18 @@ Item {
         showHidden: app.showHidden
         showDotAndDotDot: false
         caseSensitive: false
-        onCountChanged: Qt.callLater(app.rebuild)
-        onStatusChanged: Qt.callLater(app.rebuild)
-        onRowsInserted: Qt.callLater(app.rebuild)
-        onRowsRemoved: Qt.callLater(app.rebuild)
-        onModelReset: Qt.callLater(app.rebuild)
+        onCountChanged: app.regather()
+        onStatusChanged: {
+            if (status === FolderListModel.Ready) {
+                app.awaitingFolder = false;
+                arrival.stop();
+            }
+            app.regather();
+        }
+        onRowsInserted: app.regather()
+        onRowsRemoved: app.regather()
+        onModelReset: app.regather()
+        onDataChanged: app.regather()
     }
 
     FileView {
