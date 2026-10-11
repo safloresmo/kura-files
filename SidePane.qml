@@ -114,6 +114,7 @@ Rectangle {
                 }
                 Text {
                     text: row.modelData.name
+                    textFormat: Text.PlainText
                     color: row.modelData.isDir ? Tokens.inkDim : Tokens.inkFaint
                     font.family: Tokens.ui
                     font.pixelSize: 14

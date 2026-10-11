@@ -456,6 +456,37 @@ call key $ESC 0; call key $ENTER 0
 echo x >"$zone/a5.txt"; sleep 1.5
 expect "a new file lands in its place" names "alfa | Zeta | A1.txt | a2.txt | a5.txt | a10.txt | Álbum.txt | b.txt"
 
+echo "-- saving over a file that is not on show"
+fresh
+echo secret >"$zone/.hidden.txt"
+pkill -f "qs -p $harness" 2>/dev/null; sleep 0.3
+ARCHIVOS_PICK=save ARCHIVOS_PICK_NAME=.hidden.txt ARCHIVOS_PICK_OUT=$work/answer2 ARCHIVOS_DIR=$zone qs -p "$harness" >"$work/window.log" 2>&1 &
+sleep 4
+call pickDone; sleep 1
+expect "a hidden file with that name is asked about" asking "YA EXISTE"
+[ ! -s "$work/answer2" ] && echo "ok    and nothing is answered meanwhile" || { echo "FAIL  and nothing is answered meanwhile"; failed=1; }
+call key $ESC 0
+
+echo "-- an undo that cannot be done"
+fresh
+open_at "$zone"
+call click 400 340 1 0; call key $DELETE 0; sleep 1.2
+echo again >"$zone/a.txt"; sleep 1
+call key 90 $CTRL; sleep 1.5
+expect "stays in the history" undos 1
+expect "and leaves nothing to redo" redos 0
+[ "$(cat "$zone/a.txt")" = again ] && echo "ok    the file that took its place is untouched" || { echo "FAIL  the file that took its place is untouched"; failed=1; }
+
+echo "-- a folder opened in place, marked whole"
+fresh
+mkdir -p "$zone/folder"; echo x >"$zone/folder/kid.txt"
+open_at "$zone"
+call click 400 312 1 0; call key 16777236 0; sleep 0.8
+call key 65 $CTRL; call key $DELETE 0; sleep 1.5
+expect "everything goes, the folder standing for what it holds" rows 0
+call key 90 $CTRL; sleep 1.5
+[ -f "$zone/folder/kid.txt" ] && [ -f "$zone/a.txt" ] && echo "ok    and one undo brings it all back" || { echo "FAIL  and one undo brings it all back"; failed=1; }
+
 echo "-- the selection panel"
 open_at "$zone"
 expect "nothing picked, no panel" detail false

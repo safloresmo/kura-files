@@ -39,8 +39,19 @@ if [ "$remove" = 1 ]; then
         [ "$(readlink -f "$bin/$name" 2>/dev/null)" = "$root/bin/archivos" ] && rm -f "$bin/$name"
     done
     rm -f "$icon"
-    rm -f "$launcher" "$services/org.freedesktop.FileManager1.service" \
-        "$services/org.freedesktop.impl.portal.desktop.kura.service" "$portal"
+    # Only what points at this copy goes: another file manager may have put
+    # a file of the same name there.
+    for file in "$launcher" "$services/org.freedesktop.FileManager1.service" \
+        "$services/org.freedesktop.impl.portal.desktop.kura.service"; do
+        grep -qF "$root/bin/" "$file" 2>/dev/null && rm -f "$file"
+    done
+    rm -f "$portal"
+    # Folders go back to whatever opened them before, if this was set as the default.
+    if command -v xdg-mime >/dev/null 2>&1 && [ "$(xdg-mime query default inode/directory 2>/dev/null)" = archivos.desktop ]; then
+        for list in "${XDG_CONFIG_HOME:-$HOME/.config}/mimeapps.list" "$data/applications/mimeapps.list"; do
+            [ -f "$list" ] && sed -i '/^inode\/directory=archivos\.desktop;\{0,1\}$/d' "$list"
+        done
+    fi
     say "Quitado. Tus ajustes siguen en ${XDG_CONFIG_HOME:-$HOME/.config}/archivos." "Removed. Your settings are still in ${XDG_CONFIG_HOME:-$HOME/.config}/archivos."
     exit 0
 fi
@@ -100,7 +111,7 @@ GenericName=File Manager
 GenericName[es]=Gestor de archivos
 Comment=Browse and organise your files
 Comment[es]=Explora y ordena tus archivos
-Exec=$root/bin/archivos %f
+Exec="$root/bin/archivos" %f
 Icon=kura-files
 Terminal=false
 Categories=System;FileTools;FileManager;
@@ -114,9 +125,13 @@ command -v update-desktop-database >/dev/null 2>&1 && update-desktop-database "$
 if [ "$with_services" = 1 ]; then
     if python3 -c 'import gi' 2>/dev/null; then
         mkdir -p "$services" "$(dirname "$portal")"
-        printf '[D-BUS Service]\nName=org.freedesktop.FileManager1\nExec=%s/bin/archivos-servicio\n' "$root" \
-            >"$services/org.freedesktop.FileManager1.service"
-        printf '[D-BUS Service]\nName=org.freedesktop.impl.portal.desktop.kura\nExec=%s/bin/archivos-portal\n' "$root" \
+        mine=$services/org.freedesktop.FileManager1.service
+        if [ -f "$mine" ] && ! grep -qF "$root/bin/" "$mine"; then
+            say "Otro programa atiende ya «mostrar en carpeta» ($mine); lo dejo como está." "Another program already answers show in folder ($mine); left as it is."
+        else
+            printf '[D-BUS Service]\nName=org.freedesktop.FileManager1\nExec="%s/bin/archivos-servicio"\n' "$root" >"$mine"
+        fi
+        printf '[D-BUS Service]\nName=org.freedesktop.impl.portal.desktop.kura\nExec="%s/bin/archivos-portal"\n' "$root" \
             >"$services/org.freedesktop.impl.portal.desktop.kura.service"
         printf '[portal]\nDBusName=org.freedesktop.impl.portal.desktop.kura\nInterfaces=org.freedesktop.impl.portal.FileChooser;\n' >"$portal"
         say "Servicios puestos. Para que los programas usen su selector de archivos, añade" "Services in place. For programs to use its file chooser, add"

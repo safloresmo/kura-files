@@ -112,6 +112,7 @@ Item {
                 bottomPadding: Tokens.s3
                 width: parent.width - Tokens.s4
                 text: sheet.info.name || Lang.t("Leyendo…")
+                textFormat: Text.PlainText
                 color: Tokens.ink
                 font.family: Tokens.ui
                 font.pixelSize: 20
@@ -203,7 +204,7 @@ Item {
                                         font.pixelSize: 11
                                     }
                                     HoverHandler { cursorShape: Qt.PointingHandCursor }
-                                    TapHandler { onTapped: sheet.app.chmod(((bits.mode & 0o777) ^ bit.mask).toString(8)) }
+                                    TapHandler { onTapped: sheet.app.chmod(((bits.mode & 0o7777) ^ bit.mask).toString(8)) }
                                 }
                             }
                         }

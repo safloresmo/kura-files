@@ -13,17 +13,24 @@ use crate::{file_name, free_name, report, taken, trash, STOP};
 
 const CHUNK: usize = 1 << 20;
 
-struct Progress {
+pub struct Progress {
     done: u64,
     total: u64,
     last: Instant,
 }
 
 impl Progress {
+    /// For work that reports no total, such as taking a move back.
+    pub fn quiet() -> Self {
+        Progress { done: 0, total: 0, last: Instant::now() }
+    }
+
     fn add(&mut self, bytes: u64, name: &str) {
         self.done += bytes;
         if self.last.elapsed() >= Duration::from_millis(120) {
             self.last = Instant::now();
+            // The name is only shown: whatever could end the line is left out.
+            let name: String = name.chars().filter(|c| !c.is_control()).collect();
             println!("progress\t{}\t{}\t{name}", self.done, self.total);
         }
     }
@@ -85,6 +92,8 @@ pub fn run(mode: &str, dest: &Path, sources: &[String], policy: &str) -> Result<
         }
     }
 
+    // What this run has put in place: never something to move out of the way.
+    let mut placed: Vec<PathBuf> = Vec::new();
     for (source, moving) in jobs {
         if STOP.load(Ordering::Relaxed) {
             eprintln!("Cancelado");
@@ -98,22 +107,36 @@ pub fn run(mode: &str, dest: &Path, sources: &[String], policy: &str) -> Result<
         if clash && policy == "--skip" {
             continue;
         }
-        if clash && policy == "--replace" {
-            let old = dest.join(&wanted).to_string_lossy().into_owned();
-            if trash(&[old]).is_err() {
-                eprintln!("No se pudo apartar lo que había: {wanted}");
-                failed = true;
-                continue;
-            }
+        let old = dest.join(&wanted);
+        // Replacing means sending what was there to the trash. Not when the
+        // source lives inside it (it would go along), and not when it is
+        // something this same run brought: those keep both.
+        let inside = source.canonicalize().ok().zip(old.canonicalize().ok()).is_some_and(|(s, o)| s.starts_with(&o));
+        let replaced = clash && policy == "--replace" && !inside && !placed.contains(&old);
+        if replaced && trash(&[old.to_string_lossy().into_owned()]).is_err() {
+            eprintln!("No se pudo apartar lo que había: {wanted}");
+            failed = true;
+            continue;
         }
         let name = free_name(dest, &wanted);
         let target = dest.join(&name);
         let outcome = if moving { relocate(&source, &target, &mut progress) } else { duplicate(&source, &target, &mut progress) };
         match outcome {
-            Ok(()) => report(if moving { "move" } else { "copy" }, &source, &target),
+            Ok(()) => {
+                report(if moving { "move" } else { "copy" }, &source, &target);
+                if replaced {
+                    // So that undoing brings back what was replaced.
+                    report("replaced", &old, &old);
+                }
+                placed.push(target);
+            }
             Err(e) => {
                 eprintln!("{}: {e}", source.display());
                 failed = true;
+                // What was moved aside comes back: the swap did not happen.
+                if replaced && !taken(&old) {
+                    let _ = crate::untrash(&[old.to_string_lossy().into_owned()]);
+                }
             }
         }
     }
@@ -149,7 +172,7 @@ fn duplicate(source: &Path, target: &Path, progress: &mut Progress) -> io::Resul
     copied
 }
 
-fn relocate(source: &Path, target: &Path, progress: &mut Progress) -> io::Result<()> {
+pub fn relocate(source: &Path, target: &Path, progress: &mut Progress) -> io::Result<()> {
     if taken(target) {
         return Err(io::Error::new(io::ErrorKind::AlreadyExists, "el destino ya existe"));
     }

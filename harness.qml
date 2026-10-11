@@ -54,6 +54,7 @@ ShellRoot {
                 query: app.query,
                 deep: app.deep,
                 hidden: app.showHidden,
+                asking: app.dialog.visible ? app.dialog.heading : "",
                 repo: app.repo ? app.repo.branch + " " + app.repo.url : "",
                 page: app.selected ? app.repoPage(app.selected.path) : app.repoPage(""),
                 clouds: app.clouds.map(c => c.name + (c.mounted ? "*" : "")).join(" "),

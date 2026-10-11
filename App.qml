@@ -52,8 +52,20 @@ Item {
     property var redoStack: []
     readonly property var undo: undoStack.length > 0 ? undoStack[undoStack.length - 1] : null
     readonly property var redo: redoStack.length > 0 ? redoStack[redoStack.length - 1] : null
-    property bool undoing: false
-    property bool redoing: false
+    // True while an undo or a redo is running, so a second press waits its turn.
+    property bool stepping: false
+    // Presses that came meanwhile, in order.
+    property var stepQueue: []
+    function nextStep(worked) {
+        stepping = false;
+        // After a failure the rest would act on the wrong step: they are let go.
+        const queue = worked ? stepQueue : [];
+        stepQueue = [];
+        if (queue.length === 0)
+            return;
+        stepQueue = queue.slice(1);
+        Qt.callLater(queue[0] === "undo" ? undoLast : redoLast);
+    }
     property bool recent: false
     // The transfers under way: { id, label, name, done, total, paused }.
     property var transfers: []
@@ -95,6 +107,9 @@ Item {
     readonly property var servers: settings.servers
     property string deepQuery: ""
     property bool deepInside: false
+    // Counts the lists asked for (search, recent, label, everywhere): only the
+    // answer to the latest one is shown.
+    property int asked: 0
     // Folders opened in place in the list: each one's path and what it holds.
     property var expanded: ({})
     readonly property bool canExpand: !grid && !deep && !inTrash && query === ""
@@ -417,11 +432,11 @@ Item {
             say(Lang.t("ESCRIBE UN NOMBRE"), true);
             return;
         }
-        const target = (path === "/" ? "" : path) + "/" + name;
-        if (rows.some(e => e.name === name))
-            dialog.confirm(Lang.t("YA EXISTE"), "«" + name + Lang.t("» ya está en esta carpeta. ¿Reemplazarlo?"), () => pickAnswer([target]), Lang.t("REEMPLAZAR"));
-        else
-            pickAnswer([target]);
+        // The disk is asked, not the list: a hidden or filtered-out file is there all the same.
+        existence.target = (path === "/" ? "" : path) + "/" + name;
+        existence.shownName = name;
+        existence.command = [engine, "exists", existence.target];
+        existence.running = true;
     }
 
     function clean(p) {
@@ -540,12 +555,14 @@ Item {
         noticeBad = bad === true;
         noticeClear.restart();
     }
-    function run(command, okText, failText, undoArgs) {
+    function run(command, okText, failText, undoArgs, role, step) {
         const task = job.createObject(app, {
             command: command,
             okText: okText,
             failText: failText || Lang.t("NO SE PUDO"),
             undoArgs: undoArgs === undefined ? null : undoArgs,
+            role: role || "",
+            step: step || null,
             tid: ++jobCount
         });
         jobTasks[task.tid] = task;
@@ -561,24 +578,26 @@ Item {
             say(Lang.t("NADA QUE DESHACER"), true);
             return;
         }
-        const last = undo;
-        undoStack = undoStack.slice(0, -1);
-        undoing = true;
-        if (last.again)
-            redoStack = redoStack.concat([{ args: last.again, text: last.text }]);
-        else
-            redoStack = [];
-        op(last.args, Lang.t("DESHECHO · ") + last.text, null);
+        if (stepping) {
+            stepQueue = stepQueue.concat(["undo"]);
+            return;
+        }
+        // The step leaves the history only once it has really been taken back.
+        stepping = true;
+        run([engine].concat(undo.args), Lang.t("DESHECHO · ") + undo.text, "", null, "undo", undo);
     }
     function redoLast() {
         if (!redo) {
             say(Lang.t("NADA QUE REHACER"), true);
             return;
         }
+        if (stepping) {
+            stepQueue = stepQueue.concat(["redo"]);
+            return;
+        }
+        stepping = true;
         const again = redo;
-        redoStack = redoStack.slice(0, -1);
-        redoing = true;
-        op(again.args, again.text, again.args[0] === "trash" ? ["untrash"].concat(again.args.slice(1)) : "auto");
+        run([engine].concat(again.args), again.text, "", again.args[0] === "trash" ? ["untrash"].concat(again.args.slice(1)) : "auto", "redo", again);
     }
     // What asks for the administrator's password and runs a command as root.
     readonly property string elevator: Quickshell.env("ARCHIVOS_PKEXEC") || "pkexec"
@@ -596,7 +615,11 @@ Item {
         dialog.confirm(Lang.t("PERMISO DENEGADO"), Lang.t("Tu usuario no puede hacer esto aquí. ¿Repetirlo como administrador? Te pedirá la contraseña y no se podrá deshacer."),
             () => run(asRoot, okText, failText, null), Lang.t("COMO ADMINISTRADOR"));
     }
+    // Steps are told apart by a number of their own: an object handed to a
+    // job and read back is a copy, no longer the one in the history.
+    property int stepCount: 0
     function pushUndo(step) {
+        step.id = ++stepCount;
         undoStack = undoStack.concat([step]).slice(-40);
     }
     function trackJob(task, done, total, name) {
@@ -631,10 +654,19 @@ Item {
             cancelJob(t.id);
     }
     // What an action applies to: the marked rows, or the one under the cursor.
+    // Whether the list still shows the folder just left, on the way to another.
+    readonly property bool stale: !deep && !inTrash && (awaitingFolder || dir.status === FolderListModel.Loading)
     function picked() {
-        if (markedCount > 0)
-            return rows.filter(e => marked[e.path] === true);
-        return selected ? [selected] : [];
+        // Nothing is picked while the rows on show belong to another folder.
+        if (stale)
+            return [];
+        if (markedCount === 0)
+            return selected ? [selected] : [];
+        const list = rows.filter(e => marked[e.path] === true);
+        // With a folder opened in place, it and what it holds can both be
+        // marked: the folder alone stands for all of it.
+        const tops = list.filter(e => e.isDir).map(e => e.path + "/");
+        return tops.length === 0 ? list : list.filter(e => !tops.some(top => e.path.indexOf(top) === 0));
     }
     function label(list) {
         return list.length === 1 ? list[0].name.toUpperCase() : list.length + Lang.t(" ELEMENTOS");
@@ -717,6 +749,9 @@ Item {
         deep = true;
         rail.filter.clear();
         query = "";
+        finder.running = false;
+        labelLister.running = false;
+        ++asked;
         sources.loadRecent();
         focusList();
     }
@@ -767,6 +802,8 @@ Item {
         rail.filter.clear();
         query = "";
         finder.running = false;
+        finder.base = path;
+        finder.ask = ++asked;
         finder.command = [engine, deepInside ? "inside" : "search", path, q].concat(showHidden ? ["hidden"] : []);
         finder.running = true;
         focusList();
@@ -786,7 +823,9 @@ Item {
         deep = true;
         rail.filter.clear();
         query = "";
+        finder.running = false;
         labelLister.running = false;
+        labelLister.ask = ++asked;
         labelLister.command = [engine, "everywhere", q].concat(showHidden ? ["hidden"] : []);
         labelLister.running = true;
         focusList();
@@ -829,10 +868,11 @@ Item {
     function paste() {
         if (inTrash)
             return;
-        if (!clip) {
-            pasteboard.running = true;
-            return;
-        }
+        // The system's clipboard is read first: something copied elsewhere
+        // since then is what the person means now.
+        pasteboard.running = true;
+    }
+    function pasteHeld() {
         // A cut is spent once the move really starts, not if the question is cancelled.
         const held = clip;
         transferTo(clip.cut ? "move" : "copy", path, clip.paths, (clip.cut ? Lang.t("MOVIDO · ") : Lang.t("PEGADO · ")) + clip.text,
@@ -1137,9 +1177,10 @@ Item {
         items.push({ label: Lang.t("Pegar aquí"), hint: "CTRL+V", act: () => paste() });
         if (n > 0)
             items.push({ label: Lang.t("Renombrar") + many, hint: "F2", act: () => rename() });
-        if (n > 0)
+        if (n > 0) {
             items.push({ label: Lang.t("Duplicar") + many, hint: Lang.t("CTRL+SHIFT+D"), act: () => duplicate() });
             items.push({ label: dual ? Lang.t("Enlazar en el otro panel") : Lang.t("Crear enlace"), hint: Lang.t("CTRL+SHIFT+L"), act: () => makeLink() });
+        }
         items.push({ label: Lang.t("Nueva carpeta"), hint: Lang.t("CTRL+SHIFT+N"), act: () => newFolder() });
         items.push({ label: Lang.t("Nuevo archivo"), hint: "CTRL+N", act: () => newFile() });
         if (undo)
@@ -1156,9 +1197,10 @@ Item {
                 ]
             });
         }
-        if (one && !one.isDir && Fmt.icon(one.name, false) === "archive")
+        if (one && !one.isDir && Fmt.icon(one.name, false) === "archive") {
             items.push({ label: Lang.t("Ver por dentro"), act: () => peek() });
             items.push({ label: Lang.t("Extraer aquí"), act: () => extract() });
+        }
         if (one && one.isDir)
             items.push({ label: isBookmarked(one.path) ? Lang.t("Quitar marcador") : Lang.t("Añadir a marcadores"), hint: "CTRL+D", act: () => toggleBookmark(one.path) });
         if (n > 0)
@@ -1232,9 +1274,10 @@ Item {
                 add(Lang.t("Comprimir en .tar.gz"), Lang.t("ACCIÓN"), () => compress("tar.gz"));
                 add(Lang.t("Comprimir en .7z"), Lang.t("ACCIÓN"), () => compress("7z"));
             }
-            if (n === 1 && !list[0].isDir && Fmt.icon(list[0].name, false) === "archive")
+            if (n === 1 && !list[0].isDir && Fmt.icon(list[0].name, false) === "archive") {
                 add(Lang.t("Ver por dentro sin extraer"), Lang.t("ACCIÓN"), () => peek());
                 add(Lang.t("Extraer aquí"), Lang.t("ACCIÓN"), () => extract());
+            }
             add(Lang.t("Pegar aquí"), "CTRL+V", () => paste());
             add(Lang.t("Nueva carpeta"), Lang.t("CTRL+SHIFT+N"), () => newFolder());
             add(Lang.t("Nuevo archivo"), "CTRL+N", () => newFile());
@@ -1458,11 +1501,30 @@ Item {
         let next = null;
         for (let i = 0; i + 2 < results.length; i += 3) {
             const from = results[i + 1], to = results[i + 2];
-            if (results[i] !== "move" || labels[from] === undefined)
+            if (results[i] !== "move")
                 continue;
-            next = next || Object.assign({}, labels);
-            next[to] = next[from];
-            delete next[from];
+            // The item itself, and whatever it holds when it is a folder.
+            for (const p of Object.keys(next || labels)) {
+                if (p !== from && p.indexOf(from + "/") !== 0)
+                    continue;
+                next = next || Object.assign({}, labels);
+                next[to + p.slice(from.length)] = next[p];
+                delete next[p];
+            }
+        }
+        if (next)
+            saveLabels(next);
+    }
+    // What went to the trash or was deleted no longer wears a label.
+    function dropLabels(paths) {
+        let next = null;
+        for (const gone of paths) {
+            for (const p of Object.keys(next || labels)) {
+                if (p !== gone && p.indexOf(gone + "/") !== 0)
+                    continue;
+                next = next || Object.assign({}, labels);
+                delete next[p];
+            }
         }
         if (next)
             saveLabels(next);
@@ -1482,6 +1544,9 @@ Item {
         rail.filter.clear();
         query = "";
         found = [];
+        finder.running = false;
+        labelLister.running = false;
+        labelLister.ask = ++asked;
         labelLister.command = [engine, "stat"].concat(Object.keys(labels).filter(p => labels[p] === key));
         labelLister.running = true;
         focusList();
@@ -1660,7 +1725,11 @@ Item {
         list = shown;
         dirTotal = dirs;
         fileTotal = regular;
+        // Leaving a huge folder frees a lot at once: hand it back now.
+        const shrank = rows.length > 5000 && list.length < rows.length / 2;
         rows = list;
+        if (shrank)
+            Qt.callLater(gc);
         if (perf)
             console.log("perf", "rows", list.length, "built", Date.now() - perfStart, "ms", "since-go", Date.now() - perfFrom, "ms", "status", dir.status);
         const target = wanted !== "" ? list.findIndex(e => e.path === wanted) : -1;
@@ -1709,8 +1778,13 @@ Item {
 
     onPathChanged: {
         perfFrom = Date.now();
+        // A search still under way was about the folder just left.
+        ++asked;
+        finder.running = false;
+        labelLister.running = false;
         awaitingFolder = true;
         arrival.restart();
+        stalled.restart();
         expanded = ({});
         repo = null;
         pinType = "";
@@ -1767,6 +1841,19 @@ Item {
     }
 
     // Should the model never say it is ready, the wait ends by itself.
+    // A folder that takes long to read (a server, the cloud) does not keep
+    // showing the one before under its own name.
+    Timer {
+        id: stalled
+        interval: 350
+        onTriggered: {
+            if (app.stale && app.rows.length > 0) {
+                app.rows = [];
+                app.current = -1;
+                app.marked = {};
+            }
+        }
+    }
     Timer {
         id: arrival
         interval: 2500
@@ -1867,6 +1954,12 @@ Item {
             }
             function listen(data) {
                 heard += data;
+                // Another question is open (a rename being typed, say): this
+                // one waits, so an Enter meant for that one cannot answer it.
+                if (dialog.visible) {
+                    later.restart();
+                    return;
+                }
                 const tail = heard.replace(/\s+$/, "");
                 const name = server.name.toUpperCase();
                 if (/Choice:$/.test(tail)) {
@@ -1887,14 +1980,20 @@ Item {
                         dialog.askSecret(Lang.t("CONTRASEÑA · ") + name, text => mount.answer(text));
                         dialog.orElse(() => mount.giveUp());
                     }
-                } else if (/(User|Domain):$/.test(tail)) {
-                    const domain = /Domain:$/.test(tail);
+                } else if (/(User|Domain)( \[[^\]]*\])?:$/.test(tail)) {
+                    // "User [name]: " offers a default; an empty answer takes it.
+                    const domain = /Domain( \[[^\]]*\])?:$/.test(tail);
+                    const offered = /\[([^\]]*)\]:$/.exec(tail);
                     heard = "";
-                    dialog.ask((domain ? Lang.t("DOMINIO · ") : Lang.t("USUARIO · ")) + name, domain ? "WORKGROUP" : "", text => mount.answer(text));
+                    dialog.askAny((domain ? Lang.t("DOMINIO · ") : Lang.t("USUARIO · ")) + name, offered ? offered[1] : "", text => mount.answer(text));
                     dialog.orElse(() => mount.giveUp());
                 }
             }
 
+            property Timer later: Timer {
+                interval: 300
+                onTriggered: mount.listen("")
+            }
             command: [Quickshell.env("ARCHIVOS_GIO") || "gio", "mount", server ? server.uri : ""]
             // The questions are matched by their English wording.
             environment: ({ "LC_ALL": "C" })
@@ -1930,6 +2029,9 @@ Item {
             property var results: []
             property int tid: 0
             property bool paused: false
+            // "undo" or "redo" when the job is one of those, with the step it works on.
+            property string role: ""
+            property var step: null
 
             function finish() {
                 const why = errors.text.trim().split("\n")[0];
@@ -1945,16 +2047,26 @@ Item {
                     }
                 }
                 app.carryLabels(results);
-                if (undoArgs === "auto")
-                    results.length > 0 && app.pushUndo({ text: okText, args: ["revert"].concat(results), again: again });
-                else if (undoArgs !== null && code === 0)
-                    app.pushUndo({ text: okText, args: undoArgs, again: again });
-                if (app.undoing)
-                    app.undoing = false;
-                else if (app.redoing)
-                    app.redoing = false;
-                else if (undoArgs !== null)
-                    app.redoStack = [];
+                if (code === 0 && again && (again[0] === "trash" || again[0] === "delete"))
+                    app.dropLabels(again.slice(1));
+                if (role === "undo") {
+                    if (code === 0) {
+                        const done = step;
+                        app.undoStack = app.undoStack.filter(s => s.id !== done.id);
+                        app.redoStack = done.again ? app.redoStack.concat([{ args: done.again, text: done.text, id: ++app.stepCount }]) : [];
+                    }
+                } else {
+                    if (role === "redo" && (code === 0 || results.length > 0)) {
+                        const done = step;
+                        app.redoStack = app.redoStack.filter(s => s.id !== done.id);
+                    }
+                    if (undoArgs === "auto")
+                        results.length > 0 && app.pushUndo({ text: okText, args: ["revert"].concat(results), again: again });
+                    else if (undoArgs !== null && code === 0)
+                        app.pushUndo({ text: okText, args: undoArgs, again: again });
+                    if (role === "" && undoArgs !== null && (code === 0 || results.length > 0))
+                        app.redoStack = [];
+                }
                 if (code === 0)
                     app.say(okText);
                 else if (app.canElevate(command, why)) {
@@ -1969,6 +2081,8 @@ Item {
                 else
                     app.say(failText + (why ? " · " + Lang.message(why).toUpperCase() : ""), true);
                 app.refresh();
+                if (role !== "")
+                    app.nextStep(code === 0);
                 destroy();
             }
 
@@ -1978,7 +2092,13 @@ Item {
                     if (cols[0] === "progress" && cols.length >= 4) {
                         app.trackJob(task, Number(cols[1]), Number(cols[2]), cols.slice(3).join("\t"));
                     } else if (cols[0] === "done" && cols.length === 4) {
-                        task.results = task.results.concat([cols[1], cols[2], cols[3]]);
+                        // Names come with their tabs and line breaks written as
+                        // escapes; a line whose paths are not whole is not ours.
+                        const whole = f => f.replace(/\\(.)/g, (m, c) => c === "t" ? "\t" : c === "n" ? "\n" : c === "r" ? "\r" : c);
+                        const from = whole(cols[2]);
+                        const to = whole(cols[3]);
+                        if (from.charAt(0) === "/" && to.charAt(0) === "/")
+                            task.results = task.results.concat([cols[1], from, to]);
                     }
                 }
             }
@@ -2119,15 +2239,21 @@ Item {
     }
     Process {
         id: finder
+        // The folder a search started in, and which request it answers: what
+        // comes back late, after the view moved on, is thrown away.
+        property string base: ""
+        property int ask: 0
         stdout: StdioCollector {
             onStreamFinished: {
+                if (finder.ask !== app.asked || !app.deep)
+                    return;
                 const list = [];
                 for (const line of text.split("\n")) {
                     const cols = line.split("\t");
                     if (cols.length < 4)
                         continue;
                     const shown = cols.slice(3).join("\t");
-                    const full = (app.path === "/" ? "" : app.path) + "/" + shown;
+                    const full = (finder.base === "/" ? "" : finder.base) + "/" + shown;
                     list.push({
                         name: full.slice(full.lastIndexOf("/") + 1),
                         shown: shown,
@@ -2140,6 +2266,18 @@ Item {
                 app.found = list;
                 app.rebuild();
             }
+        }
+    }
+    Process {
+        id: existence
+        property string target: ""
+        property string shownName: ""
+        onExited: code => {
+            const target = existence.target;
+            if (code === 0)
+                dialog.confirm(Lang.t("YA EXISTE"), "«" + shownName + Lang.t("» ya está en esta carpeta. ¿Reemplazarlo?"), () => app.pickAnswer([target]), Lang.t("REEMPLAZAR"));
+            else
+                app.pickAnswer([target]);
         }
     }
     Process {
@@ -2201,8 +2339,11 @@ Item {
     }
     Process {
         id: labelLister
+        property int ask: 0
         stdout: StdioCollector {
             onStreamFinished: {
+                if (labelLister.ask !== app.asked || !app.deep)
+                    return;
                 const list = [];
                 for (const line of text.split("\n")) {
                     const cols = line.split("\t");
@@ -2397,6 +2538,13 @@ Item {
                     if (uri.indexOf("file://") === 0)
                         paths.push(decodeURIComponent(uri.slice(7)));
                 }
+                const ours = app.clip !== null && (paths.length === 0
+                    || (paths.length === app.clip.paths.length && paths.every(p => app.clip.paths.indexOf(p) >= 0)));
+                if (ours) {
+                    app.pasteHeld();
+                    return;
+                }
+                app.clip = null;
                 if (paths.length === 0)
                     app.say(Lang.t("NADA QUE PEGAR"), true);
                 else
@@ -2517,6 +2665,8 @@ Item {
                 app.newFile();
             else if (event.key === Qt.Key_Slash)
                 app.focusFilter();
+            else if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && ctrl && app.selected && app.selected.isDir)
+                app.newTab(app.selected.path);
             else if (event.key === Qt.Key_Return || event.key === Qt.Key_Enter)
                 app.open(app.current);
             else if (event.key === Qt.Key_Backspace)
@@ -2527,8 +2677,6 @@ Item {
                 app.erase();
             else if (event.key === Qt.Key_Delete)
                 app.trash();
-            else if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter) && ctrl && app.selected && app.selected.isDir)
-                app.newTab(app.selected.path);
             else if (event.key >= Qt.Key_1 && event.key <= Qt.Key_9 && (event.modifiers & Qt.AltModifier))
                 app.showTab(event.key - Qt.Key_1);
             else if (event.key === Qt.Key_F2)

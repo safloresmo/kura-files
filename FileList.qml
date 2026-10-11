@@ -235,6 +235,7 @@ Rectangle {
                 Text {
                     readonly property string flag: card.app.flagFor(row.modelData.path)
                     text: (row.modelData.shown || row.modelData.name) + (flag !== "" ? "  " + flag : "")
+                    textFormat: Text.PlainText
                     color: row.lit ? Tokens.ink
                         : (row.modelData.name.charAt(0) === "." ? Tokens.inkFaint : (row.modelData.isDir ? Tokens.ink : Tokens.inkDim))
                     font.family: Tokens.ui
@@ -413,6 +414,7 @@ Rectangle {
                 anchors.rightMargin: 10
                 horizontalAlignment: Text.AlignHCenter
                 text: (tile.lit ? "// " : "") + (tile.modelData.shown || tile.modelData.name)
+                textFormat: Text.PlainText
                 color: tile.lit ? Tokens.ink : (tile.modelData.name.charAt(0) === "." ? Tokens.inkFaint : Tokens.inkDim)
                 font.family: Tokens.ui
                 font.pixelSize: 12

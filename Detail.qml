@@ -134,6 +134,7 @@ Rectangle {
             Text {
                 width: parent.width - Tokens.s4 * 2
                 text: card.item ? card.item.name : card.app.title
+                textFormat: Text.PlainText
                 color: Tokens.ink
                 font.family: Tokens.ui
                 font.pixelSize: 18

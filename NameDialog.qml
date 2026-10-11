@@ -13,6 +13,7 @@ Item {
     property bool masked: false
     // Runs when the question is put away without an answer.
     property var refused: null
+    property bool emptyOk: false
     // Turns what is being typed into a line shown under the field.
     property var hint: null
 
@@ -23,10 +24,10 @@ Item {
     function askSecret(title, callback) {
         ask(title, "", callback);
         masked = true;
+        emptyOk = true;
     }
     function ask(title, value, callback) {
-        masked = false;
-        hint = null;
+        settle();
         heading = title;
         done = callback;
         plain = false;
@@ -38,6 +39,7 @@ Item {
     }
     // A question with several answers: `options` is a list of { text, act }.
     function choose(title, text, options) {
+        settle();
         heading = title;
         detail = text;
         done = null;
@@ -53,6 +55,7 @@ Item {
     }
     // A yes or no question; the callback runs only on yes.
     function confirm(title, text, callback, yesLabel) {
+        settle();
         choices = [];
         yesText = yesLabel || Lang.t("SÍ");
         heading = title;
@@ -70,12 +73,33 @@ Item {
         refused = callback;
     }
     function accept() {
-        const value = plain ? "yes" : field.text.trim();
+        // A password is taken as typed, spaces and all.
+        const value = plain ? "yes" : (masked ? field.text : field.text.trim());
+        if (!plain && value === "" && !emptyOk) {
+            // Nothing typed is not an answer: the question stays open.
+            return;
+        }
         const callback = done;
         refused = null;
         close();
-        if (callback && value !== "")
+        if (callback)
             callback(value);
+    }
+    // A line that may be left empty, which then means "the one offered".
+    function askAny(title, value, callback) {
+        ask(title, value, callback);
+        emptyOk = true;
+    }
+    // A question asked while another is open puts that one away as unanswered
+    // first, so whoever asked it is told, and nothing of it leaks into this one.
+    function settle() {
+        const gaveUp = visible ? refused : null;
+        refused = null;
+        masked = false;
+        hint = null;
+        emptyOk = false;
+        if (gaveUp)
+            gaveUp();
     }
     function close() {
         if (!visible)

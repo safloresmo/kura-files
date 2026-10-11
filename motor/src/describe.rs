@@ -138,14 +138,14 @@ fn clock(seconds: f64) -> String {
 pub fn facts(path: &Path) -> Result<(), String> {
     if path.is_dir() {
         if path.join(".git").exists() {
-            let branch = Command::new("git")
+            let branch = git_look()
                 .arg("-C")
                 .arg(path)
                 .args(["rev-parse", "--abbrev-ref", "HEAD"])
                 .output()
                 .map(|out| String::from_utf8_lossy(&out.stdout).trim().to_string())
                 .unwrap_or_default();
-            let changes = Command::new("git")
+            let changes = git_look()
                 .arg("-C")
                 .arg(path)
                 .args(["status", "--porcelain"])
@@ -209,6 +209,16 @@ pub fn facts(path: &Path) -> Result<(), String> {
 
 /// Inside a git work tree, say which entries of `dir` hold changes:
 /// `git<TAB>LETTER<TAB>PATH`, the letter being `?` for new, `M` for the rest.
+/// git, for looking only. A folder that was merely opened must not get to run
+/// anything, and a repository's own settings can name programs to run (a file
+/// monitor, hooks): those are switched off here. Names come out as they are.
+fn git_look() -> Command {
+    let mut git = Command::new("git");
+    git.args(["-c", "core.fsmonitor=false", "-c", "core.hooksPath=/dev/null", "-c", "core.quotepath=false"])
+        .env("GIT_OPTIONAL_LOCKS", "0");
+    git
+}
+
 /// The page of a repository, from the address git fetches it from: empty
 /// when there is none, or when it is not something a browser can open.
 pub fn web_address(origin: &str) -> String {
@@ -243,7 +253,7 @@ pub fn web_address(origin: &str) -> String {
 
 fn git_marks(dir: &Path) {
     let run = |args: &[&str]| {
-        Command::new("git")
+        git_look()
             .arg("-C")
             .arg(dir)
             .args(args)
@@ -273,7 +283,7 @@ fn git_marks(dir: &Path) {
         }
     }
     for (entry, letter) in seen {
-        println!("git\t{letter}\t{}", entry.display());
+        crate::emit(format!("git\t{letter}\t{}", entry.display()), 2);
     }
 }
 
@@ -287,13 +297,13 @@ pub fn counts(dir: &Path) -> Result<(), String> {
         let path = entry.path();
         let Ok(meta) = path.symlink_metadata() else { continue };
         if meta.file_type().is_symlink() {
-            println!("link\t{}", path.display());
+            crate::emit(format!("link\t{}", path.display()), 1);
         }
         if path.is_dir() {
             let count = fs::read_dir(&path).map(|inner| inner.count()).unwrap_or(0);
-            println!("{count}\t{}", path.display());
+            crate::emit(format!("{count}\t{}", path.display()), 1);
         } else if meta.is_file() && meta.permissions().mode() & 0o111 != 0 {
-            println!("exec\t{}", path.display());
+            crate::emit(format!("exec\t{}", path.display()), 1);
         }
     }
     Ok(())
@@ -309,7 +319,7 @@ pub fn list(dir: &Path, hidden: bool) -> Result<(), String> {
         }
         let Ok(meta) = entry.path().metadata().or_else(|_| entry.path().symlink_metadata()) else { continue };
         let kind = if meta.is_dir() { 'd' } else { 'f' };
-        println!("{kind}\t{}\t{}\t{name}", meta.len(), seconds(meta.modified()));
+        crate::emit(format!("{kind}\t{}\t{}\t{name}", meta.len(), seconds(meta.modified())), 3);
     }
     Ok(())
 }
@@ -320,10 +330,16 @@ fn cloud_dir(name: &str) -> PathBuf {
     runtime.join("archivos/nube").join(name)
 }
 
+/// A path as the kernel's list of mounts writes it, read back: a space, a
+/// tab, a line break and a backslash appear there as octal escapes.
+pub fn mount_path(field: &str) -> String {
+    field.replace("\\040", " ").replace("\\011", "\t").replace("\\012", "\n").replace("\\134", "\\")
+}
+
 fn mounted_at(dir: &Path) -> bool {
     let wanted = dir.to_string_lossy();
     fs::read_to_string("/proc/self/mounts")
-        .map(|text| text.lines().any(|line| line.split(' ').nth(1) == Some(wanted.as_ref())))
+        .map(|text| text.lines().any(|line| line.split(' ').nth(1).map(mount_path).as_deref() == Some(wanted.as_ref())))
         .unwrap_or(false)
 }
 
@@ -412,7 +428,7 @@ pub fn stat(paths: &[String]) -> Result<(), String> {
     for path in paths {
         let Ok(meta) = Path::new(path).symlink_metadata() else { continue };
         let kind = if meta.is_dir() { 'd' } else { 'f' };
-        println!("{kind}\t{}\t{}\t{path}", meta.len(), seconds(meta.modified()));
+        crate::emit(format!("{kind}\t{}\t{}\t{path}", meta.len(), seconds(meta.modified())), 3);
     }
     Ok(())
 }
@@ -469,7 +485,7 @@ pub fn everywhere(text: &str, hidden: bool) -> Result<(), String> {
         // The index may be hours old: what is gone is left out.
         let Ok(meta) = Path::new(path).symlink_metadata() else { continue };
         let kind = if meta.is_dir() { 'd' } else { 'f' };
-        println!("{kind}\t{}\t{}\t{path}", meta.len(), seconds(meta.modified()));
+        crate::emit(format!("{kind}\t{}\t{}\t{path}", meta.len(), seconds(meta.modified())), 3);
         found += 1;
         if found >= SEARCH_LIMIT {
             break;
@@ -497,7 +513,7 @@ pub fn search(dir: &Path, text: &str, hidden: bool) -> Result<(), String> {
             if name.to_lowercase().contains(&needle) {
                 let shown = path.strip_prefix(dir).unwrap_or(&path);
                 let kind = if meta.is_dir() { 'd' } else { 'f' };
-                println!("{kind}\t{}\t{}\t{}", meta.len(), seconds(meta.modified()), shown.display());
+                crate::emit(format!("{kind}\t{}\t{}\t{}", meta.len(), seconds(meta.modified()), shown.display()), 3);
                 found += 1;
                 if found >= SEARCH_LIMIT {
                     return Ok(());
@@ -564,7 +580,8 @@ pub fn sum(path: &Path) -> Result<(), String> {
         return Err(format!("No es un archivo: {}", path.display()));
     }
     let out = output_of("sha256sum", &["--"], Some(path));
-    match out.split_whitespace().next() {
+    // A name with a backslash or a line break makes it put a backslash first.
+    match out.trim_start_matches('\\').split_whitespace().next() {
         Some(digest) if digest.len() == 64 => {
             println!("{digest}");
             Ok(())
@@ -640,28 +657,22 @@ fn render_with(path: &Path, exec: &str) -> Option<PathBuf> {
     let thumb = thumbnail(path);
     if !made(&thumb) {
         let _ = fs::create_dir_all(thumb.parent().unwrap_or(Path::new("/")));
-        let source = path.to_string_lossy();
-        let mut command = String::new();
-        let mut chars = exec.chars();
-        while let Some(c) = chars.next() {
-            if c != '%' {
-                command.push(c);
-                continue;
-            }
-            match chars.next() {
-                Some('i') => command.push_str(&quoted(&source)),
-                Some('u') => command.push_str(&quoted(&encode(&source))),
-                Some('o') => command.push_str(&quoted(&thumb.to_string_lossy())),
-                Some('s') => command.push_str("512"),
-                Some('%') => command.push('%'),
-                _ => {}
-            }
-        }
-        let _ = Command::new("sh").arg("-c").arg(&command).output();
+        let source = path.to_string_lossy().into_owned();
+        let target = thumb.to_string_lossy().into_owned();
+        let Ok(command) = command_of(exec, &|code| match code {
+            'i' => Some(vec![source.clone()]),
+            'u' => Some(vec![encode(&source)]),
+            'o' => Some(vec![target.clone()]),
+            's' => Some(vec!["512".to_string()]),
+            _ => None,
+        }) else {
+            return None;
+        };
+        let _ = Command::new(&command[0]).args(&command[1..]).output();
         // Some draw through the display server and fail where its graphics
         // differ from what they expect; without one they draw off screen.
         if !made(&thumb) {
-            let _ = Command::new("sh").arg("-c").arg(&command).env_remove("DISPLAY").output();
+            let _ = Command::new(&command[0]).args(&command[1..]).env_remove("DISPLAY").output();
         }
     }
     made(&thumb).then_some(thumb)
@@ -692,7 +703,7 @@ pub fn thumbs(dir: &Path) -> Result<(), String> {
             None
         };
         if let Some(thumb) = picture {
-            println!("{}\t{}", path.display(), thumb.display());
+            crate::emit(format!("{}\t{}", path.display(), thumb.display()), 1);
         }
     }
     Ok(())
@@ -887,7 +898,7 @@ fn all_scripts() -> Vec<(PathBuf, String)> {
 
 /// The address a pack was fetched from.
 fn origin_of(pack: &Path) -> String {
-    Command::new("git")
+    git_look()
         .arg("-C")
         .arg(pack)
         .args(["config", "--get", "remote.origin.url"])
@@ -923,6 +934,11 @@ pub fn pack_add(address: &str) -> Result<(), String> {
     // A private repository must fail, not sit waiting for a name and a password.
     git.env("GIT_ASKPASS", "true").stdin(std::process::Stdio::null());
     if target.is_dir() {
+        // The same name from somewhere else is another pack, not an update.
+        let known = origin_of(&target);
+        if known.trim_end_matches('/').trim_end_matches(".git") != address.trim_end_matches(".git") {
+            return Err(format!("Ya hay un paquete llamado {name}, de {known}"));
+        }
         git.arg("-C").arg(&target).args(["pull", "--quiet", "--ff-only"]);
     } else {
         git.args(["clone", "--quiet", "--depth", "1", address]).arg(&target);
@@ -1073,27 +1089,106 @@ fn quoted(text: &str) -> String {
     format!("'{}'", text.replace('\'', "'\\''"))
 }
 
-/// An Exec line with its field codes filled in, ready for the shell.
-pub fn filled(exec: &str, paths: &[String]) -> String {
-    let first = paths.first().map(String::as_str).unwrap_or("");
-    let all = paths.iter().map(|path| quoted(path)).collect::<Vec<_>>().join(" ");
-    let mut out = String::new();
-    let mut chars = exec.chars();
+/// An Exec line cut into words the way a launcher does it: spaces separate,
+/// quotes hold a word together and are dropped, a backslash keeps the next
+/// character. No shell reads the line, so nothing in it runs by accident.
+fn words(exec: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut word = String::new();
+    let mut open = false;
+    let mut quote: Option<char> = None;
+    let mut chars = exec.chars().peekable();
     while let Some(c) = chars.next() {
-        if c != '%' {
-            out.push(c);
-            continue;
-        }
-        match chars.next() {
-            Some('f' | 'u') => out.push_str(&quoted(first)),
-            Some('F' | 'U') => out.push_str(&all),
-            Some('d') => out.push_str(&quoted(&Path::new(first).parent().unwrap_or(Path::new("/")).to_string_lossy())),
-            Some('n') => out.push_str(&quoted(&file_name(Path::new(first)))),
-            Some('%') => out.push('%'),
-            _ => {}
+        match (quote, c) {
+            (None, ' ' | '\t') => {
+                if open {
+                    out.push(std::mem::take(&mut word));
+                    open = false;
+                }
+            }
+            (None, '\'' | '"') => {
+                quote = Some(c);
+                open = true;
+            }
+            (Some(q), _) if c == q => quote = None,
+            (None | Some('"'), '\\') if chars.peek().is_some() => {
+                word.push(chars.next().unwrap_or('\\'));
+                open = true;
+            }
+            _ => {
+                word.push(c);
+                open = true;
+            }
         }
     }
+    if open {
+        out.push(word);
+    }
     out
+}
+
+/// The command an Exec line stands for, with its field codes filled in.
+/// `value` gives what a code means: several words for the codes that take a
+/// list, one otherwise. A word that is only a code becomes those words as they
+/// are. A code inside a longer word is written into it. The one place where a
+/// name could turn into a command is a script handed to a shell (`sh -c '…'`):
+/// there the value goes in quoted for that shell, and a script that already
+/// wraps the code in double quotes is refused, because no quoting is safe there.
+pub fn command_of(exec: &str, value: &dyn Fn(char) -> Option<Vec<String>>) -> Result<Vec<String>, String> {
+    const SHELLS: [&str; 6] = ["sh", "bash", "dash", "zsh", "ksh", "fish"];
+    let line = words(exec);
+    let shell = line.first().is_some_and(|program| SHELLS.contains(&file_name(Path::new(program)).as_str()));
+    let mut out: Vec<String> = Vec::new();
+    for (at, word) in line.iter().enumerate() {
+        let script = shell && at > 0 && line[at - 1] == "-c";
+        let mut letters = word.chars();
+        if let (Some('%'), Some(code), None) = (letters.next(), letters.next(), letters.next()) {
+            if let Some(values) = value(code) {
+                out.extend(values);
+                continue;
+            }
+        }
+        let mut made = String::new();
+        let mut chars = word.chars();
+        while let Some(c) = chars.next() {
+            if c != '%' {
+                made.push(c);
+                continue;
+            }
+            match chars.next() {
+                Some('%') => made.push('%'),
+                Some(code) => {
+                    let Some(values) = value(code) else { continue };
+                    if script {
+                        if made.matches('"').count() % 2 == 1 {
+                            return Err("Esta acción no es segura con nombres de archivo: lleva el nombre entre comillas dobles".to_string());
+                        }
+                        made.push_str(&values.iter().map(|v| quoted(v)).collect::<Vec<_>>().join(" "));
+                    } else {
+                        made.push_str(&values.join(" "));
+                    }
+                }
+                None => {}
+            }
+        }
+        out.push(made);
+    }
+    if out.is_empty() {
+        return Err("La acción no dice qué ejecutar".to_string());
+    }
+    Ok(out)
+}
+
+/// What the field codes of a service menu mean for these paths.
+pub fn action_command(exec: &str, paths: &[String]) -> Result<Vec<String>, String> {
+    let first = paths.first().cloned().unwrap_or_default();
+    command_of(exec, &|code| match code {
+        'f' | 'u' => Some(vec![first.clone()]),
+        'F' | 'U' => Some(paths.to_vec()),
+        'd' => Some(vec![Path::new(&first).parent().unwrap_or(Path::new("/")).to_string_lossy().into_owned()]),
+        'n' => Some(vec![file_name(Path::new(&first))]),
+        _ => None,
+    })
 }
 
 /// Run one action of a service menu on the paths, without waiting for it.
@@ -1118,9 +1213,9 @@ pub fn act(file: &Path, id: &str, paths: &[String]) -> Result<(), String> {
     }
     let text = fs::read_to_string(file).map_err(|e| format!("No se pudo leer: {e}"))?;
     let exec = key_of(&text, &format!("Desktop Action {id}"), "Exec").ok_or_else(|| format!("No existe la acción: {id}"))?;
-    Command::new("sh")
-        .arg("-c")
-        .arg(filled(&exec, paths))
+    let command = action_command(&exec, paths)?;
+    Command::new(&command[0])
+        .args(&command[1..])
         .current_dir(folder)
         .spawn()
         .map(|_| ())
@@ -1223,7 +1318,7 @@ pub fn recent() -> Result<(), String> {
     for (_, path) in entries {
         let Ok(meta) = fs::metadata(&path) else { continue };
         let kind = if meta.is_dir() { 'd' } else { 'f' };
-        println!("{kind}\t{}\t{}\t{path}", meta.len(), seconds(meta.modified()));
+        crate::emit(format!("{kind}\t{}\t{}\t{path}", meta.len(), seconds(meta.modified())), 3);
         shown += 1;
         if shown >= 60 {
             break;
@@ -1236,7 +1331,13 @@ pub fn recent() -> Result<(), String> {
 pub fn bookmarks(action: &str, path: Option<&str>) -> Result<(), String> {
     let config = env::var("XDG_CONFIG_HOME").map(PathBuf::from).unwrap_or_else(|_| home().join(".config"));
     let file = config.join("gtk-3.0/bookmarks");
-    let text = fs::read_to_string(&file).unwrap_or_default();
+    // A file that is there but cannot be read is left alone: writing a list
+    // made from nothing would throw the bookmarks away.
+    let text = match fs::read_to_string(&file) {
+        Ok(text) => text,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => String::new(),
+        Err(e) => return Err(format!("No se pudieron leer los marcadores: {e}")),
+    };
     let lines: Vec<&str> = text.lines().filter(|line| !line.trim().is_empty()).collect();
     match (action, path) {
         ("list", _) => {
@@ -1251,9 +1352,11 @@ pub fn bookmarks(action: &str, path: Option<&str>) -> Result<(), String> {
         }
         ("add", Some(path)) | ("remove", Some(path)) => {
             let uri = encode(path);
+            // Compared as paths: other programs write the same place with
+            // other characters escaped.
             let mut kept: Vec<String> = lines
                 .iter()
-                .filter(|line| line.split(' ').next() != Some(uri.as_str()))
+                .filter(|line| line.split(' ').next().and_then(decode).as_deref() != Some(path))
                 .map(|line| line.to_string())
                 .collect();
             if action == "add" {

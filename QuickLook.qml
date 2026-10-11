@@ -57,6 +57,7 @@ Item {
             Text {
                 anchors { left: parent.left; leftMargin: Tokens.s4; right: tag.left; rightMargin: Tokens.s4; verticalCenter: parent.verticalCenter }
                 text: look.item ? look.item.name : ""
+                textFormat: Text.PlainText
                 color: Tokens.ink
                 font.family: Tokens.ui
                 font.pixelSize: Tokens.fRow

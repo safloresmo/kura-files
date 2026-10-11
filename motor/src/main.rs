@@ -49,6 +49,7 @@ archivos-motor cloud-mount NAME
 archivos-motor cloud-unmount NAME
 archivos-motor themes DIR
 archivos-motor languages DIR
+archivos-motor exists PATH
 archivos-motor stat PATH...
 archivos-motor index
 archivos-motor everywhere TEXT [hidden]
@@ -79,9 +80,17 @@ fn main() {
     // Die quietly when the reader goes away, instead of panicking on a closed pipe.
     unsafe {
         signal(13, 0);
-        signal(15, on_terminate as extern "C" fn(i32) as usize);
     }
-    let args: Vec<String> = env::args().skip(1).collect();
+    // Names that are not valid text arrive as close as they can be written,
+    // instead of ending the program on the spot.
+    let args: Vec<String> = env::args_os().skip(1).map(|arg| arg.to_string_lossy().into_owned()).collect();
+    // Only a transfer finishes what it is doing when asked to stop; anything
+    // else just ends, so a newer request never waits on an older one.
+    if matches!(args.first().map(String::as_str), Some("copy" | "move" | "drop")) {
+        unsafe {
+            signal(15, on_terminate as extern "C" fn(i32) as usize);
+        }
+    }
     let Some((command, rest)) = args.split_first() else {
         eprintln!("{USAGE}");
         exit(2);
@@ -136,6 +145,8 @@ fn main() {
         ("cloud-unmount", [name]) => describe::cloud_unmount(name),
         ("themes", [given]) => describe::catalogue("temas", Path::new(given)),
         ("languages", [given]) => describe::catalogue("idiomas", Path::new(given)),
+        // Whether a name is taken on disk, hidden or not: the exit code is the answer.
+        ("exists", [path]) => if taken(Path::new(path)) { Ok(()) } else { Err(String::new()) },
         ("stat", paths) => describe::stat(paths),
         ("index", []) => describe::index(),
         ("everywhere", [text]) => describe::everywhere(text, false),
@@ -193,8 +204,27 @@ pub fn file_name(path: &Path) -> String {
     path.file_name().unwrap_or(OsStr::new("")).to_string_lossy().into_owned()
 }
 
+/// A path as one field of a line: a tab, a line break or a backslash in a
+/// name is written as an escape, so that no name can pass for a line of its own.
+pub fn field(path: &Path) -> String {
+    let text = path.to_string_lossy();
+    if !text.contains(['\t', '\n', '\r', '\\']) {
+        return text.into_owned();
+    }
+    text.replace('\\', "\\\\").replace('\t', "\\t").replace('\n', "\\n").replace('\r', "\\r")
+}
+
+/// Print one line about one item, unless a name in it would break it into
+/// more lines or fields than it has: such an item is left out of the listing
+/// instead of showing up as rows that do not exist.
+pub fn emit(line: String, tabs: usize) {
+    if !line.contains(['\n', '\r']) && line.matches('\t').count() == tabs {
+        println!("{line}");
+    }
+}
+
 pub fn report(kind: &str, source: &Path, dest: &Path) {
-    println!("done\t{kind}\t{}\t{}", source.display(), dest.display());
+    println!("done\t{kind}\t{}\t{}", field(source), field(dest));
 }
 
 fn rename(source: &Path, name: &str) -> Result<(), String> {
@@ -334,7 +364,7 @@ fn trash_cans() -> Vec<(PathBuf, Option<PathBuf>)> {
     let uid = fs::metadata(env::var("HOME").unwrap_or_else(|_| "/".into())).map(|m| m.uid()).unwrap_or(0);
     for line in fs::read_to_string("/proc/mounts").unwrap_or_default().lines() {
         let Some(mount) = line.split(' ').nth(1) else { continue };
-        let top = PathBuf::from(mount.replace("\\040", " "));
+        let top = PathBuf::from(describe::mount_path(mount));
         let can = top.join(format!(".Trash-{uid}"));
         if can.join("info").is_dir() {
             cans.push((can, Some(top)));
@@ -398,7 +428,7 @@ fn trashed() -> Result<(), String> {
         let held = item.can.join("files").join(&item.name);
         let Ok(meta) = held.symlink_metadata() else { continue };
         let kind = if meta.is_dir() { 'd' } else { 'f' };
-        println!("{kind}\t{}\t{}\t{}\t{}", meta.len(), item.deleted, item.original.display(), held.display());
+        crate::emit(format!("{kind}\t{}\t{}\t{}\t{}", meta.len(), item.deleted, item.original.display(), held.display()), 4);
     }
     Ok(())
 }
@@ -427,7 +457,7 @@ fn restore(held: &[String]) -> Result<(), String> {
 }
 
 /// Bring back from any trash the newest entry that came from each original path.
-fn untrash(originals: &[String]) -> Result<(), String> {
+pub fn untrash(originals: &[String]) -> Result<(), String> {
     let everything = all_trashed();
     let mut failed = false;
     for original in originals {
@@ -455,6 +485,17 @@ fn chmod(mode: &str, path: &Path) -> Result<(), String> {
         return Err(format!("Permisos no válidos: {mode}"));
     }
     fs::set_permissions(path, fs::Permissions::from_mode(bits)).map_err(|e| format!("No se pudieron cambiar los permisos: {e}"))
+}
+
+/// Take a moved item home, across disks too, and say so: the window keeps
+/// what it knows about a path (its label) by following these lines.
+fn put_back(from: &Path, home: &Path) -> Result<(), String> {
+    if fs::rename(from, home).is_err() {
+        let mut progress = transfer::Progress::quiet();
+        transfer::relocate(from, home, &mut progress).map_err(|e| format!("No se pudo devolver: {e}"))?;
+    }
+    report("move", from, home);
+    Ok(())
 }
 
 /// Undo earlier results: a copy or a new item goes to the trash, a move goes back.
@@ -502,7 +543,9 @@ fn revert(triples: &[String]) -> Result<(), String> {
         let outcome = match kind {
             "copy" | "new" => trash(&[triple[2].clone()]),
             "move" if taken(source) => Err(format!("Ya existe: {}", source.display())),
-            "move" => fs::rename(dest, source).map_err(|e| format!("No se pudo devolver: {e}")),
+            "move" => put_back(dest, source),
+            // What a replace sent to the trash returns once its place is free.
+            "replaced" => untrash(&[triple[1].clone()]),
             _ => Err(format!("No sé deshacer: {kind}")),
         };
         if let Err(message) = outcome {
@@ -604,6 +647,11 @@ fn peek(archive: &Path) -> Result<(), String> {
             return Err(format!("No se pudo abrir: {}", file_name(archive)));
         }
     }
+    // The folder's date says when it was last looked into, whatever date the
+    // archive gave it: that is what the clean-up above goes by.
+    if let Ok(dir) = fs::File::open(&target) {
+        let _ = dir.set_modified(std::time::SystemTime::now());
+    }
     println!("{}", target.display());
     Ok(())
 }
@@ -694,11 +742,44 @@ mod tests {
     }
 
     #[test]
-    fn exec_lines_get_their_paths_quoted() {
-        let paths = ["/tmp/a b.png".to_string(), "/tmp/it's.png".to_string()];
-        assert_eq!(describe::filled("convert %f out.jpg", &paths), "convert '/tmp/a b.png' out.jpg");
-        assert_eq!(describe::filled("pack %F", &paths), "pack '/tmp/a b.png' '/tmp/it'\\''s.png'");
-        assert_eq!(describe::filled("cd %d && echo 100%% %n", &paths), "cd '/tmp' && echo 100% 'a b.png'");
+    fn replacing_spares_the_source_and_what_just_arrived() {
+        let scratch = Scratch::new();
+        // The source lives inside what replacing would move aside: both stay.
+        let inner = scratch.file("d/foo/foo", "dentro");
+        let d = scratch.0.join("d");
+        transfer::run("copy", &d, &[inner.to_string_lossy().into_owned()], "--replace").unwrap();
+        assert_eq!(text(&inner), "dentro");
+        assert_eq!(text(&d.join("foo (2)")), "dentro");
+        // Two sources with one name: the second does not push the first out.
+        let one = scratch.file("a/x.txt", "uno");
+        let two = scratch.file("b/x.txt", "dos");
+        let dest = scratch.0.join("dest");
+        fs::create_dir(&dest).unwrap();
+        let both = [one.to_string_lossy().into_owned(), two.to_string_lossy().into_owned()];
+        transfer::run("move", &dest, &both, "--replace").unwrap();
+        assert_eq!(text(&dest.join("x.txt")), "uno");
+        assert_eq!(text(&dest.join("x (2).txt")), "dos");
+    }
+
+    #[test]
+    fn names_cannot_pass_for_lines() {
+        assert_eq!(field(Path::new("/tmp/a\tb\nc\\d")), "/tmp/a\\tb\\nc\\\\d");
+        assert_eq!(field(Path::new("/tmp/plain")), "/tmp/plain");
+        assert_eq!(describe::mount_path("/run/media/My\\040Disk"), "/run/media/My Disk");
+    }
+
+    #[test]
+    fn exec_lines_become_commands_without_a_shell() {
+        let paths = ["/tmp/a b.png".to_string(), "/tmp/it's;rm -rf x.png".to_string()];
+        let run = |exec: &str| describe::action_command(exec, &paths);
+        assert_eq!(run("convert %f out.jpg").unwrap(), ["convert", "/tmp/a b.png", "out.jpg"]);
+        assert_eq!(run("pack %F").unwrap(), ["pack", "/tmp/a b.png", "/tmp/it's;rm -rf x.png"]);
+        assert_eq!(run("cp %f %d/twin-of-%n").unwrap(), ["cp", "/tmp/a b.png", "/tmp/twin-of-a b.png"]);
+        assert_eq!(run("tool \"%f\" --rate=100%%").unwrap(), ["tool", "/tmp/a b.png", "--rate=100%"]);
+        // A script for a shell gets each name quoted for it...
+        assert_eq!(run("sh -c 'for f in %F; do echo $f; done'").unwrap()[2], "for f in '/tmp/a b.png' '/tmp/it'\\''s;rm -rf x.png'; do echo $f; done");
+        // ...and one that wraps the name in double quotes is not run at all.
+        assert!(run("sh -c 'echo \"%f\"'").is_err());
     }
 
     #[test]
