@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 use std::process;
 use std::time::{Duration, Instant};
 
-use std::sync::atomic::Ordering;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use crate::{file_name, free_name, report, taken, trash, STOP};
 
@@ -84,6 +84,7 @@ pub fn run(mode: &str, dest: &Path, sources: &[String], policy: &str) -> Result<
         jobs.push((source, moving));
     }
 
+    sweep(dest);
     let mut progress = Progress { done: 0, total: 0, last: Instant::now() };
     for (source, moving) in &jobs {
         let same_disk = source.symlink_metadata().map(|m| m.dev() == dest_device).unwrap_or(false);
@@ -156,10 +157,32 @@ fn weigh(path: &Path) -> u64 {
     }
 }
 
+/// Remove what a copy left half done when it was killed outright, or the
+/// window closed on it: partial files whose maker is no longer running.
+fn sweep(dir: &Path) {
+    let Ok(entries) = fs::read_dir(dir) else { return };
+    for entry in entries.flatten() {
+        let name = entry.file_name().to_string_lossy().into_owned();
+        let maker = name
+            .strip_prefix(".kura-parcial-")
+            .and_then(|rest| rest.split('-').next())
+            .or_else(|| if name.starts_with('.') { name.rsplit_once(".parcial-").map(|(_, pid)| pid) } else { None });
+        let Some(pid) = maker.filter(|pid| !pid.is_empty() && pid.bytes().all(|b| b.is_ascii_digit())) else { continue };
+        if Path::new("/proc").join(pid).exists() {
+            continue;
+        }
+        let path = entry.path();
+        let _ = if path.is_dir() { fs::remove_dir_all(&path) } else { fs::remove_file(&path) };
+    }
+}
+
 /// Copy under a hidden partial name first, so an interrupted copy never looks finished.
 fn duplicate(source: &Path, target: &Path, progress: &mut Progress) -> io::Result<()> {
     let parent = target.parent().unwrap_or(Path::new("/"));
-    let partial = parent.join(format!(".{}.parcial-{}", file_name(target), process::id()));
+    // Named by who is making it, not after the file: a name already at the
+    // length limit leaves no room for anything added to it.
+    static NEXT: AtomicUsize = AtomicUsize::new(0);
+    let partial = parent.join(format!(".kura-parcial-{}-{}", process::id(), NEXT.fetch_add(1, Ordering::Relaxed)));
     let copied = copy_tree(source, &partial, progress).and_then(|()| {
         if taken(target) {
             return Err(io::Error::new(io::ErrorKind::AlreadyExists, "el destino apareció mientras se copiaba"));

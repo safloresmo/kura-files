@@ -235,7 +235,11 @@ fn rename(source: &Path, name: &str) -> Result<(), String> {
     if dest == source {
         return Ok(());
     }
-    if taken(&dest) {
+    // Where capitals do not tell names apart (a FAT disk), the new name
+    // "exists" and is the file itself: that is a change of capitals, not a clash.
+    use std::os::unix::fs::MetadataExt;
+    let itself = source.symlink_metadata().ok().zip(dest.symlink_metadata().ok()).is_some_and(|(a, b)| a.dev() == b.dev() && a.ino() == b.ino());
+    if taken(&dest) && !itself {
         return Err(format!("Ya existe: {name}"));
     }
     fs::rename(source, &dest).map_err(|e| format!("No se pudo renombrar: {e}"))?;
@@ -603,7 +607,8 @@ fn unpack(archive: &Path, target: &Path) -> bool {
         let mut into = target.as_os_str().to_os_string();
         into.push("/");
         done = Command::new("unrar")
-            .args(["x", "-o-", "-idq"])
+            // -p- : an archive locked with a password fails instead of waiting to be asked.
+            .args(["x", "-o-", "-idq", "-p-"])
             .arg(archive)
             .arg(into)
             .status()

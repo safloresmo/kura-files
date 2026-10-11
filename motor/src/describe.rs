@@ -668,6 +668,12 @@ fn render_with(path: &Path, exec: &str) -> Option<PathBuf> {
         }) else {
             return None;
         };
+        // A 3D model is drawn on nothing, so it sits on whatever theme is on
+        // instead of inside a white square.
+        let mut command = command;
+        if file_name(Path::new(&command[0])) == "f3d" {
+            command.insert(1, "--no-background".to_string());
+        }
         let _ = Command::new(&command[0]).args(&command[1..]).output();
         // Some draw through the display server and fail where its graphics
         // differ from what they expect; without one they draw off screen.

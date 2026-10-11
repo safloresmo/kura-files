@@ -1756,10 +1756,13 @@ Item {
         const parent = e.path.slice(0, e.path.lastIndexOf("/")) || "/";
         wanted = e.path;
         forget.restart();
-        if (parent === path)
+        if (parent === path) {
             endSearch();
-        else
+            // Already there: the list is put together again so the cursor lands on it.
+            rebuild();
+        } else {
             go(parent);
+        }
     }
     // Go to the folder that holds `p` and leave the cursor on it.
     function showPath(p) {
