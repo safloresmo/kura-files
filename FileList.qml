@@ -367,7 +367,9 @@ Rectangle {
                     id: thumb
                     anchors.fill: parent
                     visible: status === Image.Ready
-                    source: tile.modelData.isDir ? ""
+                    // Over a network every picture would be a download: icons only.
+                    // Over a network a picture is a download: only the small ones, as they come into view.
+                    source: tile.modelData.isDir || (card.app.far && !(tile.modelData.size <= 8 * 1024 * 1024)) ? ""
                         : Fmt.isImage(tile.modelData.name) ? card.app.url(tile.modelData.path)
                         : card.app.thumbs[tile.modelData.path] ? card.app.url(card.app.thumbs[tile.modelData.path]) : ""
                     asynchronous: true

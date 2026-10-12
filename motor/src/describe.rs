@@ -14,6 +14,7 @@ use crate::file_name;
 
 const SEARCH_LIMIT: usize = 500;
 const ACTION_PATHS: usize = 30;
+const FAR_PREVIEW_BYTES: u64 = 8 * 1024 * 1024;
 const INDEX_SECONDS: u64 = 6 * 60 * 60;
 const INDEX_SKIP: &str = ".git .cache node_modules target";
 /// The action id that stands for a whole script, not a section of a menu.
@@ -38,7 +39,34 @@ fn output_of(program: &str, args: &[&str], path: Option<&Path>) -> String {
         .unwrap_or_default()
 }
 
+/// Whether a path lives somewhere reached over a network: an account in the
+/// cloud, a server, a phone. There, looking inside a file means downloading
+/// it, and listing a folder is a request, so only what is asked for is done.
+pub fn far(path: &Path) -> bool {
+    let wanted = path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
+    let Ok(mounts) = fs::read_to_string("/proc/self/mounts") else { return false };
+    let mut best: (usize, &str) = (0, "");
+    for line in mounts.lines() {
+        let mut fields = line.split(' ');
+        let (Some(_), Some(at), Some(kind)) = (fields.next(), fields.next(), fields.next()) else { continue };
+        let at = mount_path(at);
+        if wanted.starts_with(&at) && at.len() >= best.0 {
+            best = (at.len(), kind);
+        }
+    }
+    let kind = best.1;
+    (kind.starts_with("fuse.") && kind != "fuse.portal") || matches!(kind, "nfs" | "nfs4" | "cifs" | "smb3" | "9p" | "davfs" | "ceph")
+}
+
 fn mime(path: &Path) -> String {
+    if far(path) {
+        // By its name alone: reading the first bytes would fetch the file.
+        let listing = output_of("gio", &["info", "-a", "standard::fast-content-type"], Some(path));
+        return listing
+            .lines()
+            .find_map(|line| line.split_once("standard::fast-content-type: ").map(|(_, kind)| kind.trim().to_string()))
+            .unwrap_or_default();
+    }
     output_of("file", &["--brief", "--mime-type", "--dereference", "--"], Some(path))
 }
 
@@ -136,6 +164,10 @@ fn clock(seconds: f64) -> String {
 /// The few things worth knowing at a glance beyond size and date, by kind of
 /// file: `LABEL<TAB>VALUE` per line. Slow or missing tools just add nothing.
 pub fn facts(path: &Path) -> Result<(), String> {
+    // Everything below reads the file to describe it.
+    if far(path) {
+        return Ok(());
+    }
     if path.is_dir() {
         if path.join(".git").exists() {
             let branch = git_look()
@@ -291,6 +323,11 @@ fn git_marks(dir: &Path) {
 /// a sub folder holds, `link<TAB>PATH` for a symbolic link and `exec<TAB>PATH`
 /// for a file that can be run.
 pub fn counts(dir: &Path) -> Result<(), String> {
+    if far(dir) {
+        // Counting what each folder holds would be one request per folder.
+        println!("far\t{}", dir.display());
+        return Ok(());
+    }
     let entries = fs::read_dir(dir).map_err(|e| format!("No se pudo leer: {e}"))?;
     git_marks(dir);
     for entry in entries.flatten() {
@@ -370,7 +407,14 @@ pub fn cloud_mount(name: &str) -> Result<(), String> {
             .arg("mount")
             .arg(format!("{name}:"))
             .arg(&dir)
-            .args(["--daemon", "--vfs-cache-mode", "writes", "--dir-cache-time", "30s", "--daemon-wait", "20s"])
+            // What is opened stays on disk for the day, so going back to a file
+            // does not fetch it again. Listings are kept only briefly: a
+            // service that cannot say what changed would otherwise hide a new
+            // file for as long as they were kept.
+            .args(["--daemon", "--daemon-wait", "20s"])
+            .args(["--vfs-cache-mode", "full", "--vfs-cache-max-age", "24h", "--vfs-cache-max-size", "5G"])
+            .args(["--dir-cache-time", "1m", "--poll-interval", "1m", "--attr-timeout", "10s"])
+            .args(["--vfs-fast-fingerprint", "--no-checksum", "--buffer-size", "32M"])
             .output()
             .map_err(|_| "Hace falta rclone".to_string())?;
         if !out.status.success() {
@@ -686,9 +730,13 @@ fn render_with(path: &Path, exec: &str) -> Option<PathBuf> {
 
 /// Pictures for every video and PDF in a folder: `PATH<TAB>THUMBNAIL`, as each is ready.
 pub fn thumbs(dir: &Path) -> Result<(), String> {
+    // Each picture would be a download.
+    if far(dir) {
+        return Ok(());
+    }
     const VIDEO: [&str; 6] = ["mp4", "mkv", "webm", "mov", "avi", "m4v"];
-    const DRAWN: [&str; 22] = [
-        "stl", "3mf", "obj", "ply", "glb", "gltf", "step", "stp", "fbx", "dae", "blend", "off", "amf", "docx", "odt", "xlsx", "ods",
+    const DRAWN: [&str; 28] = [
+        "heic", "heif", "avif", "jxl", "cr2", "dng", "stl", "3mf", "obj", "ply", "glb", "gltf", "step", "stp", "fbx", "dae", "blend", "off", "amf", "docx", "odt", "xlsx", "ods",
         "pptx", "odp", "epub", "ttf", "otf",
     ];
     let entries = fs::read_dir(dir).map_err(|e| format!("No se pudo leer: {e}"))?;
@@ -745,18 +793,31 @@ fn drawn(path: &Path) -> Option<PathBuf> {
     render_with(path, &thumbnailer_for(&kinds)?)
 }
 
-pub fn preview(path: &Path, bytes: usize) -> Result<(), String> {
+pub fn preview(path: &Path, bytes: usize, asked: bool) -> Result<(), String> {
     if !path.is_file() {
         println!("none");
         return Ok(());
     }
     let kind = mime(path);
+    // Over a network a preview is a download. A small picture or a text is
+    // worth it; anything bigger, or that has to be fetched whole to be drawn
+    // (a video, a PDF, a 3D model), waits until it is asked for.
+    if !asked && far(path) {
+        let small = path.metadata().map(|meta| meta.len() <= FAR_PREVIEW_BYTES).unwrap_or(false);
+        if !(small && (kind.starts_with("image/") || kind.starts_with("text/"))) {
+            println!("far");
+            return Ok(());
+        }
+    }
     let textual = kind.starts_with("text/")
         || matches!(
             kind.as_str(),
             "application/json" | "application/toml" | "application/x-shellscript" | "application/xml" | "application/javascript"
         );
-    if kind.starts_with("image/") {
+    // Formats the window cannot open by itself (the phone's HEIC among them)
+    // are drawn by whichever thumbnailer knows them.
+    let foreign = matches!(kind.as_str(), "image/heif" | "image/heic" | "image/avif" | "image/jxl" | "image/x-canon-cr2" | "image/x-adobe-dng");
+    if kind.starts_with("image/") && !foreign {
         println!("image {}", path.display());
     } else if kind.starts_with("video/") || kind == "application/pdf" {
         match render(path, kind == "application/pdf") {

@@ -294,6 +294,9 @@ Item {
     }
     // The git repository the folder on show belongs to: { root, branch, url }, or null.
     property var repo: null
+    // The folder on show is reached over a network (the cloud, a server, a
+    // phone): nothing is fetched there unless asked for.
+    property bool far: false
     function git(args, okText) {
         // A repository that wants a name and a password fails at once instead of waiting.
         run(["env", "GIT_ASKPASS=true", "git", "-C", repo.root].concat(args), okText);
@@ -1373,6 +1376,7 @@ Item {
     function loadPreview() {
         const e = entry(current);
         previewer.running = false;
+        resting.stop();
         facter.running = false;
         if (facter.target !== (e ? e.path : path))
             facts = [];
@@ -1386,8 +1390,18 @@ Item {
         if (previewer.target !== e.path)
             preview = { kind: "none" };
         previewer.target = e.path;
-        previewer.command = [engine, "preview", e.path, look.visible ? "60000" : "2500"];
-        previewer.running = true;
+        previewer.command = [engine, "preview", e.path, look.visible ? "60000" : "2500"].concat(look.visible ? ["asked"] : []);
+        // Over a network the cursor has to rest on a file before it is
+        // fetched, so walking down a list does not download every one.
+        if (far && !look.visible)
+            resting.restart();
+        else
+            previewer.running = true;
+    }
+    Timer {
+        id: resting
+        interval: 350
+        onTriggered: previewer.running = true
     }
 
     function matches(name) {
@@ -1562,7 +1576,8 @@ Item {
         return git ? (mark === "" ? git : mark + " " + git) : mark;
     }
     function countLabel(dirPath, long) {
-        if (!countsReady || deep)
+        // Folders reached over a network are not counted: it is a request each.
+        if (!countsReady || deep || far)
             return "";
         const n = counts[dirPath] || 0;
         return long ? Fmt.plural(n, Lang.t("elemento"), Lang.t("elementos")) : n + Lang.t(" elem.");
@@ -1781,6 +1796,7 @@ Item {
 
     onPathChanged: {
         perfFrom = Date.now();
+        far = false;
         // A search still under way was about the folder just left.
         ++asked;
         finder.running = false;
@@ -2183,6 +2199,8 @@ Item {
                     app.preview = { kind: "image", path: first.slice(6) };
                 else if (first === "text")
                     app.preview = { kind: "text", text: text.slice(cut + 1) };
+                else if (first === "far")
+                    app.preview = { kind: "far" };
                 else
                     app.preview = { kind: "none" };
             }

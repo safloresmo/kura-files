@@ -408,14 +408,19 @@ call set language es; sleep 0.6
 echo "-- accounts in the cloud"
 if command -v rclone >/dev/null 2>&1 && command -v fusermount3 >/dev/null 2>&1; then
     # A remote that is only another name for a local folder stands in for a real account.
-    mkdir -p "$work/far"; echo sky >"$work/far/cloud-note.txt"
+    mkdir -p "$work/far"; echo sky >"$work/far/cloud-note.txt"; printf '%%PDF-1.4\n' >"$work/far/big.pdf"
     export RCLONE_CONFIG=$work/rclone.conf
     printf '[skybox]\ntype = alias\nremote = %s\n' "$work/far" >"$RCLONE_CONFIG"
     open_at "$zone"
     expect "the account is listed" clouds "skybox"
     call cloud skybox; sleep 4
-    expect "connecting shows what it holds" names "cloud-note.txt"
+    expect "connecting shows what it holds" names "big.pdf | cloud-note.txt"
     expect "under the account's name" shown "skybox:/"
+    call click 400 312 1 0; sleep 1.5
+    expect "the cursor is on the file that cannot be drawn without all of it" selected "big.pdf"
+    expect "a file that must be fetched whole waits to be asked for" preview "far"
+    call click 400 352 1 0; sleep 1.5
+    expect "a small text shows once the cursor rests on it" preview "text"
     call uncloud skybox; sleep 2
     expect "disconnecting lets it go" clouds "skybox"
     unset RCLONE_CONFIG

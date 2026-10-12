@@ -41,7 +41,7 @@ archivos-motor counts DIR
 archivos-motor search DIR TEXT [hidden]
 archivos-motor inside DIR TEXT [hidden]
 archivos-motor sum PATH
-archivos-motor preview PATH [BYTES]
+archivos-motor preview PATH [BYTES [asked]]
 archivos-motor apps PATH
 archivos-motor list DIR [hidden]
 archivos-motor clouds
@@ -136,8 +136,9 @@ fn main() {
         ("inside", [dir, text]) => describe::inside(Path::new(dir), text, false),
         ("inside", [dir, text, _]) => describe::inside(Path::new(dir), text, true),
         ("sum", [path]) => describe::sum(Path::new(path)),
-        ("preview", [path]) => describe::preview(Path::new(path), 4000),
-        ("preview", [path, bytes]) => describe::preview(Path::new(path), bytes.parse().unwrap_or(4000)),
+        ("preview", [path]) => describe::preview(Path::new(path), 4000, false),
+        ("preview", [path, bytes]) => describe::preview(Path::new(path), bytes.parse().unwrap_or(4000), false),
+        ("preview", [path, bytes, _]) => describe::preview(Path::new(path), bytes.parse().unwrap_or(4000), true),
         ("list", [dir]) => describe::list(Path::new(dir), false),
         ("list", [dir, _]) => describe::list(Path::new(dir), true),
         ("clouds", []) => describe::clouds(),

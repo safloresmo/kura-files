@@ -121,6 +121,16 @@ Rectangle {
                     size: 44
                     color: card.item ? card.app.toneFor(card.item.name, card.item.path, card.item.isDir) : Tokens.inkFaint
                 }
+                Text {
+                    // Over a network the file is only fetched when asked to.
+                    visible: card.app.preview.kind === "far"
+                    anchors { horizontalCenter: parent.horizontalCenter; bottom: parent.bottom; bottomMargin: Tokens.s2 }
+                    text: Lang.t("ESPACIO PARA VERLO")
+                    color: Tokens.inkFaint
+                    font.family: Tokens.mono
+                    font.pixelSize: 9
+                    font.letterSpacing: 1.4
+                }
             }
         }
 
